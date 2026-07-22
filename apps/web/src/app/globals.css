@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-stone-50 text-stone-800 font-sans antialiased;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #pdf-area,
+  #pdf-area * {
+    visibility: visible;
+  }
+  #pdf-area {
+    position: absolute;
+    inset: 0;
+  }
+}
