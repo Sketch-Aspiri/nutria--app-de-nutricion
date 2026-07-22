@@ -1,0 +1,716 @@
+// Esquema de datos de nutria (V2).
+// Convención del repo: tablas y columnas en snake_case, modelos en PascalCase.
+// Los campos de texto clínico se cifran a nivel de aplicación antes de escribirse (fase 8).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums de dominio
+// ---------------------------------------------------------------------------
+
+enum UserRole {
+  NUTRITIONIST @map("nutritionist")
+  ADMIN        @map("admin")
+  END_USER     @map("end_user")
+
+  @@map("user_role")
+}
+
+enum SubscriptionPlan {
+  FREE    @map("free")
+  PRO     @map("pro")
+  CLINICA @map("clinica")
+
+  @@map("subscription_plan")
+}
+
+enum SubscriptionStatus {
+  ACTIVE   @map("active")
+  TRIALING @map("trialing")
+  PAST_DUE @map("past_due")
+  CANCELED @map("canceled")
+  UNPAID   @map("unpaid")
+
+  @@map("subscription_status")
+}
+
+enum Gender {
+  FEMENINO  @map("femenino")
+  MASCULINO @map("masculino")
+  OTRO      @map("otro")
+
+  @@map("gender")
+}
+
+enum PatientStatus {
+  ACTIVO     @map("activo")
+  ARCHIVADO  @map("archivado")
+
+  @@map("patient_status")
+}
+
+enum ActivityLevel {
+  SEDENTARIO @map("sedentario")
+  LIGERO     @map("ligero")
+  MODERADO   @map("moderado")
+  ACTIVO     @map("activo")
+  MUY_ACTIVO @map("muy_activo")
+
+  @@map("activity_level")
+}
+
+enum Goal {
+  PERDIDA_DE_GRASA    @map("perdida_de_grasa")
+  GANANCIA_MUSCULAR   @map("ganancia_muscular")
+  MANTENIMIENTO       @map("mantenimiento")
+  CONTROL_DE_DIABETES @map("control_de_diabetes")
+  MEJORA_DEPORTIVA    @map("mejora_deportiva")
+  OTRO                @map("otro")
+
+  @@map("goal")
+}
+
+enum ContentOrigin {
+  MANUAL     @map("manual")
+  IA         @map("ia")
+  PLANTILLA  @map("plantilla")
+
+  @@map("content_origin")
+}
+
+enum MealPlanStatus {
+  BORRADOR   @map("borrador")
+  ACTIVO     @map("activo")
+  ARCHIVADO  @map("archivado")
+
+  @@map("meal_plan_status")
+}
+
+enum RecipeStatus {
+  SUGERIDA @map("sugerida")
+  ENVIADA  @map("enviada")
+  EN_CURSO @map("en_curso")
+
+  @@map("recipe_status")
+}
+
+enum FoodSource {
+  INCMNSZ @map("incmnsz")
+  USDA    @map("usda")
+  OFF     @map("off")
+  PROPIA  @map("propia")
+
+  @@map("food_source")
+}
+
+enum AppointmentType {
+  PRESENCIAL   @map("presencial")
+  VIDEOLLAMADA @map("videollamada")
+
+  @@map("appointment_type")
+}
+
+enum AppointmentStatus {
+  PROGRAMADA  @map("programada")
+  COMPLETADA  @map("completada")
+  CANCELADA   @map("cancelada")
+  NO_ASISTIO  @map("no_asistio")
+
+  @@map("appointment_status")
+}
+
+enum MessageSender {
+  NUTRITIONIST @map("nutritionist")
+  PATIENT      @map("patient")
+
+  @@map("message_sender")
+}
+
+enum InvoiceStatus {
+  PENDIENTE @map("pendiente")
+  PAGADA    @map("pagada")
+  CANCELADA @map("cancelada")
+
+  @@map("invoice_status")
+}
+
+// ---------------------------------------------------------------------------
+// Identidad y cuentas
+// ---------------------------------------------------------------------------
+
+model User {
+  id              String    @id @default(uuid()) @db.Uuid
+  email           String    @unique
+  passwordHash    String?   @map("password_hash")
+  role            UserRole  @default(NUTRITIONIST)
+  name            String?
+  image           String?
+  emailVerified   DateTime? @map("email_verified")
+  lastLoginAt     DateTime? @map("last_login_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  accounts             Account[]
+  sessions             Session[]
+  nutritionistProfile  NutritionistProfile?
+  subscription         Subscription?
+  aiUsage              AiUsage[]
+  patients             Patient[]             @relation("NutritionistPatients")
+  patientAccount       Patient?              @relation("PatientAccount")
+  planTemplates        PlanTemplate[]
+  recipes              Recipe[]
+  appointments         Appointment[]
+  messages             Message[]
+  invoices             Invoice[]
+  foods                Food[]
+  auditLogs            AuditLog[]
+  emailTokens          EmailVerificationToken[]
+  passwordResetTokens  PasswordResetToken[]
+
+  @@map("users")
+}
+
+model NutritionistProfile {
+  id                 String   @id @default(uuid()) @db.Uuid
+  userId             String   @unique @map("user_id") @db.Uuid
+  nombreCompleto     String   @map("nombre_completo")
+  cedulaProfesional  String?  @map("cedula_profesional")
+  telefono           String?
+  especialidad       String?
+  bio                String?
+  marcaNombre        String?  @map("marca_nombre")
+  marcaColor         String   @default("#065f46") @map("marca_color")
+  marcaLogoUrl       String?  @map("marca_logo_url")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("nutritionist_profiles")
+}
+
+model Subscription {
+  id                   String             @id @default(uuid()) @db.Uuid
+  userId               String             @unique @map("user_id") @db.Uuid
+  stripeCustomerId     String?            @unique @map("stripe_customer_id")
+  stripeSubscriptionId String?            @unique @map("stripe_subscription_id")
+  plan                 SubscriptionPlan   @default(FREE)
+  status               SubscriptionStatus @default(ACTIVE)
+  currentPeriodEnd     DateTime?          @map("current_period_end")
+  cancelAtPeriodEnd    Boolean            @default(false) @map("cancel_at_period_end")
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+model AiUsage {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  mes           String // YYYY-MM
+  generaciones  Int      @default(0)
+  tokensEntrada Int      @default(0) @map("tokens_entrada")
+  tokensSalida  Int      @default(0) @map("tokens_salida")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, mes])
+  @@map("ai_usage")
+}
+
+// Modelos requeridos por el adaptador de Auth.js. Los nombres de campo de
+// Account los define el adaptador y no deben renombrarse.
+model Account {
+  id                String  @id @default(uuid()) @db.Uuid
+  userId            String  @map("user_id") @db.Uuid
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(uuid()) @db.Uuid
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id") @db.Uuid
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// Flujo propio de verificación de correo y recuperación de contraseña:
+// se guarda solo el hash del token, nunca el token en claro.
+model EmailVerificationToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("email_verification_tokens")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+// ---------------------------------------------------------------------------
+// Pacientes y expediente clínico
+// ---------------------------------------------------------------------------
+
+model Patient {
+  id              String        @id @default(uuid()) @db.Uuid
+  nutritionistId  String        @map("nutritionist_id") @db.Uuid
+  userId          String?       @unique @map("user_id") @db.Uuid
+  nombre          String
+  fechaNacimiento DateTime?     @map("fecha_nacimiento") @db.Date
+  genero          Gender        @default(OTRO)
+  email           String?
+  telefono        String?
+  fotoUrl         String?       @map("foto_url")
+  estado          PatientStatus @default(ACTIVO)
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  deletedAt       DateTime?     @map("deleted_at")
+
+  nutritionist User  @relation("NutritionistPatients", fields: [nutritionistId], references: [id], onDelete: Cascade)
+  user         User? @relation("PatientAccount", fields: [userId], references: [id], onDelete: SetNull)
+
+  medicalRecord     MedicalRecord?
+  foodPreference    FoodPreference?
+  measurements      AnthropometryMeasurement[]
+  consultationNotes ConsultationNote[]
+  mealPlans         MealPlan[]
+  recipes           Recipe[]
+  mealLogs          MealLog[]
+  weightLogs        WeightLog[]
+  exerciseLogs      ExerciseLog[]
+  activityPlans     ActivityPlan[]
+  appointments      Appointment[]
+  messages          Message[]
+  invoices          Invoice[]
+
+  @@index([nutritionistId, estado])
+  @@map("patients")
+}
+
+model MedicalRecord {
+  id             String        @id @default(uuid()) @db.Uuid
+  patientId      String        @unique @map("patient_id") @db.Uuid
+  condiciones    Json          @default("[]")
+  antecedentes   String?
+  medicamentos   String?
+  nivelActividad ActivityLevel @default(MODERADO) @map("nivel_actividad")
+  objetivo       Goal          @default(MANTENIMIENTO)
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@map("medical_records")
+}
+
+model AnthropometryMeasurement {
+  id         String   @id @default(uuid()) @db.Uuid
+  patientId  String   @map("patient_id") @db.Uuid
+  fecha      DateTime @db.Date
+  pesoKg     Float?   @map("peso_kg")
+  alturaCm   Float?   @map("altura_cm")
+  cinturaCm  Float?   @map("cintura_cm")
+  caderaCm   Float?   @map("cadera_cm")
+  grasaPct   Float?   @map("grasa_pct")
+  musculoPct Float?   @map("musculo_pct")
+  // Pliegues cutáneos en mm: { tricipital, bicipital, subescapular, suprailiaco }
+  pliegues   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, fecha])
+  @@map("anthropometry_measurements")
+}
+
+model FoodPreference {
+  id                String   @id @default(uuid()) @db.Uuid
+  patientId         String   @unique @map("patient_id") @db.Uuid
+  tipoDieta         String?  @map("tipo_dieta")
+  alergias          Json     @default("[]")
+  disgustos         String?
+  comidasPorDia     Int      @default(3) @map("comidas_por_dia")
+  presupuestoTiempo String   @default("Medio") @map("presupuesto_tiempo")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@map("food_preferences")
+}
+
+// Append-only una vez firmada (NOM-004-SSA3). Texto cifrado en aplicación.
+model ConsultationNote {
+  id               String        @id @default(uuid()) @db.Uuid
+  patientId        String        @map("patient_id") @db.Uuid
+  fecha            DateTime
+  motivo           String?
+  hallazgos        String?
+  plan             String?
+  seguimiento      String?
+  transcripcionUrl String?       @map("transcripcion_url")
+  origen           ContentOrigin @default(MANUAL)
+  firmadaAt        DateTime?     @map("firmada_at")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, fecha])
+  @@map("consultation_notes")
+}
+
+// ---------------------------------------------------------------------------
+// Nutrición: alimentos, planes, plantillas y recetas
+// ---------------------------------------------------------------------------
+
+model Food {
+  id                 String     @id @default(uuid()) @db.Uuid
+  nombre             String
+  // Sin acentos ni mayúsculas: soporta la búsqueda difusa (pg_trgm, fase 3).
+  nombreNormalizado  String     @map("nombre_normalizado")
+  grupoSmae          String     @map("grupo_smae")
+  subgrupo           String?
+  porcionDescripcion String     @map("porcion_descripcion")
+  porcionGramos      Float      @map("porcion_gramos")
+  energiaKcal        Float      @map("energia_kcal")
+  proteinaG          Float      @map("proteina_g")
+  lipidosG           Float      @map("lipidos_g")
+  saturadasG         Float?     @map("saturadas_g")
+  colesterolMg       Float?     @map("colesterol_mg")
+  carbohidratosG     Float      @map("carbohidratos_g")
+  fibraG             Float?     @map("fibra_g")
+  azucarG            Float?     @map("azucar_g")
+  sodioMg            Float?     @map("sodio_mg")
+  potasioMg          Float?     @map("potasio_mg")
+  calcioMg           Float?     @map("calcio_mg")
+  hierroMg           Float?     @map("hierro_mg")
+  acidoFolicoUg      Float?     @map("acido_folico_ug")
+  vitaminaAUg        Float?     @map("vitamina_a_ug")
+  vitaminaCMg        Float?     @map("vitamina_c_mg")
+  indiceGlicemico    Int?       @map("indice_glicemico")
+  // Equivalentes SMAE que aporta la porción: { cereales: 1, grasas: 0.5 }
+  equivalentes       Json       @default("{}")
+  imagenUrl          String?    @map("imagen_url")
+  fuente             FoodSource @default(PROPIA)
+  fuenteRef          String?    @map("fuente_ref")
+  esPublico          Boolean    @default(true) @map("es_publico")
+  nutritionistId     String?    @map("nutritionist_id") @db.Uuid
+  createdAt          DateTime   @default(now()) @map("created_at")
+  updatedAt          DateTime   @updatedAt @map("updated_at")
+  deletedAt          DateTime?  @map("deleted_at")
+
+  nutritionist User?          @relation(fields: [nutritionistId], references: [id], onDelete: Cascade)
+  planItems    MealPlanItem[]
+
+  @@index([nombreNormalizado])
+  @@index([grupoSmae])
+  @@index([nutritionistId])
+  @@map("foods")
+}
+
+model MealPlan {
+  id              String         @id @default(uuid()) @db.Uuid
+  patientId       String         @map("patient_id") @db.Uuid
+  estado          MealPlanStatus @default(BORRADOR)
+  caloriasDiarias Int            @map("calorias_diarias")
+  proteinaG       Int            @map("proteina_g")
+  carbosG         Int            @map("carbos_g")
+  grasaG          Int            @map("grasa_g")
+  nota            String?
+  origen          ContentOrigin  @default(MANUAL)
+  // Copia del cálculo (BMR, TDEE, ecuación usada) al momento de crear el plan.
+  calculoSnapshot Json?          @map("calculo_snapshot")
+  compartidoAt    DateTime?      @map("compartido_at")
+  pdfUrl          String?        @map("pdf_url")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  patient Patient        @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  meals   MealPlanMeal[]
+
+  @@index([patientId, estado])
+  @@map("meal_plans")
+}
+
+model MealPlanMeal {
+  id          String  @id @default(uuid()) @db.Uuid
+  mealPlanId  String  @map("meal_plan_id") @db.Uuid
+  orden       Int
+  nombre      String
+  horario     String?
+  descripcion String?
+
+  mealPlan MealPlan       @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
+  items    MealPlanItem[]
+  mealLogs MealLog[]
+
+  @@index([mealPlanId, orden])
+  @@map("meal_plan_meals")
+}
+
+// Los macros se copian al crear el item: el alimento puede editarse después
+// y el plan impreso del paciente no debe cambiar retroactivamente.
+model MealPlanItem {
+  id                String  @id @default(uuid()) @db.Uuid
+  mealId            String  @map("meal_id") @db.Uuid
+  foodId            String? @map("food_id") @db.Uuid
+  descripcionLibre  String? @map("descripcion_libre")
+  cantidadPorciones Float   @default(1) @map("cantidad_porciones")
+  energiaKcal       Float   @map("energia_kcal")
+  proteinaG         Float   @map("proteina_g")
+  carbohidratosG    Float   @map("carbohidratos_g")
+  lipidosG          Float   @map("lipidos_g")
+
+  meal MealPlanMeal @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  food Food?        @relation(fields: [foodId], references: [id], onDelete: SetNull)
+
+  @@index([mealId])
+  @@map("meal_plan_items")
+}
+
+model PlanTemplate {
+  id             String   @id @default(uuid()) @db.Uuid
+  nutritionistId String   @map("nutritionist_id") @db.Uuid
+  nombre         String
+  objetivo       Goal     @default(MANTENIMIENTO)
+  calorias       Int
+  descripcion    String?
+  // Comidas e items serializados, listos para materializar en un MealPlan.
+  estructura     Json     @default("{}")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  nutritionist User @relation(fields: [nutritionistId], references: [id], onDelete: Cascade)
+
+  @@index([nutritionistId])
+  @@map("plan_templates")
+}
+
+model Recipe {
+  id             String        @id @default(uuid()) @db.Uuid
+  nutritionistId String        @map("nutritionist_id") @db.Uuid
+  patientId      String?       @map("patient_id") @db.Uuid
+  nombre         String
+  ingredientes   Json          @default("[]")
+  pasos          String?
+  calorias       Int?
+  porciones      Int           @default(1)
+  origen         ContentOrigin @default(MANUAL)
+  estado         RecipeStatus  @default(SUGERIDA)
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  nutritionist User     @relation(fields: [nutritionistId], references: [id], onDelete: Cascade)
+  patient      Patient? @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([nutritionistId])
+  @@index([patientId])
+  @@map("recipes")
+}
+
+// ---------------------------------------------------------------------------
+// Seguimiento (lo alimenta la app móvil del paciente)
+// ---------------------------------------------------------------------------
+
+model MealLog {
+  id                   String   @id @default(uuid()) @db.Uuid
+  patientId            String   @map("patient_id") @db.Uuid
+  mealPlanMealId       String?  @map("meal_plan_meal_id") @db.Uuid
+  fecha                DateTime
+  nombre               String
+  fotoUrl              String?  @map("foto_url")
+  comentarioPaciente   String?  @map("comentario_paciente")
+  comentarioNutriologo String?  @map("comentario_nutriologo")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  patient      Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  mealPlanMeal MealPlanMeal? @relation(fields: [mealPlanMealId], references: [id], onDelete: SetNull)
+
+  @@index([patientId, fecha])
+  @@map("meal_logs")
+}
+
+model WeightLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  patientId String   @map("patient_id") @db.Uuid
+  fecha     DateTime @db.Date
+  pesoKg    Float    @map("peso_kg")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@unique([patientId, fecha])
+  @@index([patientId, fecha])
+  @@map("weight_logs")
+}
+
+model ExerciseLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  patientId   String   @map("patient_id") @db.Uuid
+  fecha       DateTime @db.Date
+  tipo        String
+  duracionMin Int      @map("duracion_min")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, fecha])
+  @@map("exercise_logs")
+}
+
+model ActivityPlan {
+  id           String        @id @default(uuid()) @db.Uuid
+  patientId    String        @map("patient_id") @db.Uuid
+  texto        String
+  origen       ContentOrigin @default(MANUAL)
+  compartidoAt DateTime?     @map("compartido_at")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@map("activity_plans")
+}
+
+// ---------------------------------------------------------------------------
+// Agenda, mensajes y cobros
+// ---------------------------------------------------------------------------
+
+model Appointment {
+  id                 String            @id @default(uuid()) @db.Uuid
+  nutritionistId     String            @map("nutritionist_id") @db.Uuid
+  patientId          String            @map("patient_id") @db.Uuid
+  inicio             DateTime          @db.Timestamptz(3)
+  duracionMin        Int               @default(45) @map("duracion_min")
+  tipo               AppointmentType   @default(PRESENCIAL)
+  estado             AppointmentStatus @default(PROGRAMADA)
+  notas              String?
+  videoUrl           String?           @map("video_url")
+  recordatorioEnviadoAt DateTime?      @map("recordatorio_enviado_at")
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+
+  nutritionist User    @relation(fields: [nutritionistId], references: [id], onDelete: Cascade)
+  patient      Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([nutritionistId, inicio])
+  @@index([patientId, inicio])
+  @@map("appointments")
+}
+
+// El texto se cifra en aplicación antes de escribirse.
+model Message {
+  id             String        @id @default(uuid()) @db.Uuid
+  nutritionistId String        @map("nutritionist_id") @db.Uuid
+  patientId      String        @map("patient_id") @db.Uuid
+  emisor         MessageSender
+  texto          String
+  leidoAt        DateTime?     @map("leido_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  nutritionist User    @relation(fields: [nutritionistId], references: [id], onDelete: Cascade)
+  patient      Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, createdAt])
+  @@map("messages")
+}
+
+// Cobro del nutriólogo a su paciente. La suscripción del nutriólogo a nutria
+// vive en `subscriptions` y la gobierna Stripe.
+model Invoice {
+  id             String        @id @default(uuid()) @db.Uuid
+  nutritionistId String        @map("nutritionist_id") @db.Uuid
+  patientId      String        @map("patient_id") @db.Uuid
+  concepto       String
+  montoCentavos  Int           @map("monto_centavos")
+  moneda         String        @default("MXN")
+  estado         InvoiceStatus @default(PENDIENTE)
+  metodo         String?
+  requiereCfdi   Boolean       @default(false) @map("requiere_cfdi")
+  cfdiStatus     String?       @map("cfdi_status")
+  pagadaAt       DateTime?     @map("pagada_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  nutritionist User    @relation(fields: [nutritionistId], references: [id], onDelete: Cascade)
+  patient      Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([nutritionistId, estado])
+  @@map("invoices")
+}
+
+// Bitácora de acceso a expedientes. `metadata` nunca contiene datos de salud.
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  accion     String
+  recurso    String
+  recursoId  String?  @map("recurso_id")
+  ip         String?
+  metadata   Json     @default("{}")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([recurso, recursoId])
+  @@map("audit_logs")
+}

@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Base efímera del runner: ningún paso toca datos reales.
+  DATABASE_URL: postgresql://postgres:postgres@localhost:5432/nutria_ci
+  DIRECT_URL: postgresql://postgres:postgres@localhost:5432/nutria_ci
+  SHADOW_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/nutria_shadow
+  AUTH_SECRET: secreto-solo-para-ci-no-usar-en-produccion
+  AUTH_URL: http://localhost:3000
+
+jobs:
+  verificacion:
+    name: Esquema, tipos, tests y build
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: nutria_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Preparar base de sombra
+        run: psql "$DATABASE_URL" -c 'CREATE DATABASE nutria_shadow;'
+
+      - name: Validar el esquema de Prisma
+        run: npx prisma validate
+        working-directory: apps/web
+
+      - name: Aplicar migraciones
+        run: npx prisma migrate deploy
+        working-directory: apps/web
+
+      - name: Verificar que no haya deriva entre migraciones y esquema
+        # Falla si alguien editó schema.prisma sin generar su migración.
+        run: |
+          npx prisma migrate diff \
+            --from-migrations ./prisma/migrations \
+            --to-schema-datamodel ./prisma/schema.prisma \
+            --shadow-database-url "$SHADOW_DATABASE_URL" \
+            --exit-code \
+          || (echo "::error::schema.prisma cambió sin migración. Corre 'npm run db:migrate'." && exit 1)
+        working-directory: apps/web
+
+      - name: Type-check
+        run: npm run type-check --workspaces --if-present
+
+      - name: Tests
+        run: npm run test --workspaces --if-present
+
+      - name: Build de la app web
+        run: npm run build --workspace apps/web

@@ -9,8 +9,9 @@ import {
   Receipt,
   Users,
 } from 'lucide-react';
+import { signOut } from 'next-auth/react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 
 import { useAppState } from '@/store/app-state';
 
@@ -25,12 +26,10 @@ const NAV_ITEMS = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const router = useRouter();
-  const { marca, logout } = useAppState();
+  const { marca } = useAppState();
 
   const cerrarSesion = () => {
-    logout();
-    router.push('/login');
+    void signOut({ redirectTo: '/login' });
   };
 
   return (

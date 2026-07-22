@@ -5,6 +5,8 @@ type BtnProps = {
   disabled?: boolean;
   size?: 'md' | 'sm';
   className?: string;
+  /** `submit` deja que el formulario se envíe con Enter. */
+  type?: 'button' | 'submit';
 };
 
 export function Btn({
@@ -14,6 +16,7 @@ export function Btn({
   disabled,
   size = 'md',
   className = '',
+  type = 'button',
 }: BtnProps) {
   const base = 'inline-flex items-center gap-2 rounded-lg transition-colors disabled:opacity-50 font-medium';
   const sizes = { md: 'text-sm px-4 py-2.5', sm: 'text-xs px-3 py-2' };
@@ -24,7 +27,8 @@ export function Btn({
   };
   return (
     <button
-      type="button"
+      // eslint-disable-next-line react/button-has-type
+      type={type}
       onClick={onClick}
       disabled={disabled}
       className={`${base} ${sizes[size]} ${variants[variant]} ${className}`}

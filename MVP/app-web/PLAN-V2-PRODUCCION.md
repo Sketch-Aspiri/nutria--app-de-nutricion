@@ -311,7 +311,7 @@ Además: tests unitarios/integración de handlers con la BD (≥ 80 % en `src/se
 
 | Fase | Semana | Entregable (criterio de aceptación) |
 |---|---|---|
-| **0. Fundaciones** | 1 | Prisma + Neon conectados; schema completo migrado; Auth.js con registro/login/verificación; middleware de sesión; CI corriendo |
+| **0. Fundaciones** ✅ | 1 | Prisma + Neon conectados; schema completo migrado; Auth.js con registro/login/verificación; middleware de sesión; CI corriendo |
 | **1. Pacientes reales** | 2 | CRUD pacientes + expediente + antropometría contra BD; wizard conectado; el store `localStorage` eliminado de estas vistas; E2E #2 y #9 en verde |
 | **2. Fórmulas + cálculo** | 3 | Módulo `nutricion/` ampliado con tests; TabCalculo con selector de ecuación y equivalentes; snapshot persistido; E2E #3 |
 | **3. Base de alimentos** | 3–4 | Seed tanda 1 (150 núcleo MX) + tanda 2 (USDA); imágenes en Blob; búsqueda pg_trgm; FoodPicker contra API; CRUD alimentos propios |
@@ -322,6 +322,64 @@ Además: tests unitarios/integración de handlers con la BD (≥ 80 % en `src/se
 | **8. Endurecimiento y lanzamiento** | 8 | Cifrado de columnas, auditoría security-auditor, Sentry, avisos de privacidad, seed tanda 3, carga de prueba, dominio productivo, **onboarding de 3–5 nutriólogos piloto** |
 
 Cada fase = un PR enfocado (regla del repo: cambios pequeños), con `/code-review` antes de merge.
+
+---
+
+---
+
+## 13-bis. Bitácora de ejecución
+
+### Fase 0 — Fundaciones (completada)
+
+Construido en `apps/web`:
+
+- **Base de datos**: `prisma/schema.prisma` con las 28 tablas y 15 enums de la sección 3, y la
+  migración base en `prisma/migrations/0_init/migration.sql`. Cliente único en `src/server/db.ts`
+  (log restringido a errores: el log de queries expondría datos clínicos).
+- **Autenticación** (`src/server/auth/`): Auth.js v5 con sesión JWT de 8 h. `config.ts` es
+  edge-safe y contiene las reglas de acceso; `index.ts` agrega el adaptador de Prisma y el
+  proveedor de credenciales. Alta con contraseña, acceso con Google (opcional) y verificación
+  de correo con tokens de un solo uso de los que **solo se guarda el SHA-256**.
+- **API** (`src/app/api/v1/`): `auth/register`, `auth/verify_email`, `auth/resend_verification`,
+  `health` y `me`, todas siguiendo `rules/api-conventions.md`. Los helpers de respuesta y error
+  viven en `src/server/http.ts` y los reutilizarán todos los endpoints de las fases siguientes.
+- **Guardas**: `src/middleware.ts` protege la navegación del panel; `src/server/auth/guards.ts`
+  (`requiereNutriologo`) revalida sesión, correo verificado y rol en cada handler; el layout
+  `(panel)/layout.tsx` vuelve a comprobar en el servidor. Tres capas, porque un matcher mal
+  escrito no debe traducirse en expedientes visibles.
+- **UI**: `/registro`, `/login` y `/verificar` reales; el "login simulado" y el flag `loggedIn`
+  del store de demo quedaron eliminados.
+- **CI** (`.github/workflows/ci.yml`): levanta un Postgres efímero, aplica las migraciones,
+  falla si `schema.prisma` cambió sin su migración, y corre type-check, tests y build.
+
+Verificado: `tsc --noEmit` limpio, 39 tests en verde (16 nuevos sobre helpers de API, hashing
+de contraseñas y ciclo de vida de los tokens), y `next build` exitoso.
+
+**Desviaciones respecto al plan original**, y por qué:
+
+1. **bcryptjs en lugar de argon2.** argon2 es una extensión nativa: complica el build en Windows
+   y en el runtime de Vercel. bcryptjs es JS puro, ampliamente auditado y suficiente con 12
+   rondas. Se rechazan contraseñas de más de 72 bytes en vez de dejar que bcrypt las trunque
+   en silencio.
+2. **Rate limiting en memoria** (`src/server/rate-limit.ts`) en registro, verificación y reenvío.
+   Frena bucles simples, pero cada instancia serverless lleva su propia cuenta; se reemplaza por
+   Upstash en la fase 8, como marca la sección 6.
+3. **El registro responde 409 `EMAIL_TAKEN`** cuando el correo ya existe. Revela que la cuenta
+   existe, a cambio de un mensaje claro; el resto de los flujos (login, reenvío de verificación)
+   sí responden de forma neutra, y el login compara contra un hash señuelo para que la latencia
+   no delate qué correos están dados de alta.
+4. **Se puede iniciar sesión sin haber verificado el correo**, pero el middleware manda a
+   `/verificar`. Da un mensaje mucho más útil que un "credenciales inválidas" genérico y evita
+   depender de detalles inestables de la beta de Auth.js para propagar el motivo del rechazo.
+
+**Verificado contra la base real** (Neon, proyecto `nutria`, branch `production`, región
+`us-east-2`): la migración `0_init` aplicó las 28 tablas y 15 enums; `/api/v1/health` responde
+`ok` con ~80 ms de latencia; y el flujo de alta corre de punta a punta — registro, correo
+verificado, contraseña guardada como hash bcrypt, perfil y suscripción Free creados
+automáticamente, token de un solo uso rechazado al reintentarse, correo duplicado detectado
+aun cambiando mayúsculas, `/api/v1/me` respondiendo 401 sin sesión, `/pacientes` redirigiendo
+a `/login`, y borrado en cascada sin registros huérfanos. La cuenta de prueba se eliminó: la
+base quedó vacía y lista para las cuentas reales.
 
 ---
 

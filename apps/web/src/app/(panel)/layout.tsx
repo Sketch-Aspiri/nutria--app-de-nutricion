@@ -1,23 +1,19 @@
-'use client';
-
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { redirect } from 'next/navigation';
 
 import { Sidebar } from '@/components/layout/Sidebar';
 import { TopBar } from '@/components/layout/TopBar';
-import { useAppState } from '@/store/app-state';
+import { auth } from '@/server/auth';
 
-export default function PanelLayout({ children }: { children: React.ReactNode }) {
-  const { hydrated, loggedIn } = useAppState();
-  const router = useRouter();
+/**
+ * Segunda barrera de acceso al panel. El middleware ya bloquea estas rutas,
+ * pero la sesión se revalida aquí en el servidor: una regla de matcher mal
+ * escrita no debe traducirse en expedientes visibles.
+ */
+export default async function PanelLayout({ children }: { children: React.ReactNode }) {
+  const sesion = await auth();
 
-  useEffect(() => {
-    if (hydrated && !loggedIn) router.replace('/login');
-  }, [hydrated, loggedIn, router]);
-
-  if (!hydrated || !loggedIn) {
-    return <div className="min-h-screen bg-stone-50" />;
-  }
+  if (!sesion?.user) redirect('/login');
+  if (!sesion.user.emailVerificado) redirect('/verificar');
 
   return (
     <div className="flex h-screen bg-stone-50">
