@@ -312,7 +312,7 @@ Además: tests unitarios/integración de handlers con la BD (≥ 80 % en `src/se
 | Fase | Semana | Entregable (criterio de aceptación) |
 |---|---|---|
 | **0. Fundaciones** ✅ | 1 | Prisma + Neon conectados; schema completo migrado; Auth.js con registro/login/verificación; middleware de sesión; CI corriendo |
-| **1. Pacientes reales** | 2 | CRUD pacientes + expediente + antropometría contra BD; wizard conectado; el store `localStorage` eliminado de estas vistas; E2E #2 y #9 en verde |
+| **1. Pacientes reales** ✅ | 2 | CRUD pacientes + expediente + antropometría contra BD; wizard conectado; el store `localStorage` eliminado de estas vistas; E2E #2 y #9 en verde |
 | **2. Fórmulas + cálculo** | 3 | Módulo `nutricion/` ampliado con tests; TabCalculo con selector de ecuación y equivalentes; snapshot persistido; E2E #3 |
 | **3. Base de alimentos** | 3–4 | Seed tanda 1 (150 núcleo MX) + tanda 2 (USDA); imágenes en Blob; búsqueda pg_trgm; FoodPicker contra API; CRUD alimentos propios |
 | **4. Planes + PDF + plantillas** | 4–5 | Editor de plan sobre BD con items ligados a foods; plantillas; PDF real (react-pdf) con marca blanca; E2E #4 |
@@ -380,6 +380,41 @@ automáticamente, token de un solo uso rechazado al reintentarse, correo duplica
 aun cambiando mayúsculas, `/api/v1/me` respondiendo 401 sin sesión, `/pacientes` redirigiendo
 a `/login`, y borrado en cascada sin registros huérfanos. La cuenta de prueba se eliminó: la
 base quedó vacía y lista para las cuentas reales.
+
+### Fase 1 — Pacientes reales (completada)
+
+- **Identificadores**: `Paciente.id` pasó de `number` a UUID en `packages/shared/src/types.ts`, con
+  `Cita.pacienteId` y `Factura.pacienteId` al mismo tipo.
+- **Traducción de dominio** (`packages/shared/src/dominio.ts`): PostgreSQL no admite acentos ni
+  espacios en un enum, y la UI no debe mostrar `PERDIDA_DE_GRASA`. Los mapas inversos se derivan de
+  los directos para que no puedan desfasarse. Incluye `edadDesdeFechaNacimiento`: el expediente
+  guarda fecha de nacimiento, porque una edad almacenada queda obsoleta al día siguiente del
+  cumpleaños y descuadraría el TDEE.
+- **API** (`src/app/api/v1/patients/`): listado paginado, alta completa desde el asistente, detalle,
+  edición, archivado lógico, y los sub-recursos `medical_record`, `food_preferences` y `measurements`.
+  La validación vive en `src/server/patients/schemas.ts` con rangos clínicos plausibles; la
+  serialización, en `serializers.ts`.
+- **Autorización**: en `src/server/patients/repository.ts` **toda** consulta filtra por
+  `nutritionistId` dentro de la misma query — nunca se lee primero y se compara después. Las
+  actualizaciones usan `updateMany` y tratan "0 filas afectadas" como 404.
+- **Cliente**: `src/services/pacientes.ts` (cliente HTTP + traducción al tipo de dominio) y
+  `src/hooks/usePacientes.ts` (React Query). Ningún componente llama a `fetch` directamente.
+- **Almacén puente**: `src/store/app-state.tsx` ya no guarda pacientes. Conserva únicamente lo que
+  sus fases todavía no migran (cálculo, plan, seguimiento, recetas, notas) indexado por UUID, para
+  que las pestañas de las fases 2-6 sigan funcionando. Cada fase irá vaciando ese archivo.
+- **Accesibilidad**: el asistente de alta tenía `<label>` sin asociar a sus campos. El test E2E lo
+  descubrió al no poder localizarlos; se corrigió con `htmlFor`/`id`, lo que también los vuelve
+  anunciables por lector de pantalla.
+
+Verificado: 106 tests unitarios en verde (24 nuevos sobre traducción de dominio y mapeo de la API),
+type-check limpio, build exitoso y **7 tests E2E de Playwright contra la base real** — los dos
+flujos que pedía la fase. El de aislamiento (#9) confirma que un nutriólogo no ve los pacientes de
+otro en el listado, no puede abrir su expediente por URL, recibe 404 en vez de 403 al consultarlos
+por API, y no puede editarlos ni archivarlos. Las cuentas de prueba se borran al terminar.
+
+**Fuera de alcance deliberado**: el tope de 3 pacientes del plan Free. Imponerlo antes de que exista
+la ruta de pago (fase 7) dejaría al nutriólogo sin salida. La agenda, los mensajes y la facturación
+arrancan vacíos: sus datos de demostración apuntaban a pacientes ficticios que ya no existen.
 
 ---
 

@@ -3,13 +3,17 @@
 import { Loader2, Send, ShieldCheck, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 
+import { objetivoDesdeDb } from '@nutria/shared';
+
 import { Avatar } from '@/components/ui/Avatar';
 import { useGenerarTexto } from '@/hooks/useIA';
+import { usePacientes } from '@/hooks/usePacientes';
 import { useAppState } from '@/store/app-state';
 
 export default function MensajesPage() {
-  const { pacientes, mensajes, setMensajes } = useAppState();
-  const [activo, setActivo] = useState(pacientes[0]?.id ?? 0);
+  const { mensajes, setMensajes } = useAppState();
+  const { pacientes } = usePacientes();
+  const [activo, setActivo] = useState('');
   const [texto, setTexto] = useState('');
   const sugerirRespuesta = useGenerarTexto();
 
@@ -35,7 +39,8 @@ export default function MensajesPage() {
   const sugerir = () => {
     if (!paciente) return;
     const ultimo = [...hilo].reverse().find((m) => m.de === 'paciente');
-    const prompt = `Eres asistente de un nutriólogo. Redacta una respuesta breve, cálida y profesional para este mensaje de un paciente (${paciente.nombre}, objetivo ${paciente.medico.objetivo}): "${ultimo ? ultimo.texto : 'quiere saber cómo va su progreso'}". Solo el texto de la respuesta.`;
+    const objetivo = paciente.objetivo ? objetivoDesdeDb(paciente.objetivo) : 'sin definir';
+    const prompt = `Eres asistente de un nutriólogo. Redacta una respuesta breve, cálida y profesional para este mensaje de un paciente (${paciente.nombre}, objetivo ${objetivo}): "${ultimo ? ultimo.texto : 'quiere saber cómo va su progreso'}". Solo el texto de la respuesta.`;
     sugerirRespuesta.mutate(
       { prompt, maxTokens: 200 },
       { onSuccess: (t) => setTexto(t.trim()) },
@@ -55,7 +60,7 @@ export default function MensajesPage() {
               activo === p.id ? 'bg-emerald-50' : 'hover:bg-stone-50'
             }`}
           >
-            <Avatar foto={p.foto} nombre={p.nombre} size={36} />
+            <Avatar foto={p.foto_url} nombre={p.nombre} size={36} />
             <div className="min-w-0">
               <div className="text-sm text-emerald-950 truncate">{p.nombre}</div>
               <div className="text-xs text-stone-400 truncate">
@@ -67,7 +72,7 @@ export default function MensajesPage() {
       </div>
       <div className="flex-1 flex flex-col">
         <div className="px-6 py-4 border-b border-stone-200 bg-white flex items-center gap-3">
-          <Avatar foto={paciente?.foto ?? null} nombre={paciente?.nombre ?? '?'} size={36} />
+          <Avatar foto={paciente?.foto_url ?? null} nombre={paciente?.nombre ?? '?'} size={36} />
           <div className="text-sm text-emerald-950 font-medium">{paciente?.nombre}</div>
           <span className="flex items-center gap-1 text-[10px] text-emerald-600 ml-auto">
             <ShieldCheck size={12} /> Cifrado extremo a extremo

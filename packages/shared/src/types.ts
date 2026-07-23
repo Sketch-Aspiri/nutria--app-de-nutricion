@@ -122,10 +122,13 @@ export type Seguimiento = {
 };
 
 export type Paciente = {
-  id: number;
+  /** UUID asignado por la base de datos. */
+  id: string;
   nombre: string;
   foto: string | null;
+  /** Años cumplidos, derivados de `fechaNacimiento`; no se almacena. */
   edad: number;
+  fechaNacimiento: string | null;
   genero: Genero;
   telefono: string;
   email: string;
@@ -141,7 +144,7 @@ export type Paciente = {
 
 export type Cita = {
   id: number;
-  pacienteId: number;
+  pacienteId: string;
   paciente: string;
   fecha: string;
   hora: string;
@@ -157,7 +160,7 @@ export type MensajeChat = {
 
 export type Factura = {
   id: number;
-  pacienteId: number;
+  pacienteId: string;
   paciente: string;
   concepto: string;
   monto: number;

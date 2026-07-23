@@ -2,14 +2,15 @@
 
 import { useState } from 'react';
 
-import type { Cita, Paciente } from '@nutria/shared';
+import type { Cita } from '@nutria/shared';
 
 import { Btn } from '@/components/ui/Btn';
 import { Modal, ModalHeader } from '@/components/ui/Modal';
 import { inputClass as inp, labelClass as lbl } from '@/components/ui/campos';
+import type { PacienteResumenApi } from '@/services/pacientes';
 
 type NuevaCitaModalProps = {
-  pacientes: Paciente[];
+  pacientes: PacienteResumenApi[];
   onClose: () => void;
   onCrear: (cita: Cita) => void;
 };
@@ -17,7 +18,7 @@ type NuevaCitaModalProps = {
 export function NuevaCitaModal({ pacientes, onClose, onCrear }: NuevaCitaModalProps) {
   const hoy = new Date().toISOString().slice(0, 10);
   const [form, setForm] = useState({
-    pacienteId: pacientes[0]?.id ?? 0,
+    pacienteId: pacientes[0]?.id ?? '',
     fecha: hoy,
     hora: '10:00',
     tipo: 'Seguimiento',
@@ -25,7 +26,7 @@ export function NuevaCitaModal({ pacientes, onClose, onCrear }: NuevaCitaModalPr
   });
 
   const crear = () => {
-    const p = pacientes.find((x) => x.id === Number(form.pacienteId));
+    const p = pacientes.find((x) => x.id === form.pacienteId);
     if (!p) return;
     onCrear({
       id: Date.now(),
@@ -48,7 +49,7 @@ export function NuevaCitaModal({ pacientes, onClose, onCrear }: NuevaCitaModalPr
             <select
               className={inp}
               value={form.pacienteId}
-              onChange={(e) => setForm({ ...form, pacienteId: Number(e.target.value) })}
+              onChange={(e) => setForm({ ...form, pacienteId: e.target.value })}
             >
               {pacientes.map((p) => (
                 <option key={p.id} value={p.id}>

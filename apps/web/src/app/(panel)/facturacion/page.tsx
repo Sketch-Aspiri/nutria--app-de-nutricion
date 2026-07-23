@@ -6,13 +6,15 @@ import { useState } from 'react';
 import { Btn } from '@/components/ui/Btn';
 import { Modal, ModalHeader } from '@/components/ui/Modal';
 import { inputClass as inp, labelClass as lbl } from '@/components/ui/campos';
+import { usePacientes } from '@/hooks/usePacientes';
 import { useAppState } from '@/store/app-state';
 
 export default function FacturacionPage() {
-  const { facturas, setFacturas, pacientes } = useAppState();
+  const { facturas, setFacturas } = useAppState();
+  const { pacientes } = usePacientes();
   const [nueva, setNueva] = useState(false);
   const [form, setForm] = useState({
-    pacienteId: pacientes[0]?.id ?? 0,
+    pacienteId: pacientes[0]?.id ?? '',
     concepto: 'Consulta',
     monto: '600',
     cfdi: false,
@@ -22,7 +24,7 @@ export default function FacturacionPage() {
   const pendiente = facturas.reduce((s, f) => s + (!f.pagada ? f.monto : 0), 0);
 
   const crear = () => {
-    const p = pacientes.find((x) => x.id === Number(form.pacienteId));
+    const p = pacientes.find((x) => x.id === form.pacienteId);
     if (!p) return;
     setFacturas((f) => [
       {
@@ -104,7 +106,7 @@ export default function FacturacionPage() {
                 <select
                   className={inp}
                   value={form.pacienteId}
-                  onChange={(e) => setForm({ ...form, pacienteId: Number(e.target.value) })}
+                  onChange={(e) => setForm({ ...form, pacienteId: e.target.value })}
                 >
                   {pacientes.map((p) => (
                     <option key={p.id} value={p.id}>

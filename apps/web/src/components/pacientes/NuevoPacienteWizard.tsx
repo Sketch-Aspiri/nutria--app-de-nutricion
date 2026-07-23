@@ -3,13 +3,17 @@
 import { Camera, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 
-import type { Genero, NivelActividad, Objetivo, Paciente } from '@nutria/shared';
+import type { Genero, NivelActividad, Objetivo } from '@nutria/shared';
 import {
   ALERGIAS_COMUNES,
   CONDICIONES,
   NIVELES_ACTIVIDAD,
   OBJETIVOS,
   TIPOS_DIETA,
+  fechaNacimientoDesdeEdad,
+  generoADb,
+  nivelActividadADb,
+  objetivoADb,
 } from '@nutria/shared';
 
 import { Avatar } from '@/components/ui/Avatar';
@@ -17,6 +21,8 @@ import { Btn } from '@/components/ui/Btn';
 import { Chip } from '@/components/ui/Chip';
 import { Modal, ModalHeader } from '@/components/ui/Modal';
 import { inputClass as inp, labelClass as lbl } from '@/components/ui/campos';
+import { useCrearPaciente } from '@/hooks/usePacientes';
+import { ApiError, type CrearPacientePayload } from '@/services/pacientes';
 
 type FormPaciente = {
   nombre: string;
@@ -52,53 +58,71 @@ const FORM_INICIAL: FormPaciente = {
 
 const PASOS = ['Datos generales', 'Expediente médico', 'Antropometría', 'Preferencias alimentarias'];
 
-function construirPaciente(form: FormPaciente): Paciente {
+/** Campo numérico opcional: vacío se envía como null, no como 0. */
+function numeroOpcional(valor: string): number | null {
+  const numero = Number(valor);
+  return valor.trim() !== '' && Number.isFinite(numero) && numero > 0 ? numero : null;
+}
+
+export function construirPayload(form: FormPaciente): CrearPacientePayload {
   return {
-    id: Date.now(),
-    nombre: form.nombre || 'Nuevo paciente',
-    foto: form.foto,
-    edad: Number(form.edad) || 0,
-    genero: form.genero,
-    telefono: form.telefono,
-    email: form.email,
-    medico: {
-      condiciones: form.condiciones.length ? form.condiciones : ['Ninguna'],
-      antecedentes: form.antecedentes,
-      medicamentos: form.medicamentos,
-      nivelActividad: form.nivelActividad,
-      objetivo: form.objetivo,
+    nombre: form.nombre.trim(),
+    // El expediente guarda fecha de nacimiento; la edad capturada se convierte.
+    fecha_nacimiento: fechaNacimientoDesdeEdad(Number(form.edad)),
+    genero: generoADb(form.genero),
+    email: form.email.trim() || null,
+    telefono: form.telefono.trim() || null,
+    foto_url: form.foto,
+    expediente_medico: {
+      condiciones: form.condiciones,
+      antecedentes: form.antecedentes.trim() || null,
+      medicamentos: form.medicamentos.trim() || null,
+      nivel_actividad: nivelActividadADb(form.nivelActividad),
+      objetivo: objetivoADb(form.objetivo),
+    },
+    preferencias_alimentarias: {
+      tipo_dieta: form.tipoDieta,
+      alergias: form.alergias,
+      disgustos: form.disgustos.trim() || null,
+      comidas_por_dia: Number(form.comidasPorDia) || 3,
+      presupuesto_tiempo: form.presupuestoTiempo,
     },
     antropometria: {
-      peso: Number(form.peso) || 0,
-      altura: Number(form.altura) || 0,
-      cintura: Number(form.cintura) || 0,
-      cadera: Number(form.cadera) || 0,
-      grasaCorporal: Number(form.grasaCorporal) || 0,
-      historial: [{ fecha: 'Hoy', peso: Number(form.peso) || 0 }],
+      peso_kg: numeroOpcional(form.peso),
+      altura_cm: numeroOpcional(form.altura),
+      cintura_cm: numeroOpcional(form.cintura),
+      cadera_cm: numeroOpcional(form.cadera),
+      grasa_pct: numeroOpcional(form.grasaCorporal),
     },
-    preferencias: {
-      tipoDieta: form.tipoDieta,
-      alergias: form.alergias.length ? form.alergias : ['Ninguna'],
-      disgustos: form.disgustos,
-      comidasPorDia: Number(form.comidasPorDia) || 4,
-      presupuestoTiempo: form.presupuestoTiempo,
-    },
-    calculo: null,
-    planActivo: null,
-    planEjercicio: null,
-    notasConsulta: [],
-    seguimiento: { adherencia: 0, racha: 0, comidas: [], ejercicio: [], recetasEnCurso: [], recetasSugeridas: [] },
   };
 }
 
 type NuevoPacienteWizardProps = {
   onClose: () => void;
-  onCrear: (p: Paciente) => void;
+  onCreado: (id: string) => void;
 };
 
-export function NuevoPacienteWizard({ onClose, onCrear }: NuevoPacienteWizardProps) {
+export function NuevoPacienteWizard({ onClose, onCreado }: NuevoPacienteWizardProps) {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormPaciente>(FORM_INICIAL);
+  const [error, setError] = useState('');
+  const crear = useCrearPaciente();
+
+  const guardar = async () => {
+    setError('');
+    try {
+      const paciente = await crear.mutateAsync(construirPayload(form));
+      onCreado(paciente.id);
+    } catch (fallo: unknown) {
+      setError(
+        fallo instanceof ApiError
+          ? fallo.message
+          : 'No pudimos guardar al paciente. Intenta de nuevo.',
+      );
+      // El expediente se captura en el paso 0: ahí se ven los errores de datos.
+      if (fallo instanceof ApiError && fallo.details?.nombre) setStep(0);
+    }
+  };
   const set = <K extends keyof FormPaciente>(k: K, v: FormPaciente[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
   const toggleList = (k: 'condiciones' | 'alergias', val: string) =>
@@ -136,17 +160,17 @@ export function NuevoPacienteWizard({ onClose, onCrear }: NuevoPacienteWizardPro
               </label>
             </div>
             <div>
-              <label className={lbl}>Nombre completo</label>
-              <input className={inp} value={form.nombre} onChange={(e) => set('nombre', e.target.value)} placeholder="Ej. Ana López" />
+              <label className={lbl} htmlFor="paciente-nombre">Nombre completo</label>
+              <input id="paciente-nombre" className={inp} value={form.nombre} onChange={(e) => set('nombre', e.target.value)} placeholder="Ej. Ana López" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className={lbl}>Edad</label>
-                <input type="number" className={inp} value={form.edad} onChange={(e) => set('edad', e.target.value)} />
+                <label className={lbl} htmlFor="paciente-edad">Edad</label>
+                <input id="paciente-edad" type="number" className={inp} value={form.edad} onChange={(e) => set('edad', e.target.value)} />
               </div>
               <div>
-                <label className={lbl}>Género</label>
-                <select className={inp} value={form.genero} onChange={(e) => set('genero', e.target.value as Genero)}>
+                <label className={lbl} htmlFor="paciente-genero">Género</label>
+                <select id="paciente-genero" className={inp} value={form.genero} onChange={(e) => set('genero', e.target.value as Genero)}>
                   <option>Femenino</option>
                   <option>Masculino</option>
                   <option>Otro</option>
@@ -155,12 +179,12 @@ export function NuevoPacienteWizard({ onClose, onCrear }: NuevoPacienteWizardPro
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className={lbl}>Teléfono</label>
-                <input className={inp} value={form.telefono} onChange={(e) => set('telefono', e.target.value)} />
+                <label className={lbl} htmlFor="paciente-telefono">Teléfono</label>
+                <input id="paciente-telefono" className={inp} value={form.telefono} onChange={(e) => set('telefono', e.target.value)} />
               </div>
               <div>
-                <label className={lbl}>Email</label>
-                <input className={inp} value={form.email} onChange={(e) => set('email', e.target.value)} />
+                <label className={lbl} htmlFor="paciente-email">Email</label>
+                <input id="paciente-email" className={inp} value={form.email} onChange={(e) => set('email', e.target.value)} />
               </div>
             </div>
           </>
@@ -176,23 +200,23 @@ export function NuevoPacienteWizard({ onClose, onCrear }: NuevoPacienteWizardPro
               </div>
             </div>
             <div>
-              <label className={lbl}>Antecedentes relevantes</label>
-              <textarea rows={2} className={inp} value={form.antecedentes} onChange={(e) => set('antecedentes', e.target.value)} />
+              <label className={lbl} htmlFor="paciente-antecedentes">Antecedentes relevantes</label>
+              <textarea id="paciente-antecedentes" rows={2} className={inp} value={form.antecedentes} onChange={(e) => set('antecedentes', e.target.value)} />
             </div>
             <div>
-              <label className={lbl}>Medicamentos actuales</label>
-              <input className={inp} value={form.medicamentos} onChange={(e) => set('medicamentos', e.target.value)} />
+              <label className={lbl} htmlFor="paciente-medicamentos">Medicamentos actuales</label>
+              <input id="paciente-medicamentos" className={inp} value={form.medicamentos} onChange={(e) => set('medicamentos', e.target.value)} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className={lbl}>Nivel de actividad</label>
-                <select className={inp} value={form.nivelActividad} onChange={(e) => set('nivelActividad', e.target.value as NivelActividad)}>
+                <label className={lbl} htmlFor="paciente-actividad">Nivel de actividad</label>
+                <select id="paciente-actividad" className={inp} value={form.nivelActividad} onChange={(e) => set('nivelActividad', e.target.value as NivelActividad)}>
                   {NIVELES_ACTIVIDAD.map((n) => <option key={n}>{n}</option>)}
                 </select>
               </div>
               <div>
-                <label className={lbl}>Objetivo</label>
-                <select className={inp} value={form.objetivo} onChange={(e) => set('objetivo', e.target.value as Objetivo)}>
+                <label className={lbl} htmlFor="paciente-objetivo">Objetivo</label>
+                <select id="paciente-objetivo" className={inp} value={form.objetivo} onChange={(e) => set('objetivo', e.target.value as Objetivo)}>
                   {OBJETIVOS.map((o) => <option key={o}>{o}</option>)}
                 </select>
               </div>
@@ -211,8 +235,8 @@ export function NuevoPacienteWizard({ onClose, onCrear }: NuevoPacienteWizardPro
               ] as const
             ).map(([campo, etiqueta]) => (
               <div key={campo}>
-                <label className={lbl}>{etiqueta}</label>
-                <input type="number" className={inp} value={form[campo]} onChange={(e) => set(campo, e.target.value)} />
+                <label className={lbl} htmlFor={`paciente-${campo}`}>{etiqueta}</label>
+                <input id={`paciente-${campo}`} type="number" className={inp} value={form[campo]} onChange={(e) => set(campo, e.target.value)} />
               </div>
             ))}
           </div>
@@ -236,17 +260,17 @@ export function NuevoPacienteWizard({ onClose, onCrear }: NuevoPacienteWizardPro
               </div>
             </div>
             <div>
-              <label className={lbl}>Alimentos que no le gustan</label>
-              <input className={inp} value={form.disgustos} onChange={(e) => set('disgustos', e.target.value)} placeholder="Ej. cilantro, hígado" />
+              <label className={lbl} htmlFor="paciente-disgustos">Alimentos que no le gustan</label>
+              <input id="paciente-disgustos" className={inp} value={form.disgustos} onChange={(e) => set('disgustos', e.target.value)} placeholder="Ej. cilantro, hígado" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className={lbl}>Comidas al día</label>
-                <input type="number" className={inp} value={form.comidasPorDia} onChange={(e) => set('comidasPorDia', e.target.value)} />
+                <label className={lbl} htmlFor="paciente-comidas">Comidas al día</label>
+                <input id="paciente-comidas" type="number" className={inp} value={form.comidasPorDia} onChange={(e) => set('comidasPorDia', e.target.value)} />
               </div>
               <div>
-                <label className={lbl}>Tiempo para cocinar</label>
-                <select className={inp} value={form.presupuestoTiempo} onChange={(e) => set('presupuestoTiempo', e.target.value as FormPaciente['presupuestoTiempo'])}>
+                <label className={lbl} htmlFor="paciente-tiempo">Tiempo para cocinar</label>
+                <select id="paciente-tiempo" className={inp} value={form.presupuestoTiempo} onChange={(e) => set('presupuestoTiempo', e.target.value as FormPaciente['presupuestoTiempo'])}>
                   <option>Bajo</option>
                   <option>Medio</option>
                   <option>Alto</option>
@@ -256,8 +280,20 @@ export function NuevoPacienteWizard({ onClose, onCrear }: NuevoPacienteWizardPro
           </>
         )}
       </div>
+      {error && (
+        <div
+          role="alert"
+          className="mx-6 mt-4 bg-red-50 border border-red-200 text-red-800 text-xs rounded-lg px-3 py-2.5"
+        >
+          {error}
+        </div>
+      )}
       <div className="flex justify-between p-6 pt-5">
-        <Btn variant="ghost" onClick={() => (step === 0 ? onClose() : setStep(step - 1))}>
+        <Btn
+          variant="ghost"
+          disabled={crear.isPending}
+          onClick={() => (step === 0 ? onClose() : setStep(step - 1))}
+        >
           {step === 0 ? 'Cancelar' : 'Atrás'}
         </Btn>
         {step < PASOS.length - 1 ? (
@@ -265,7 +301,9 @@ export function NuevoPacienteWizard({ onClose, onCrear }: NuevoPacienteWizardPro
             Siguiente <ChevronRight size={15} />
           </Btn>
         ) : (
-          <Btn onClick={() => onCrear(construirPaciente(form))}>Crear paciente</Btn>
+          <Btn disabled={crear.isPending} onClick={() => void guardar()}>
+            {crear.isPending ? 'Guardando…' : 'Crear paciente'}
+          </Btn>
         )}
       </div>
     </Modal>

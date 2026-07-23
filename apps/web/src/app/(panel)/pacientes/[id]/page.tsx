@@ -11,7 +11,7 @@ import { TabPlan } from '@/components/pacientes/TabPlan';
 import { TabRecetas } from '@/components/pacientes/TabRecetas';
 import { TabSeguimiento } from '@/components/pacientes/TabSeguimiento';
 import { Avatar } from '@/components/ui/Avatar';
-import { useAppState } from '@/store/app-state';
+import { usePaciente } from '@/hooks/usePacientes';
 
 const TABS = [
   { id: 'expediente', label: 'Expediente', icon: ClipboardList },
@@ -25,15 +25,19 @@ type TabId = (typeof TABS)[number]['id'];
 
 export default function PacienteDetallePage() {
   const params = useParams<{ id: string }>();
-  const { pacientes } = useAppState();
+  const { paciente, cargando } = usePaciente(params.id);
   const [tab, setTab] = useState<TabId>('expediente');
 
-  const paciente = pacientes.find((p) => p.id === Number(params.id));
+  if (cargando) {
+    return <div className="p-8 text-stone-400 text-sm">Cargando expediente…</div>;
+  }
 
   if (!paciente) {
     return (
       <div className="p-8">
-        <div className="text-stone-500 text-sm">Paciente no encontrado.</div>
+        <div className="text-stone-500 text-sm">
+          No encontramos este paciente, o no pertenece a tu consulta.
+        </div>
         <Link href="/pacientes" className="text-emerald-800 text-sm underline mt-2 inline-block">
           Volver a pacientes
         </Link>

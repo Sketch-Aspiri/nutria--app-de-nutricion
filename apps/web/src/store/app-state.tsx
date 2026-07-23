@@ -2,36 +2,43 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-import type { Cita, Factura, Marca, MensajeChat, Paciente, PlantillaPlan } from '@nutria/shared';
+import type { Cita, Factura, Marca, MensajeChat, PlantillaPlan } from '@nutria/shared';
 
-import {
-  CITAS_DEMO,
-  FACTURAS_DEMO,
-  MARCA_DEMO,
-  MENSAJES_DEMO,
-  PACIENTES_DEMO,
-  PLANTILLAS_DEMO,
-} from './datos-demo';
+import { EXTRAS_VACIOS, type ExtrasPaciente } from '@/services/pacientes';
 
-const STORAGE_KEY = 'nutria-web-state-v1';
+import { CITAS_DEMO, FACTURAS_DEMO, MARCA_DEMO, MENSAJES_DEMO, PLANTILLAS_DEMO } from './datos-demo';
+
+/**
+ * Almacén puente.
+ *
+ * Los pacientes y su expediente ya viven en PostgreSQL (ver `usePacientes`).
+ * Aquí solo quedan las partes que sus fases todavía no migran: el cálculo, el
+ * plan, el seguimiento, las recetas y las notas de cada paciente, más agenda,
+ * mensajes, facturación, plantillas y marca. Cada fase irá vaciando este archivo.
+ */
+
+const STORAGE_KEY = 'nutria-web-state-v2';
+
+type ExtrasPorPaciente = Record<string, ExtrasPaciente>;
 
 type PersistedState = {
-  pacientes: Paciente[];
+  extras: ExtrasPorPaciente;
   citas: Cita[];
-  mensajes: Record<number, MensajeChat[]>;
+  mensajes: Record<string, MensajeChat[]>;
   facturas: Factura[];
   plantillas: PlantillaPlan[];
   marca: Marca;
 };
 
-export type PatientPatch = Partial<Paciente> | ((p: Paciente) => Partial<Paciente>);
+export type ExtrasPatch =
+  | Partial<ExtrasPaciente>
+  | ((actual: ExtrasPaciente) => Partial<ExtrasPaciente>);
 
 type AppState = PersistedState & {
   hydrated: boolean;
-  crearPaciente: (p: Paciente) => void;
-  updatePatient: (id: number, patch: PatientPatch) => void;
+  updatePatient: (id: string, patch: ExtrasPatch) => void;
   setCitas: React.Dispatch<React.SetStateAction<Cita[]>>;
-  setMensajes: React.Dispatch<React.SetStateAction<Record<number, MensajeChat[]>>>;
+  setMensajes: React.Dispatch<React.SetStateAction<Record<string, MensajeChat[]>>>;
   setFacturas: React.Dispatch<React.SetStateAction<Factura[]>>;
   setPlantillas: React.Dispatch<React.SetStateAction<PlantillaPlan[]>>;
   setMarca: React.Dispatch<React.SetStateAction<Marca>>;
@@ -44,16 +51,16 @@ function leerEstadoGuardado(): PersistedState | null {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     return raw ? (JSON.parse(raw) as PersistedState) : null;
   } catch {
-    // Estado corrupto: se descarta y se arranca con datos demo.
+    // Estado corrupto: se descarta y se arranca en blanco.
     return null;
   }
 }
 
 export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
-  const [pacientes, setPacientes] = useState<Paciente[]>(PACIENTES_DEMO);
+  const [extras, setExtras] = useState<ExtrasPorPaciente>({});
   const [citas, setCitas] = useState<Cita[]>(CITAS_DEMO);
-  const [mensajes, setMensajes] = useState<Record<number, MensajeChat[]>>(MENSAJES_DEMO);
+  const [mensajes, setMensajes] = useState<Record<string, MensajeChat[]>>(MENSAJES_DEMO);
   const [facturas, setFacturas] = useState<Factura[]>(FACTURAS_DEMO);
   const [plantillas, setPlantillas] = useState<PlantillaPlan[]>(PLANTILLAS_DEMO);
   const [marca, setMarca] = useState<Marca>(MARCA_DEMO);
@@ -61,7 +68,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const guardado = leerEstadoGuardado();
     if (guardado) {
-      setPacientes(guardado.pacientes);
+      setExtras(guardado.extras ?? {});
       setCitas(guardado.citas);
       setMensajes(guardado.mensajes);
       setFacturas(guardado.facturas);
@@ -73,34 +80,31 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!hydrated) return;
-    const estado: PersistedState = { pacientes, citas, mensajes, facturas, plantillas, marca };
+    const estado: PersistedState = { extras, citas, mensajes, facturas, plantillas, marca };
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(estado));
     } catch {
       // Sin espacio o storage bloqueado: la app sigue funcionando en memoria.
     }
-  }, [hydrated, pacientes, citas, mensajes, facturas, plantillas, marca]);
+  }, [hydrated, extras, citas, mensajes, facturas, plantillas, marca]);
 
-  const updatePatient = useCallback((id: number, patch: PatientPatch) => {
-    setPacientes((ps) =>
-      ps.map((p) => (p.id === id ? { ...p, ...(typeof patch === 'function' ? patch(p) : patch) } : p)),
-    );
-  }, []);
-
-  const crearPaciente = useCallback((p: Paciente) => {
-    setPacientes((ps) => [p, ...ps]);
+  const updatePatient = useCallback((id: string, patch: ExtrasPatch) => {
+    setExtras((previos) => {
+      const actual = previos[id] ?? EXTRAS_VACIOS;
+      const cambios = typeof patch === 'function' ? patch(actual) : patch;
+      return { ...previos, [id]: { ...actual, ...cambios } };
+    });
   }, []);
 
   const value = useMemo<AppState>(
     () => ({
       hydrated,
-      pacientes,
+      extras,
       citas,
       mensajes,
       facturas,
       plantillas,
       marca,
-      crearPaciente,
       updatePatient,
       setCitas,
       setMensajes,
@@ -108,7 +112,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       setPlantillas,
       setMarca,
     }),
-    [hydrated, pacientes, citas, mensajes, facturas, plantillas, marca, crearPaciente, updatePatient],
+    [hydrated, extras, citas, mensajes, facturas, plantillas, marca, updatePatient],
   );
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
@@ -118,4 +122,10 @@ export function useAppState(): AppState {
   const ctx = useContext(AppStateContext);
   if (!ctx) throw new Error('useAppState debe usarse dentro de AppStateProvider');
   return ctx;
+}
+
+/** Extras de un paciente, con valores vacíos si todavía no tiene ninguno. */
+export function useExtrasPaciente(id: string): ExtrasPaciente {
+  const { extras } = useAppState();
+  return extras[id] ?? EXTRAS_VACIOS;
 }

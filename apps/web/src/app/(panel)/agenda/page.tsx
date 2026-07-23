@@ -8,10 +8,12 @@ import type { Cita } from '@nutria/shared';
 import { NuevaCitaModal } from '@/components/agenda/NuevaCitaModal';
 import { Btn } from '@/components/ui/Btn';
 import { Modal, ModalHeader } from '@/components/ui/Modal';
+import { usePacientes } from '@/hooks/usePacientes';
 import { useAppState } from '@/store/app-state';
 
 export default function AgendaPage() {
-  const { citas, setCitas, pacientes } = useAppState();
+  const { citas, setCitas } = useAppState();
+  const { pacientes } = usePacientes();
   const [nueva, setNueva] = useState(false);
   const [videoCita, setVideoCita] = useState<Cita | null>(null);
 

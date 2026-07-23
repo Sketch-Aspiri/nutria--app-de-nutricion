@@ -7,6 +7,7 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "test": "jest",
+    "test:e2e": "playwright test",
     "type-check": "tsc --noEmit",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
@@ -30,7 +31,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "prisma": "^6.19.3",
+    "@playwright/test": "^1.61.1",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
     "@types/jest": "^29.5.14",
@@ -41,6 +42,7 @@
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "postcss": "^8.4.49",
+    "prisma": "^6.19.3",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.6.3"
   }

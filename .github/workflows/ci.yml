@@ -78,3 +78,18 @@ jobs:
 
       - name: Build de la app web
         run: npm run build --workspace apps/web
+
+      - name: Instalar Chromium para Playwright
+        run: npx playwright install --with-deps chromium
+        working-directory: apps/web
+
+      - name: Tests E2E
+        run: npm run test:e2e --workspace apps/web
+
+      - name: Guardar reporte de E2E si algo falla
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/web/test-results/
+          retention-days: 7
