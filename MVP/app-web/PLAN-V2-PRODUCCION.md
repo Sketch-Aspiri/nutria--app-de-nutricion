@@ -314,7 +314,7 @@ Además: tests unitarios/integración de handlers con la BD (≥ 80 % en `src/se
 | **0. Fundaciones** ✅ | 1 | Prisma + Neon conectados; schema completo migrado; Auth.js con registro/login/verificación; middleware de sesión; CI corriendo |
 | **1. Pacientes reales** ✅ | 2 | CRUD pacientes + expediente + antropometría contra BD; wizard conectado; el store `localStorage` eliminado de estas vistas; E2E #2 y #9 en verde |
 | **2. Fórmulas + cálculo** ✅ | 3 | Módulo `nutricion/` ampliado con tests; TabCalculo con selector de ecuación y equivalentes; snapshot persistido; E2E #3 |
-| **3. Base de alimentos** | 3–4 | Seed tanda 1 (150 núcleo MX) + tanda 2 (USDA); imágenes en Blob; búsqueda pg_trgm; FoodPicker contra API; CRUD alimentos propios |
+| **3. Base de alimentos** ✅ | 3–4 | Seed tanda 1 (150 núcleo MX) + tanda 2 (USDA); imágenes en Blob; búsqueda pg_trgm; FoodPicker contra API; CRUD alimentos propios |
 | **4. Planes + PDF + plantillas** | 4–5 | Editor de plan sobre BD con items ligados a foods; plantillas; PDF real (react-pdf) con marca blanca; E2E #4 |
 | **5. IA Claude** | 5 | Servicio AI con streaming, salida estructurada validada, seudonimización, `ai_usage` y límites; los 5 casos de uso; E2E #10 |
 | **6. Agenda, mensajes, seguimiento** | 6 | Citas + recordatorios (cron + Resend); mensajes con polling; seguimiento leyendo logs reales; E2E #5, #6, #7 |
@@ -463,6 +463,56 @@ al recargar, y expediente incompleto que lo dice en vez de inventar. Los 14 E2E 
 tienen control en la UI todavía — el editor de plan de la fase 4 es su lugar natural. La
 comparativa no incluye ecuaciones de composición corporal por bioimpedancia: no hay de dónde leer
 ese dato hasta que exista integración con básculas.
+
+### Fase 3 — Base de alimentos (completada)
+
+- **Esquema y búsqueda**: migración `20260723_alimentos_busqueda_trgm` que habilita `pg_trgm`,
+  crea el índice GIN sobre `nombre_normalizado` y el único `(fuente, fuente_ref)` que hace
+  idempotente la siembra. La extensión la administra Prisma (`postgresqlExtensions`) para que no
+  aparezca como drift en cada `migrate dev`.
+- **Módulo `packages/shared/src/alimentos/`**: `normalizarNombre` (misma función que llena la
+  columna y que consulta), sinónimos mexicanos por palabra completa, `AlimentoFicha` con 15
+  nutrimentos, `escalarAlimento`/`sumarNutrimentos`, `equivalentesSugeridos`, `verificarEnergia`
+  (Atwater) y `verificarEquivalentes`. 100 % de cobertura de líneas y ramas.
+- **Nutrimento sin capturar es `null`, no cero**: escalar `null` da `null` y el total de una comida
+  reporta en `incompletos` qué nutrimentos son un piso y no el valor real. Un cero silencioso
+  afirmaría que un alimento no aporta sodio cuando lo que pasa es que nadie lo midió.
+- **Tanda 1 — 157 alimentos núcleo MX** capturados a mano en `prisma/seed/datos/nucleo-mx.ts`
+  (27 verduras, 25 frutas, 26 cereales y tubérculos, 9 leguminosas, 24 de origen animal, 8 de
+  leche, 18 aceites y grasas, 10 azúcares, 10 libres), con porción en medida casera y en gramos,
+  micronutrimentos y equivalentes. Antes de escribir, `revisarCatalogo` verifica cada fila contra
+  Atwater y contra sus equivalentes; el seed **falla sin tocar la base** si alguna no cuadra. Esa
+  reja atrapó siete filas de origen animal cuyos subgrupos no cuadraban con el equivalente de
+  referencia (queso Oaxaca, chorizo, requesón…), corregidas expresando la grasa como equivalentes
+  de aceite, que es la aritmética del propio sistema.
+- **Tanda 2 — USDA FoodData Central**: `npm run db:import:usda` consulta la API, mapea categoría →
+  grupo de equivalentes, traduce la descripción al español (los alimentos que no están en el
+  diccionario **no se importan**: mejor un catálogo más chico que uno con nombres en inglés que
+  nadie encuentra) y elige los gramos que aportan un equivalente del grupo. El resultado se versiona
+  en `alimentos-usda.json`, así que la siembra es reproducible sin red ni llave de API.
+- **API `/api/v1/foods`**: listado con búsqueda difusa, `GET/PATCH/DELETE /{id}` y
+  `GET /groups`. La búsqueda combina `similarity` (nombre completo), `word_similarity` (palabra
+  dentro del nombre — sin esto "pollo" no encuentra "Pechuga de pollo sin piel, cocida") y prefijo
+  para consultas de tres letras. Autorización en la misma consulta: el catálogo público más lo
+  propio, nunca lo de otro nutriólogo, y 404 en vez de 403 para no revelar identificadores.
+- **UI**: `BuscadorAlimentos` contra la API con retardo de tecleo y filtros por grupo,
+  `FoodPicker` reescrito sobre él, y pantalla `/alimentos` con el CRUD de alimentos propios. El
+  formulario muestra en vivo los equivalentes que va a guardar y avisa cuando la energía no cuadra
+  con los macronutrimentos, sin bloquear: es una advertencia, no un veredicto.
+- **Baja lógica**: retirar un alimento propio marca `deleted_at`; los planes ya entregados que lo
+  citan no se reescriben.
+
+Verificado: **225 tests unitarios en `packages/shared`**, 77 en `apps/web`, type-check limpio y
+**9 E2E nuevos** contra la base real — catálogo sembrado y clasificado, búsqueda con acentos,
+sinonimia ("tomate rojo" → jitomate) y palabra interior, ficha completa con equivalentes, alta de
+alimento propio desde la UI, aislamiento entre nutriólogos (404 en lectura, edición y borrado),
+baja lógica que conserva la fila, y el catálogo público protegido contra edición.
+
+**Fuera de alcance deliberado**: las imágenes quedan pendientes de subir —
+`npm run db:imagenes` está escrito y sube a Vercel Blob desde Open Food Facts con atribución, pero
+requiere `BLOB_READ_WRITE_TOKEN`, que este entorno todavía no tiene; mientras, la UI muestra el
+respaldo por grupo. La tanda 3 (Open Food Facts, empaquetados con código de barras) sigue
+programada para la fase 8, como dice el calendario.
 
 ---
 

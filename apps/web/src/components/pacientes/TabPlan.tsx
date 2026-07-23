@@ -3,7 +3,7 @@
 import { AlertTriangle, LayoutTemplate, Loader2, Sparkles, Utensils } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-import type { Alimento, Paciente, PlanAlimenticio, PlantillaPlan } from '@nutria/shared';
+import type { AlimentoFicha, Paciente, PlanAlimenticio, PlantillaPlan } from '@nutria/shared';
 import { NOMBRE_ECUACION } from '@nutria/shared';
 
 import { FoodPicker } from '@/components/pacientes/FoodPicker';
@@ -47,20 +47,21 @@ export function TabPlan({ paciente }: { paciente: Paciente }) {
     );
   };
 
-  const agregarAlimento = (al: Alimento) => {
+  const agregarAlimento = (alimento: AlimentoFicha) => {
     setBorrador((b) => {
       const base: PlanAlimenticio =
         b ?? { calorias_diarias: 0, macros: { proteina_g: 0, carbos_g: 0, grasa_g: 0 }, comidas: [] };
+      const porcion = `${alimento.porcion_descripcion} (${alimento.porcion_gramos} g)`;
       return {
         ...base,
         comidas: [
           ...base.comidas,
           {
-            nombre: al.nombre,
+            nombre: alimento.nombre,
             horario: '—',
-            descripcion: `${al.porcion} de ${al.nombre.toLowerCase()}`,
-            porcion: al.porcion,
-            calorias: al.kcal,
+            descripcion: `${porcion} de ${alimento.nombre.toLowerCase()}`,
+            porcion,
+            calorias: Math.round(alimento.energia_kcal),
           },
         ],
       };

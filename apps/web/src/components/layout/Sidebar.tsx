@@ -8,6 +8,7 @@ import {
   Palette,
   Receipt,
   Users,
+  Utensils,
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 import Link from 'next/link';
@@ -20,6 +21,7 @@ const NAV_ITEMS = [
   { href: '/agenda', label: 'Agenda', icon: Calendar },
   { href: '/mensajes', label: 'Mensajes', icon: MessageCircle },
   { href: '/facturacion', label: 'Facturación', icon: Receipt },
+  { href: '/alimentos', label: 'Alimentos', icon: Utensils },
   { href: '/plantillas', label: 'Plantillas', icon: LayoutTemplate },
   { href: '/marca', label: 'Marca y datos', icon: Palette },
 ];

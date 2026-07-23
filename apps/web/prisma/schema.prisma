@@ -3,13 +3,18 @@
 // Los campos de texto clínico se cifran a nivel de aplicación antes de escribirse (fase 8).
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  // `postgresqlExtensions` deja que la migración cree pg_trgm; sin él, el índice
+  // de búsqueda difusa de alimentos viviría fuera del control de Prisma y cada
+  // `migrate dev` lo reportaría como drift.
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
+  extensions = [pg_trgm]
 }
 
 // ---------------------------------------------------------------------------
@@ -459,7 +464,13 @@ model Food {
   nutritionist User?          @relation(fields: [nutritionistId], references: [id], onDelete: Cascade)
   planItems    MealPlanItem[]
 
+  // Identidad estable del alimento en su fuente ("mx:tortilla-de-maiz", "usda:168878"):
+  // hace idempotente el seed, que se corre en cada deploy y en cada branch de preview.
+  // Los alimentos propios del nutriólogo no llevan `fuenteRef` y NULL nunca colisiona.
+  @@unique([fuente, fuenteRef])
   @@index([nombreNormalizado])
+  // Búsqueda difusa: "jitomate" tiene que encontrar "tomate rojo" (sección 5 del plan).
+  @@index([nombreNormalizado(ops: raw("gin_trgm_ops"))], map: "foods_nombre_normalizado_trgm_idx", type: Gin)
   @@index([grupoSmae])
   @@index([nutritionistId])
   @@map("foods")

@@ -209,12 +209,5 @@ export type Marca = {
   logo: string | null;
 };
 
-export type Alimento = {
-  cat: string;
-  nombre: string;
-  porcion: string;
-  kcal: number;
-  prot: number;
-  carb: number;
-  gras: number;
-};
+// El tipo `Alimento` del MVP (4 macros, catálogo en memoria) lo sustituye
+// `AlimentoFicha` en `alimentos/ficha.ts`, que refleja la tabla `foods`.
