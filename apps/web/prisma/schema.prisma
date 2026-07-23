@@ -522,6 +522,8 @@ model MealPlanItem {
   id                String  @id @default(uuid()) @db.Uuid
   mealId            String  @map("meal_id") @db.Uuid
   foodId            String? @map("food_id") @db.Uuid
+  // Identidad descriptiva inmutable: el PDF no cambia si Food se edita o elimina.
+  foodSnapshot      Json?   @map("food_snapshot")
   descripcionLibre  String? @map("descripcion_libre")
   cantidadPorciones Float   @default(1) @map("cantidad_porciones")
   energiaKcal       Float   @map("energia_kcal")

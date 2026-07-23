@@ -258,18 +258,8 @@ export async function listarMediciones(nutritionistId: string, patientId: string
   return paciente.measurements;
 }
 
-/**
- * Plan sobre el que se guarda el cálculo: el activo si lo hay, si no el último
- * borrador. Así el snapshot acompaña siempre al plan que el paciente tiene en
- * la mano, y la fase de planes lo encuentra donde lo espera.
- */
-async function planVigente(patientId: string) {
-  const activo = await prisma.mealPlan.findFirst({
-    where: { patientId, estado: 'ACTIVO' },
-    orderBy: { updatedAt: 'desc' },
-  });
-  if (activo) return activo;
-
+/** El cálculo nuevo prepara el borrador; nunca altera el plan histórico activo. */
+async function borradorVigente(patientId: string) {
   return prisma.mealPlan.findFirst({
     where: { patientId, estado: 'BORRADOR' },
     orderBy: { updatedAt: 'desc' },
@@ -298,7 +288,7 @@ export async function guardarCalculo(
     calculoSnapshot: snapshot as unknown as Prisma.InputJsonValue,
   };
 
-  const plan = await planVigente(patientId);
+  const plan = await borradorVigente(patientId);
   if (plan) {
     return prisma.mealPlan.update({ where: { id: plan.id }, data: metas });
   }

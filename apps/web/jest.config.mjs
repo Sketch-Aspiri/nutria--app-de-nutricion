@@ -8,6 +8,9 @@ const config = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   // Los specs de `e2e/` los corre Playwright, no Jest.
   testPathIgnorePatterns: ['<rootDir>/e2e/', '<rootDir>/.next/'],
+  coverageThreshold: {
+    global: { lines: 60 },
+  },
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
     // Se resuelve al código fuente para que SWC lo transpile en tests.

@@ -134,16 +134,15 @@ function ultimosPliegues(mediciones: MedicionApi[]): Pliegues | null {
 }
 
 /**
- * Campos que todavía no viven en la base (plan, seguimiento, recetas, notas).
- * Los aporta el almacén puente del cliente hasta que sus fases los migren.
+ * Campos que todavía no viven en la base (seguimiento, recetas y notas).
+ * El plan salió de este almacén en la fase 4 y se consulta por su propia API.
  */
 export type ExtrasPaciente = Pick<
   Paciente,
-  'planActivo' | 'planEjercicio' | 'notasConsulta' | 'seguimiento'
+  'planEjercicio' | 'notasConsulta' | 'seguimiento'
 >;
 
 export const EXTRAS_VACIOS: ExtrasPaciente = {
-  planActivo: null,
   planEjercicio: null,
   notasConsulta: [],
   seguimiento: {
@@ -200,6 +199,9 @@ export function aPacienteDominio(api: PacienteApi, extras: ExtrasPaciente): Paci
     // detalle auditable (comparativa, equivalentes) lo lee `TabCalculo` aparte.
     calculo: resultadoDeCalculo(api.calculo),
     ...extras,
+    // Los planes tienen ciclo de vida e historial propios en `usePlanes`.
+    // Se conserva el campo de dominio por compatibilidad con mobile.
+    planActivo: null,
   };
 }
 

@@ -315,7 +315,7 @@ Además: tests unitarios/integración de handlers con la BD (≥ 80 % en `src/se
 | **1. Pacientes reales** ✅ | 2 | CRUD pacientes + expediente + antropometría contra BD; wizard conectado; el store `localStorage` eliminado de estas vistas; E2E #2 y #9 en verde |
 | **2. Fórmulas + cálculo** ✅ | 3 | Módulo `nutricion/` ampliado con tests; TabCalculo con selector de ecuación y equivalentes; snapshot persistido; E2E #3 |
 | **3. Base de alimentos** ✅ | 3–4 | Seed tanda 1 (150 núcleo MX) + tanda 2 (USDA); imágenes en Blob; búsqueda pg_trgm; FoodPicker contra API; CRUD alimentos propios |
-| **4. Planes + PDF + plantillas** | 4–5 | Editor de plan sobre BD con items ligados a foods; plantillas; PDF real (react-pdf) con marca blanca; E2E #4 |
+| **4. Planes + PDF + plantillas** ✅ | 4–5 | Editor de plan sobre BD con items ligados a foods; plantillas; PDF real (react-pdf) con marca blanca; E2E #4 |
 | **5. IA Claude** | 5 | Servicio AI con streaming, salida estructurada validada, seudonimización, `ai_usage` y límites; los 5 casos de uso; E2E #10 |
 | **6. Agenda, mensajes, seguimiento** | 6 | Citas + recordatorios (cron + Resend); mensajes con polling; seguimiento leyendo logs reales; E2E #5, #6, #7 |
 | **7. Stripe** | 7 | Checkout, portal, webhooks, entitlements en servidor; paywall; E2E #8 |
@@ -513,6 +513,57 @@ baja lógica que conserva la fila, y el catálogo público protegido contra edic
 requiere `BLOB_READ_WRITE_TOKEN`, que este entorno todavía no tiene; mientras, la UI muestra el
 respaldo por grupo. La tanda 3 (Open Food Facts, empaquetados con código de barras) sigue
 programada para la fase 8, como dice el calendario.
+
+### Fase 4 — Planes + PDF + plantillas (completada)
+
+- **Editor de plan sobre BD** (`src/app/api/v1/patients/{id}/meal_plans`, `/meal_plans/{id}` y sus
+  sub-acciones `activate`, `duplicate`, `share`, `pdf`, `export_pdf`): el plan, sus comidas y sus
+  items viven en PostgreSQL, no en `localStorage`. `src/server/plans/repository.ts` filtra **toda**
+  consulta por `nutritionistId` a través del paciente dueño, usa `updateMany` y trata "0 filas" como
+  404, y reemplaza comidas/items de forma transaccional para que un guardado parcial no deje un plan
+  a medias. La validación está en `schemas.ts` (Zod) y la serialización al tipo de dominio en
+  `serializers.ts`.
+- **Items ligados a `foods` con snapshot**: migración expand-contract
+  `20260723_plan_item_food_snapshot` que agrega `food_snapshot` (jsonb, nullable) y hace backfill de
+  los planes existentes desde la relación viva. El item conserva el FK a `foods` **y** una copia
+  escalada de la porción (nombre, grupo, gramos, imagen y los macronutrimentos a la cantidad de
+  porciones elegida — `src/server/plans/foodSnapshot.ts`). Así, editar o dar de baja un alimento no
+  reescribe planes ya entregados. Los items sin alimento del catálogo aceptan `descripcion_libre`.
+- **Regla de alérgenos en el servidor**: activar un plan que menciona un alérgeno del paciente
+  responde **422 `PLAN_ALLERGEN_CONFLICT`** — la misma regla que la UI muestra en el editor, repetida
+  en el backend porque ocultar el botón no es control. El E2E lo comprueba por API directa, no solo
+  por pantalla.
+- **PDF real con `@react-pdf/renderer`** (`src/server/pdf/`, `src/components/pdf/`): documento
+  paginado de verdad (`mealPlanPagination.ts` reparte comidas en páginas), con **marca blanca** —
+  nombre, color y **logo** del nutriólogo embebidos como imagen en el PDF. Dos rutas: `GET /pdf`
+  entrega los bytes `inline` para la vista previa en iframe, `POST /export_pdf` los entrega como
+  `attachment` para descarga. Como el renderer es ESM puro y el Jest de la app corre en CommonJS, el
+  test lo verifica ejecutando un probe `tsx` en un proceso real (`renderProbe.ts`) que confirma
+  cabecera `%PDF-`, cierre `%%EOF`, tamaño y número de páginas — sin falsear el renderer con un mock.
+- **Plantillas** (`src/app/api/v1/plan_templates`, `components/planes/`): CRUD de plantillas del
+  nutriólogo, guardar el plan actual como plantilla (`SaveTemplateModal`), aplicar una plantilla al
+  editor (`TemplatePicker`) y editarlas (`TemplateEditorModal`). La estructura de comidas/items se
+  guarda en el jsonb `estructura`, aislada por `nutritionist_id`.
+- **Cliente y UI**: `src/services/planes.ts` (HTTP + traducción), `src/hooks/usePlanes.ts` (React
+  Query, con guardado y estado "Todos los cambios guardados"), y el `PlanEditor` dividido en
+  `PlanEditorHeader`/`Content`/`Footer` para respetar el límite de ~200 líneas. El almacén puente ya
+  no guarda planes.
+- **De paso**: se generó el contrato **OpenAPI** (`src/server/openapi.ts` + `/api/v1/docs`) a partir
+  de los schemas Zod, adelantando parte de la sección 7.
+
+Verificado: **157 tests unitarios en `apps/web` en verde** (editor-model, repositorio de planes con
+autorización y snapshot, serializadores, paginación y render real de PDF), **type-check limpio** y
+**`next build` exitoso**. El E2E #4 (`e2e/plan-alimenticio.spec.ts`) cubre el flujo completo contra
+la base real: generar borrador con IA seudonimizada, buscar un alimento del catálogo con imagen,
+persistir el item con su FK y snapshot escalado (0.25 porción → 37.5 kcal), bloqueo de activación por
+alérgeno (UI y API 422), recarga que relee desde la API, activación, PDF real con el logo de marca
+blanca embebido, descarga, compartir y aislamiento entre nutriólogos (404, no 403).
+
+**Fuera de alcance deliberado**: el `pdf_url` persistido en Blob se pospone junto con
+`BLOB_READ_WRITE_TOKEN` (misma restricción de entorno que las imágenes de la fase 3) — el PDF se
+genera bajo demanda en cada petición, que es correcto y suficiente para la prueba. El envío del plan
+al paciente por email/app móvil llega con la fase 6 y la app móvil; `compartir` marca `compartido_at`
+y deja el plan disponible.
 
 ---
 

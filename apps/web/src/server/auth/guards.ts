@@ -1,7 +1,9 @@
 import type { NextResponse } from 'next/server';
 import type { Session } from 'next-auth';
 
-import { ErrorCode, jsonError, unauthenticated } from '@/server/http';
+import { prisma } from '@/server/db';
+import { ErrorCode, internalError, jsonError, unauthenticated } from '@/server/http';
+import { logger } from '@/server/logger';
 
 import { auth } from './index';
 
@@ -22,7 +24,21 @@ export async function requiereNutriologo(): Promise<ResultadoSesion> {
     return { ok: false, respuesta: unauthenticated() };
   }
 
-  if (!sesion.user.emailVerificado) {
+  let usuario;
+  try {
+    usuario = await prisma.user.findFirst({
+      where: { id: sesion.user.id, deletedAt: null },
+      select: { emailVerified: true, role: true },
+    });
+  } catch (error: unknown) {
+    logger.error('Falló la validación de la sesión contra la base de datos', error);
+    return { ok: false, respuesta: internalError() };
+  }
+  if (!usuario) {
+    return { ok: false, respuesta: unauthenticated() };
+  }
+
+  if (!usuario.emailVerified) {
     return {
       ok: false,
       respuesta: jsonError(
@@ -33,7 +49,7 @@ export async function requiereNutriologo(): Promise<ResultadoSesion> {
     };
   }
 
-  if (sesion.user.role !== 'NUTRITIONIST' && sesion.user.role !== 'ADMIN') {
+  if (usuario.role !== 'NUTRITIONIST' && usuario.role !== 'ADMIN') {
     return {
       ok: false,
       respuesta: jsonError(

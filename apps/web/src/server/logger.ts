@@ -9,15 +9,63 @@
  */
 export const logger = {
   info(mensaje: string, contexto?: Record<string, unknown>): void {
-    console.info(`[nutria] ${mensaje}`, contexto ?? '');
+    console.info(`[nutria] ${mensaje}`, contextoSeguro(contexto));
   },
   warn(mensaje: string, contexto?: Record<string, unknown>): void {
-    console.warn(`[nutria] ${mensaje}`, contexto ?? '');
+    console.warn(`[nutria] ${mensaje}`, contextoSeguro(contexto));
   },
   error(mensaje: string, error?: unknown): void {
-    console.error(`[nutria] ${mensaje}`, error instanceof Error ? error.message : error);
+    console.error(`[nutria] ${mensaje}`, errorSeguro(error));
   },
 };
+
+const CLAVES_CONTEXTO_PERMITIDAS = new Set([
+  'code',
+  'correlationId',
+  'operation',
+  'provider',
+  'status',
+]);
+
+function contextoSeguro(
+  contexto?: Record<string, unknown>,
+): Record<string, string | number> | '' {
+  if (!contexto) return '';
+
+  return Object.fromEntries(
+    Object.entries(contexto).flatMap(([clave, valor]) =>
+      CLAVES_CONTEXTO_PERMITIDAS.has(clave) &&
+      (typeof valor === 'string' || typeof valor === 'number')
+        ? [[clave, limpiarControl(valor)]]
+        : [],
+    ),
+  );
+}
+
+function errorSeguro(error: unknown): Record<string, string> | '' {
+  if (!error) return '';
+
+  const tipo =
+    error instanceof Error && /^[A-Za-z0-9_.-]{1,80}$/.test(error.name)
+      ? error.name
+      : 'UnknownError';
+  const codigo =
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    typeof error.code === 'string' &&
+    /^[A-Z0-9_-]{1,32}$/i.test(error.code)
+      ? error.code
+      : null;
+
+  return codigo ? { tipo, codigo } : { tipo };
+}
+
+function limpiarControl(valor: string | number): string | number {
+  return typeof valor === 'string'
+    ? valor.replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 120)
+    : valor;
+}
 
 export function esDesarrollo(): boolean {
   return process.env.NODE_ENV !== 'production';

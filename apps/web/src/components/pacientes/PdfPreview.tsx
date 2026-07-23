@@ -1,87 +1,80 @@
 'use client';
 
-import { Download, X } from 'lucide-react';
+import { Download, ExternalLink, FileText, X } from 'lucide-react';
 
-import type { Marca, Paciente, PlanAlimenticio } from '@nutria/shared';
-
-import { Btn } from '@/components/ui/Btn';
 import { Modal } from '@/components/ui/Modal';
 
 type PdfPreviewProps = {
-  paciente: Paciente;
-  plan: PlanAlimenticio;
-  marca: Marca;
+  planId: string;
   onClose: () => void;
 };
 
-export function PdfPreview({ paciente, plan, marca, onClose }: PdfPreviewProps) {
+/**
+ * Previsualiza exactamente el documento que entrega el servidor.
+ *
+ * El navegador no reconstruye una versión HTML: tanto el iframe como la
+ * descarga apuntan al mismo endpoint PDF autenticado.
+ */
+export function PdfPreview({ planId, onClose }: PdfPreviewProps) {
+  const pdfUrl = `/api/v1/meal_plans/${planId}/pdf`;
+
   return (
     <Modal wide>
-      <div className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="font-display text-lg text-emerald-950 font-medium">
-            Vista previa · plan con tu marca
+      <div className="p-5">
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-800 text-white">
+              <FileText size={18} aria-hidden="true" />
+            </div>
+            <div className="min-w-0">
+              <div className="font-display text-lg font-medium text-emerald-950">
+                Vista previa del plan
+              </div>
+              <div className="truncate text-xs text-stone-500">Documento con marca blanca</div>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Btn size="sm" onClick={() => window.print()}>
-              <Download size={14} /> Descargar / Imprimir
-            </Btn>
-            <button type="button" onClick={onClose} className="text-stone-400 hover:text-stone-600" aria-label="Cerrar">
-              <X size={18} />
-            </button>
-          </div>
-        </div>
-        <div className="bg-white border border-stone-200 rounded-xl p-8" id="pdf-area">
-          <div
-            className="flex items-center justify-between border-b-2 pb-4 mb-5"
-            style={{ borderColor: marca.color }}
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-600"
+            aria-label="Cerrar vista previa del PDF"
           >
-            <div className="flex items-center gap-3">
-              {marca.logo ? (
-                // eslint-disable-next-line @next/next/no-img-element -- logo subido como data URL
-                <img src={marca.logo} alt="logo" className="w-12 h-12 object-contain rounded" />
-              ) : (
-                <div
-                  className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-medium"
-                  style={{ background: marca.color }}
-                >
-                  {(marca.nombre || 'N')[0]}
-                </div>
-              )}
-              <div>
-                <div className="font-display text-xl">{marca.nombre || 'nutria'}</div>
-                <div className="text-xs text-stone-400">{marca.profesional || 'Nutrióloga certificada'}</div>
-              </div>
-            </div>
-            <div className="text-right text-xs text-stone-400">
-              <div>Plan alimenticio</div>
-              <div>{new Date().toLocaleDateString('es-MX')}</div>
-            </div>
-          </div>
-          <div className="mb-4">
-            <div className="text-sm text-stone-400">Paciente</div>
-            <div className="text-lg text-emerald-950 font-medium">{paciente.nombre}</div>
-            <div className="text-xs text-stone-400">
-              {paciente.medico.objetivo} · {plan.calorias_diarias} kcal/día
-            </div>
-          </div>
-          <div className="space-y-3">
-            {plan.comidas.map((c, i) => (
-              <div key={i} className="border-l-2 pl-3" style={{ borderColor: marca.color }}>
-                <div className="text-sm font-medium text-emerald-950">
-                  {c.nombre} <span className="text-stone-400 font-normal">· {c.horario}</span>
-                </div>
-                <div className="text-xs text-stone-500">{c.descripcion}</div>
-                <div className="font-mono text-xs text-stone-400 mt-0.5">
-                  {c.porcion ? c.porcion + ' · ' : ''}
-                  {c.calorias} kcal
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="text-[10px] text-stone-400 mt-6 pt-3 border-t border-stone-100">
-            Documento generado por {marca.nombre || 'nutria'}. Uso exclusivo del paciente. No
-            sustituye consulta médica.
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="overflow-hidden rounded-xl border border-stone-200 bg-stone-200">
+          <iframe
+            className="h-[62vh] min-h-[420px] w-full bg-white"
+            src={pdfUrl}
+            title="Vista previa del plan alimenticio"
+          />
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <p className="max-w-sm text-xs text-stone-500">
+            El archivo incluye la marca guardada en tu perfil y los valores persistidos del plan.
+          </p>
+          <div className="flex gap-2">
+            <a
+              href={pdfUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 rounded-lg border border-emerald-800 px-3 py-2 text-xs font-medium text-emerald-800 transition-colors hover:bg-emerald-50"
+              aria-label="Abrir PDF del plan en otra pestaña"
+            >
+              <ExternalLink size={14} aria-hidden="true" />
+              Abrir
+            </a>
+            <a
+              href={`${pdfUrl}?download=1`}
+              download
+              className="inline-flex items-center gap-2 rounded-lg bg-emerald-900 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-emerald-800"
+              aria-label="Descargar PDF del plan"
+            >
+              <Download size={14} aria-hidden="true" />
+              Descargar PDF
+            </a>
           </div>
         </div>
       </div>

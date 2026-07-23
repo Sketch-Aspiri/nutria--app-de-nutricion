@@ -24,6 +24,20 @@ export const ErrorCode = {
   PLAN_LIMIT: 'PLAN_LIMIT',
   /** 422: la petición es correcta, pero el expediente no tiene los datos clínicos. */
   EXPEDIENTE_INCOMPLETO: 'EXPEDIENTE_INCOMPLETO',
+  /** 422: el plan menciona un alérgeno declarado por el paciente. */
+  PLAN_ALLERGEN_CONFLICT: 'PLAN_ALLERGEN_CONFLICT',
+  /** 422: el plan no tiene energía o contenido suficiente para activarse. */
+  PLAN_INCOMPLETE: 'PLAN_INCOMPLETE',
+  /** 422: la energía calculada del plan se desvía más de ±5% de la meta. */
+  PLAN_ENERGY_OUT_OF_RANGE: 'PLAN_ENERGY_OUT_OF_RANGE',
+  /** 409: un plan activo o archivado es histórico y no puede editarse. */
+  PLAN_NOT_EDITABLE: 'PLAN_NOT_EDITABLE',
+  /** 422: la estructura referencia comidas o items ajenos al plan. */
+  PLAN_STRUCTURE_INVALID: 'PLAN_STRUCTURE_INVALID',
+  /** 409: otra sesión guardó una versión más reciente del plan. */
+  PLAN_VERSION_CONFLICT: 'PLAN_VERSION_CONFLICT',
+  /** 422: el documento excede el máximo seguro de comidas o items. */
+  PLAN_PDF_TOO_LARGE: 'PLAN_PDF_TOO_LARGE',
   INTERNAL_ERROR: 'INTERNAL_ERROR',
 } as const;
 

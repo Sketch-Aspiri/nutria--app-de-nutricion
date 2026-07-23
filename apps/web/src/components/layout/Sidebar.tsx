@@ -14,7 +14,7 @@ import { signOut } from 'next-auth/react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-import { useAppState } from '@/store/app-state';
+import { usePerfil } from '@/hooks/usePerfil';
 
 const NAV_ITEMS = [
   { href: '/pacientes', label: 'Pacientes', icon: Users },
@@ -28,7 +28,8 @@ const NAV_ITEMS = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { marca } = useAppState();
+  const perfil = usePerfil();
+  const nombreMarca = perfil.data?.perfil?.marca_nombre || 'nutria';
 
   const cerrarSesion = () => {
     void signOut({ redirectTo: '/login' });
@@ -38,7 +39,7 @@ export function Sidebar() {
     <div className="w-56 bg-emerald-950 text-stone-100 flex flex-col shrink-0">
       <div className="px-6 py-7">
         <div className="font-display text-2xl font-medium tracking-tight">
-          {marca.nombre || 'nutria'}
+          {nombreMarca}
         </div>
         <div className="text-emerald-400 text-xs mt-1 tracking-wide uppercase">
           Panel de nutriólogo

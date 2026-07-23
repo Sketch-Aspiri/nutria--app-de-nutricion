@@ -1,104 +1,115 @@
 'use client';
 
-import { Camera, CheckCircle2, Palette, ShieldCheck } from 'lucide-react';
+import { Check, Loader2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
-import { colors } from '@nutria/ui-tokens';
-
-import { SectionCard } from '@/components/ui/SectionCard';
-import { inputClass as inp, labelClass as lbl } from '@/components/ui/campos';
-import { useAppState } from '@/store/app-state';
-
-const CUMPLIMIENTO = [
-  'Datos cifrados en tránsito y en reposo',
-  'Aviso de privacidad conforme a LFPDPPP (México)',
-  'Exportación de expedientes al cancelar la suscripción',
-  'Estructura alineable a NOM-004-SSA3',
-];
+import { BrandIdentityCard } from '@/components/profile/BrandIdentityCard';
+import {
+  FORMULARIO_MARCA_VACIO,
+  type FormularioMarca,
+} from '@/components/profile/model';
+import { ProfessionalDataCard } from '@/components/profile/ProfessionalDataCard';
+import { Btn } from '@/components/ui/Btn';
+import { useActualizarPerfil, usePerfil } from '@/hooks/usePerfil';
 
 export default function MarcaPage() {
-  const { marca, setMarca } = useAppState();
+  const perfil = usePerfil();
+  const actualizar = useActualizarPerfil();
+  const [form, setForm] = useState<FormularioMarca>(FORMULARIO_MARCA_VACIO);
+  const [modificado, setModificado] = useState(false);
 
-  const handleLogo = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    const r = new FileReader();
-    r.onload = () =>
-      setMarca((m) => ({ ...m, logo: typeof r.result === 'string' ? r.result : null }));
-    r.readAsDataURL(f);
+  useEffect(() => {
+    if (!perfil.data) return;
+    const datos = perfil.data.perfil;
+    setForm({
+      nombreCompleto: datos?.nombre_completo ?? perfil.data.nombre ?? '',
+      cedula: datos?.cedula_profesional ?? '',
+      especialidad: datos?.especialidad ?? '',
+      telefono: datos?.telefono ?? '',
+      marcaNombre: datos?.marca_nombre ?? '',
+      marcaColor: datos?.marca_color ?? '#065f46',
+      marcaLogo: datos?.marca_logo_url ?? null,
+    });
+    setModificado(false);
+  }, [perfil.data]);
+
+  const cambiar = (patch: Partial<FormularioMarca>) => {
+    setForm((actual) => ({ ...actual, ...patch }));
+    setModificado(true);
+    actualizar.reset();
   };
 
-  return (
-    <div className="p-8 max-w-2xl space-y-4">
-      <div>
-        <h1 className="font-display text-2xl text-emerald-950 font-medium">Marca y datos</h1>
-        <div className="text-stone-500 text-sm mt-1">
-          Tu identidad en los PDF y el portal del paciente (marca blanca)
-        </div>
+  const guardar = () => {
+    actualizar.mutate(
+      {
+        nombre_completo: form.nombreCompleto,
+        cedula_profesional: form.cedula || null,
+        especialidad: form.especialidad || null,
+        telefono: form.telefono || null,
+        marca_nombre: form.marcaNombre || null,
+        marca_color: form.marcaColor,
+        marca_logo_url: form.marcaLogo,
+      },
+      { onSuccess: () => setModificado(false) },
+    );
+  };
+
+  if (perfil.isPending) {
+    return (
+      <div className="flex items-center gap-2 p-8 text-sm text-stone-500">
+        <Loader2 size={16} className="animate-spin" /> Cargando tu identidad…
       </div>
-      <SectionCard title="Identidad" icon={Palette}>
-        <div className="flex items-center gap-4 mb-4">
-          {marca.logo ? (
-            // eslint-disable-next-line @next/next/no-img-element -- logo subido como data URL
-            <img src={marca.logo} alt="logo" className="w-16 h-16 object-contain rounded-lg border border-stone-200" />
-          ) : (
-            <div
-              className="w-16 h-16 rounded-lg flex items-center justify-center text-white text-xl font-medium"
-              style={{ background: marca.color }}
-            >
-              {(marca.nombre || 'N')[0]}
-            </div>
-          )}
-          <label className="flex items-center gap-2 text-xs text-emerald-800 border border-emerald-800 rounded-lg px-3 py-2 cursor-pointer hover:bg-emerald-50">
-            <Camera size={14} /> Subir logo
-            <input type="file" accept="image/*" className="hidden" onChange={handleLogo} />
-          </label>
-        </div>
-        <div className="space-y-3">
-          <div>
-            <label className={lbl}>Nombre del consultorio / marca</label>
-            <input
-              className={inp}
-              value={marca.nombre}
-              onChange={(e) => setMarca((m) => ({ ...m, nombre: e.target.value }))}
-            />
-          </div>
-          <div>
-            <label className={lbl}>Nombre profesional</label>
-            <input
-              className={inp}
-              value={marca.profesional}
-              onChange={(e) => setMarca((m) => ({ ...m, profesional: e.target.value }))}
-            />
-          </div>
-          <div>
-            <label className={lbl}>Color de marca</label>
-            <div className="flex gap-2">
-              {colors.brandPalette.map((c) => (
-                <button
-                  type="button"
-                  key={c}
-                  onClick={() => setMarca((m) => ({ ...m, color: c }))}
-                  className={`w-8 h-8 rounded-full ${marca.color === c ? 'ring-2 ring-offset-2 ring-stone-400' : ''}`}
-                  style={{ background: c }}
-                  aria-label={`Color ${c}`}
-                />
-              ))}
-            </div>
+    );
+  }
+
+  return (
+    <div className="max-w-3xl space-y-4 p-5 sm:p-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-lime-700">
+            Identidad profesional
+          </p>
+          <h1 className="font-display text-3xl font-medium text-emerald-950">Marca y datos</h1>
+          <div className="mt-1 text-sm text-stone-500">
+            Esta identidad aparece en cada plan alimenticio que entregas.
           </div>
         </div>
-      </SectionCard>
-      <SectionCard title="Seguridad y cumplimiento" icon={ShieldCheck}>
-        <div className="space-y-2 text-sm text-stone-600">
-          {CUMPLIMIENTO.map((item) => (
-            <div key={item} className="flex items-center gap-2">
-              <CheckCircle2 size={15} className="text-emerald-600" /> {item}
-            </div>
-          ))}
+        <Btn
+          onClick={guardar}
+          disabled={actualizar.isPending || !form.nombreCompleto.trim() || !modificado}
+        >
+          {actualizar.isPending ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : actualizar.isSuccess ? (
+            <Check size={16} />
+          ) : null}
+          {actualizar.isPending
+            ? 'Guardando…'
+            : actualizar.isSuccess && !modificado
+              ? 'Guardado'
+              : 'Guardar cambios'}
+        </Btn>
+      </div>
+
+      {perfil.isError && (
+        <div
+          role="alert"
+          className="rounded-xl border border-orange-200 bg-orange-50 p-3 text-sm text-orange-700"
+        >
+          No pudimos cargar tu perfil. Recarga la página para intentarlo de nuevo.
         </div>
-        <p className="text-xs text-stone-400 mt-3">
-          Marco de cumplimiento a implementar en el backend antes del lanzamiento comercial.
-        </p>
-      </SectionCard>
+      )}
+      {actualizar.isError && (
+        <div
+          role="alert"
+          className="rounded-xl border border-orange-200 bg-orange-50 p-3 text-sm text-orange-700"
+        >
+          {actualizar.error.message}
+        </div>
+      )}
+
+      <BrandIdentityCard form={form} onChange={cambiar} />
+      <ProfessionalDataCard form={form} onChange={cambiar} />
     </div>
   );
 }

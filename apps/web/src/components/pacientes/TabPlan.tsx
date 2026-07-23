@@ -1,170 +1,194 @@
 'use client';
 
-import { AlertTriangle, LayoutTemplate, Loader2, Sparkles, Utensils } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import {
+  AlertTriangle,
+  CalendarDays,
+  FilePlus2,
+  LayoutTemplate,
+  Loader2,
+} from 'lucide-react';
+import { useState } from 'react';
 
-import type { AlimentoFicha, Paciente, PlanAlimenticio, PlantillaPlan } from '@nutria/shared';
-import { NOMBRE_ECUACION } from '@nutria/shared';
+import { objetivoADb, type Paciente } from '@nutria/shared';
 
+import { AiPlanDraft } from '@/components/planes/AiPlanDraft';
+import { planAPayload } from '@/components/planes/editor-model';
+import { SaveTemplateModal } from '@/components/planes/SaveTemplateModal';
+import { TemplatePicker } from '@/components/planes/TemplatePicker';
 import { FoodPicker } from '@/components/pacientes/FoodPicker';
 import { PdfPreview } from '@/components/pacientes/PdfPreview';
 import { PlanEditor } from '@/components/pacientes/PlanEditor';
 import { Btn } from '@/components/ui/Btn';
-import { Modal, ModalHeader } from '@/components/ui/Modal';
 import { SectionCard } from '@/components/ui/SectionCard';
-import { useGenerarJSON } from '@/hooks/useIA';
-import { useAppState } from '@/store/app-state';
+import {
+  useCrearPlantilla,
+  usePlanWorkspace,
+  usePlantillasPlanes,
+} from '@/hooks/usePlanes';
 
-function promptPlan(paciente: Paciente, notas: string): string {
-  // La ecuación la elige el nutriólogo en la pestaña de cálculo: se nombra la
-  // que realmente produjo la meta, no una fija.
-  const metaTexto = paciente.calculo
-    ? `Meta calculada (${NOMBRE_ECUACION[paciente.calculo.ecuacion]}): ${paciente.calculo.objetivoCalorias} kcal, ${paciente.calculo.proteina_g}g proteína, ${paciente.calculo.carbos_g}g carbos, ${paciente.calculo.grasa_g}g grasa. Ajústate a estos números.`
-    : '';
-  return `Eres un asistente para nutriólogos certificados. Genera un BORRADOR de plan alimenticio de un día para que el profesional lo revise y apruebe. Nunca es final ni se usa sin supervisión.
-Paciente: ${paciente.nombre}, ${paciente.edad} años, ${paciente.antropometria.peso} kg, ${paciente.antropometria.altura} cm. Objetivo: ${paciente.medico.objetivo}. Condiciones: ${paciente.medico.condiciones.join(', ')}. Dieta: ${paciente.preferencias.tipoDieta}. Alergias: ${paciente.preferencias.alergias.join(', ')}. No le gusta: ${paciente.preferencias.disgustos || 'nada'}. Comidas al día: ${paciente.preferencias.comidasPorDia}.
-${metaTexto}
-Notas del nutriólogo: ${notas || 'ninguna'}
-Responde SOLO con JSON: {"calorias_diarias": number, "macros": {"proteina_g": number, "carbos_g": number, "grasa_g": number}, "comidas": [{"nombre": string, "horario": string, "descripcion": string, "porcion": string, "calorias": number}], "nota_ia": string}`;
+function fechaCorta(iso: string): string {
+  return new Intl.DateTimeFormat('es-MX', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(iso));
 }
 
 export function TabPlan({ paciente }: { paciente: Paciente }) {
-  const { marca, plantillas, updatePatient } = useAppState();
-  const [notas, setNotas] = useState('');
-  const [borrador, setBorrador] = useState<PlanAlimenticio | null>(paciente.planActivo);
-  const [foodPicker, setFoodPicker] = useState(false);
+  const workspace = usePlanWorkspace(paciente);
+  const { plantillas, cargando: cargandoPlantillas, error: errorPlantillas } =
+    usePlantillasPlanes();
+  const crearPlantilla = useCrearPlantilla();
+  const [comidaParaAlimento, setComidaParaAlimento] = useState<string | null>(null);
   const [showPdf, setShowPdf] = useState(false);
   const [showPlantillas, setShowPlantillas] = useState(false);
-  const generarPlan = useGenerarJSON<PlanAlimenticio>();
+  const [showGuardarPlantilla, setShowGuardarPlantilla] = useState(false);
 
-  // Al cambiar de paciente se recarga su plan activo.
-  useEffect(() => setBorrador(paciente.planActivo), [paciente.id, paciente.planActivo]);
-
-  const generar = () => {
-    generarPlan.mutate(
-      { prompt: promptPlan(paciente, notas) },
-      { onSuccess: (plan) => setBorrador(plan) },
-    );
-  };
-
-  const agregarAlimento = (alimento: AlimentoFicha) => {
-    setBorrador((b) => {
-      const base: PlanAlimenticio =
-        b ?? { calorias_diarias: 0, macros: { proteina_g: 0, carbos_g: 0, grasa_g: 0 }, comidas: [] };
-      const porcion = `${alimento.porcion_descripcion} (${alimento.porcion_gramos} g)`;
-      return {
-        ...base,
-        comidas: [
-          ...base.comidas,
-          {
-            nombre: alimento.nombre,
-            horario: '—',
-            descripcion: `${porcion} de ${alimento.nombre.toLowerCase()}`,
-            porcion,
-            calorias: Math.round(alimento.energia_kcal),
-          },
-        ],
-      };
-    });
-    setFoodPicker(false);
-  };
-
-  const aplicarPlantilla = (pl: PlantillaPlan) => {
-    setBorrador({
-      calorias_diarias: pl.calorias,
-      macros: { proteina_g: 0, carbos_g: 0, grasa_g: 0 },
-      comidas: [{ nombre: 'Comida base', horario: '—', descripcion: pl.descripcion, porcion: '', calorias: pl.calorias }],
-      nota_ia: `Basado en plantilla: ${pl.nombre}`,
-    });
-    setShowPlantillas(false);
-  };
-
-  const compartir = () => {
-    if (!borrador) return;
-    const compartido = { ...borrador, compartido: new Date().toLocaleString('es-MX') };
-    setBorrador(compartido);
-    updatePatient(paciente.id, { planActivo: compartido });
-  };
+  const plan = workspace.plan;
 
   return (
     <div className="space-y-5">
       <SectionCard
-        title="Generar plan"
-        icon={Sparkles}
+        title="Planes alimenticios"
+        icon={CalendarDays}
         action={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Btn size="sm" variant="outline" onClick={() => setShowPlantillas(true)}>
-              <LayoutTemplate size={13} /> Plantilla
+              <LayoutTemplate size={13} /> Aplicar plantilla
             </Btn>
-            <Btn size="sm" variant="outline" onClick={() => setFoodPicker(true)}>
-              <Utensils size={13} /> Base de alimentos
+            <Btn size="sm" onClick={workspace.nuevo}>
+              <FilePlus2 size={13} /> Nuevo plan
             </Btn>
           </div>
         }
       >
         {!paciente.calculo && (
-          <div className="text-xs text-orange-600 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2 mb-3 flex items-center gap-2">
-            <AlertTriangle size={13} /> Tip: calcula el requerimiento en la pestaña
-            &quot;Cálculo&quot; para que la IA se ajuste a metas exactas.
+          <div className="mb-3 flex items-start gap-2 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs leading-5 text-orange-700">
+            <AlertTriangle size={13} className="mt-0.5 shrink-0" />
+            Calcula primero el requerimiento para traer metas clínicas al nuevo plan. No asignamos
+            una meta automática sin ese cálculo.
           </div>
         )}
-        <textarea
-          value={notas}
-          onChange={(e) => setNotas(e.target.value)}
-          placeholder="Ej. priorizar desayunos rápidos, más fibra, 4 comidas..."
-          className="w-full border border-stone-200 rounded-lg p-3 text-sm resize-none focus:outline-none focus:border-emerald-400"
-          rows={2}
-        />
-        <Btn onClick={generar} disabled={generarPlan.isPending} className="mt-3">
-          {generarPlan.isPending ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-          {generarPlan.isPending ? 'Generando...' : 'Generar borrador con IA'}
-        </Btn>
-        {generarPlan.isError && (
-          <div className="text-orange-600 text-xs mt-2">
-            {generarPlan.error instanceof SyntaxError
-              ? 'La IA devolvió un formato inesperado. Intenta de nuevo.'
-              : generarPlan.error.message}
+
+        {workspace.planes.length > 0 && (
+          <label className="flex flex-wrap items-center gap-2 text-xs text-stone-500">
+            Historial
+            <select
+              value={plan?.id ?? ''}
+              onChange={(evento) => workspace.seleccionar(evento.target.value)}
+              className="min-w-64 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-emerald-950 focus:border-emerald-500 focus:outline-none"
+            >
+              {!plan?.id && <option value="">Plan nuevo sin guardar</option>}
+              {workspace.planes.map((opcion) => (
+                <option key={opcion.id} value={opcion.id}>
+                  {opcion.estado === 'ACTIVO'
+                    ? 'Activo'
+                    : opcion.estado === 'BORRADOR'
+                      ? 'Borrador'
+                      : 'Archivado'}
+                  {' · '}
+                  {fechaCorta(opcion.updated_at)}
+                  {' · '}
+                  {opcion.calorias_diarias} kcal
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {workspace.cargando && (
+          <div className="flex items-center gap-2 py-4 text-sm text-stone-400">
+            <Loader2 size={15} className="animate-spin" /> Cargando planes…
           </div>
+        )}
+        {(workspace.error || (!plan && workspace.errorAccion)) && (
+          <p role="alert" className="mt-3 text-xs text-orange-600">
+            {workspace.error?.message ?? workspace.errorAccion}
+          </p>
         )}
       </SectionCard>
 
-      {borrador && (
+      <AiPlanDraft paciente={paciente} onGenerated={workspace.usarBorradorIa} />
+
+      {!workspace.cargando && !plan && !workspace.error && (
+        <div className="rounded-2xl border border-dashed border-stone-300 bg-white px-6 py-12 text-center">
+          <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50 text-emerald-800">
+            <FilePlus2 size={20} />
+          </div>
+          <h3 className="font-display text-lg font-medium text-emerald-950">
+            Diseña el primer plan
+          </h3>
+          <p className="mx-auto mt-1 max-w-sm text-sm leading-6 text-stone-500">
+            Organiza comidas, liga alimentos de la base y revisa el balance antes de activarlo.
+          </p>
+          <Btn className="mt-4" onClick={workspace.nuevo}>
+            Crear borrador
+          </Btn>
+        </div>
+      )}
+
+      {plan && (
         <PlanEditor
           paciente={paciente}
-          borrador={borrador}
-          onChange={(fn) => setBorrador((b) => (b ? fn(b) : b))}
-          onCompartir={compartir}
-          onExportar={() => setShowPdf(true)}
-          onDescartar={() => setBorrador(null)}
+          plan={plan}
+          modificado={workspace.modificado}
+          guardando={workspace.enCurso}
+          error={workspace.errorAccion}
+          onChange={workspace.cambiarPlan}
+          onAddFood={setComidaParaAlimento}
+          onSave={() => void workspace.guardar()}
+          onActivate={() => void workspace.activarActual()}
+          onShare={() => void workspace.compartirActual()}
+          onDuplicate={() => void workspace.duplicarActual()}
+          onExport={() => setShowPdf(true)}
+          onSaveTemplate={() => setShowGuardarPlantilla(true)}
+          onReset={workspace.restablecer}
         />
       )}
 
-      {foodPicker && <FoodPicker onAdd={agregarAlimento} onClose={() => setFoodPicker(false)} />}
-      {showPdf && borrador && (
-        <PdfPreview paciente={paciente} plan={borrador} marca={marca} onClose={() => setShowPdf(false)} />
+      {comidaParaAlimento && (
+        <FoodPicker
+          onAdd={(alimento) => {
+            workspace.agregarAlimento(comidaParaAlimento, alimento);
+            setComidaParaAlimento(null);
+          }}
+          onClose={() => setComidaParaAlimento(null)}
+        />
+      )}
+      {showPdf && plan?.id && (
+        <PdfPreview planId={plan.id} onClose={() => setShowPdf(false)} />
       )}
       {showPlantillas && (
-        <Modal>
-          <div className="p-6">
-            <ModalHeader title="Aplicar plantilla" onClose={() => setShowPlantillas(false)} />
-            <div className="space-y-2">
-              {plantillas.map((pl) => (
-                <button
-                  type="button"
-                  key={pl.id}
-                  onClick={() => aplicarPlantilla(pl)}
-                  className="w-full text-left border border-stone-200 rounded-lg p-3 hover:border-emerald-300"
-                >
-                  <div className="flex justify-between">
-                    <span className="text-sm text-emerald-950 font-medium">{pl.nombre}</span>
-                    <span className="font-mono text-xs text-stone-400">{pl.calorias} kcal</span>
-                  </div>
-                  <div className="text-xs text-stone-500 mt-0.5">{pl.descripcion}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-        </Modal>
+        <TemplatePicker
+          plantillas={plantillas}
+          cargando={cargandoPlantillas}
+          aplicando={workspace.aplicandoPlantilla}
+          error={errorPlantillas?.message ?? null}
+          onApply={(plantilla) =>
+            void workspace.aplicarPlantilla(plantilla).then((aplicada) => {
+              if (aplicada) setShowPlantillas(false);
+            })
+          }
+          onClose={() => setShowPlantillas(false)}
+        />
+      )}
+      {showGuardarPlantilla && plan && (
+        <SaveTemplateModal
+          objetivoInicial={objetivoADb(paciente.medico.objetivo)}
+          calorias={plan.calorias_diarias}
+          guardando={crearPlantilla.isPending}
+          error={crearPlantilla.error?.message ?? null}
+          onSave={(datos) =>
+            crearPlantilla.mutate(
+              {
+                ...datos,
+                estructura: { comidas: planAPayload(plan).comidas ?? [] },
+              },
+              { onSuccess: () => setShowGuardarPlantilla(false) },
+            )
+          }
+          onClose={() => setShowGuardarPlantilla(false)}
+        />
       )}
     </div>
   );

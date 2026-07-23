@@ -1,0 +1,3 @@
+export const MAX_COMIDAS_PLAN = 12;
+export const MAX_ITEMS_POR_COMIDA = 20;
+export const MAX_ITEMS_PLAN = MAX_COMIDAS_PLAN * MAX_ITEMS_POR_COMIDA;
