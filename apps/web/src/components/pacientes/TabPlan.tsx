@@ -4,6 +4,7 @@ import { AlertTriangle, LayoutTemplate, Loader2, Sparkles, Utensils } from 'luci
 import { useEffect, useState } from 'react';
 
 import type { Alimento, Paciente, PlanAlimenticio, PlantillaPlan } from '@nutria/shared';
+import { NOMBRE_ECUACION } from '@nutria/shared';
 
 import { FoodPicker } from '@/components/pacientes/FoodPicker';
 import { PdfPreview } from '@/components/pacientes/PdfPreview';
@@ -15,8 +16,10 @@ import { useGenerarJSON } from '@/hooks/useIA';
 import { useAppState } from '@/store/app-state';
 
 function promptPlan(paciente: Paciente, notas: string): string {
+  // La ecuación la elige el nutriólogo en la pestaña de cálculo: se nombra la
+  // que realmente produjo la meta, no una fija.
   const metaTexto = paciente.calculo
-    ? `Meta calculada (Mifflin-St Jeor): ${paciente.calculo.objetivoCalorias} kcal, ${paciente.calculo.proteina_g}g proteína, ${paciente.calculo.carbos_g}g carbos, ${paciente.calculo.grasa_g}g grasa. Ajústate a estos números.`
+    ? `Meta calculada (${NOMBRE_ECUACION[paciente.calculo.ecuacion]}): ${paciente.calculo.objetivoCalorias} kcal, ${paciente.calculo.proteina_g}g proteína, ${paciente.calculo.carbos_g}g carbos, ${paciente.calculo.grasa_g}g grasa. Ajústate a estos números.`
     : '';
   return `Eres un asistente para nutriólogos certificados. Genera un BORRADOR de plan alimenticio de un día para que el profesional lo revise y apruebe. Nunca es final ni se usa sin supervisión.
 Paciente: ${paciente.nombre}, ${paciente.edad} años, ${paciente.antropometria.peso} kg, ${paciente.antropometria.altura} cm. Objetivo: ${paciente.medico.objetivo}. Condiciones: ${paciente.medico.condiciones.join(', ')}. Dieta: ${paciente.preferencias.tipoDieta}. Alergias: ${paciente.preferencias.alergias.join(', ')}. No le gusta: ${paciente.preferencias.disgustos || 'nada'}. Comidas al día: ${paciente.preferencias.comidasPorDia}.

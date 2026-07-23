@@ -1,10 +1,12 @@
 import type {
   AnthropometryMeasurement,
   FoodPreference,
+  MealPlan,
   MedicalRecord,
   Patient,
 } from '@prisma/client';
 
+import type { SnapshotCalculo } from '@nutria/shared';
 import { edadDesdeFechaNacimiento } from '@nutria/shared';
 
 /**
@@ -61,10 +63,31 @@ export function serializarPreferencias(preferencias: FoodPreference | null) {
   };
 }
 
+export type CalculoSerializado = {
+  meal_plan_id: string;
+  guardado_en: string;
+  /**
+   * Documento versionado producido por `packages/shared`. Sus campos internos
+   * son los del módulo de nutrición (camelCase) y no forman parte del contrato
+   * de la API: se lee entero o no se lee, y `version` indica cómo interpretarlo.
+   */
+  snapshot: SnapshotCalculo;
+};
+
+export function serializarCalculo(plan: MealPlan): CalculoSerializado | null {
+  if (!plan.calculoSnapshot) return null;
+  return {
+    meal_plan_id: plan.id,
+    guardado_en: plan.updatedAt.toISOString(),
+    snapshot: plan.calculoSnapshot as unknown as SnapshotCalculo,
+  };
+}
+
 type PacienteConRelaciones = Patient & {
   medicalRecord: MedicalRecord | null;
   foodPreference: FoodPreference | null;
   measurements: AnthropometryMeasurement[];
+  mealPlans: MealPlan[];
 };
 
 function datosBase(paciente: Patient) {
@@ -96,6 +119,7 @@ export function serializarPacienteResumen(
 
 export function serializarPacienteDetalle(paciente: PacienteConRelaciones) {
   const mediciones = paciente.measurements;
+  const planConCalculo = paciente.mealPlans[0];
   return {
     ...datosBase(paciente),
     expediente_medico: serializarExpedienteMedico(paciente.medicalRecord),
@@ -103,5 +127,6 @@ export function serializarPacienteDetalle(paciente: PacienteConRelaciones) {
     // Vienen ordenadas de la más reciente a la más antigua.
     mediciones: mediciones.map(serializarMedicion),
     ultima_medicion: mediciones[0] ? serializarMedicion(mediciones[0]) : null,
+    calculo: planConCalculo ? serializarCalculo(planConCalculo) : null,
   };
 }

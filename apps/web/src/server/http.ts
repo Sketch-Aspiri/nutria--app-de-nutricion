@@ -22,6 +22,8 @@ export const ErrorCode = {
   EMAIL_NOT_VERIFIED: 'EMAIL_NOT_VERIFIED',
   RATE_LIMITED: 'RATE_LIMITED',
   PLAN_LIMIT: 'PLAN_LIMIT',
+  /** 422: la petición es correcta, pero el expediente no tiene los datos clínicos. */
+  EXPEDIENTE_INCOMPLETO: 'EXPEDIENTE_INCOMPLETO',
   INTERNAL_ERROR: 'INTERNAL_ERROR',
 } as const;
 

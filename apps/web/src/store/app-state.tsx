@@ -11,10 +11,11 @@ import { CITAS_DEMO, FACTURAS_DEMO, MARCA_DEMO, MENSAJES_DEMO, PLANTILLAS_DEMO }
 /**
  * Almacén puente.
  *
- * Los pacientes y su expediente ya viven en PostgreSQL (ver `usePacientes`).
- * Aquí solo quedan las partes que sus fases todavía no migran: el cálculo, el
- * plan, el seguimiento, las recetas y las notas de cada paciente, más agenda,
- * mensajes, facturación, plantillas y marca. Cada fase irá vaciando este archivo.
+ * Los pacientes, su expediente y su cálculo nutricional ya viven en PostgreSQL
+ * (ver `usePacientes`). Aquí solo quedan las partes que sus fases todavía no
+ * migran: el plan, el seguimiento, las recetas y las notas de cada paciente,
+ * más agenda, mensajes, facturación, plantillas y marca. Cada fase irá
+ * vaciando este archivo.
  */
 
 const STORAGE_KEY = 'nutria-web-state-v2';

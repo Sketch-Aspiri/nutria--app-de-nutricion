@@ -1,4 +1,6 @@
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+
+import type { SnapshotCalculo } from '@nutria/shared';
 
 import { prisma } from '@/server/db';
 
@@ -28,7 +30,14 @@ export function esIdValido(id: string): boolean {
 const RELACIONES_DETALLE = {
   medicalRecord: true,
   foodPreference: true,
-  measurements: { orderBy: { fecha: 'desc' } },
+  measurements: { orderBy: [{ fecha: 'desc' }, { createdAt: 'desc' }] },
+  // Solo el plan vigente y solo si ya guarda un cálculo: el detalle del
+  // paciente muestra el último snapshot, no el histórico de planes.
+  mealPlans: {
+    where: { calculoSnapshot: { not: Prisma.DbNull } },
+    orderBy: { updatedAt: 'desc' },
+    take: 1,
+  },
 } satisfies Prisma.PatientInclude;
 
 function normalizarTexto(valor: string | null | undefined): string | null {
@@ -247,6 +256,56 @@ export async function listarMediciones(nutritionistId: string, patientId: string
   const paciente = await buscarPaciente(nutritionistId, patientId);
   if (!paciente) return null;
   return paciente.measurements;
+}
+
+/**
+ * Plan sobre el que se guarda el cálculo: el activo si lo hay, si no el último
+ * borrador. Así el snapshot acompaña siempre al plan que el paciente tiene en
+ * la mano, y la fase de planes lo encuentra donde lo espera.
+ */
+async function planVigente(patientId: string) {
+  const activo = await prisma.mealPlan.findFirst({
+    where: { patientId, estado: 'ACTIVO' },
+    orderBy: { updatedAt: 'desc' },
+  });
+  if (activo) return activo;
+
+  return prisma.mealPlan.findFirst({
+    where: { patientId, estado: 'BORRADOR' },
+    orderBy: { updatedAt: 'desc' },
+  });
+}
+
+/**
+ * Persiste el snapshot del cálculo junto con las metas que produce.
+ * Devuelve null si el paciente no es de este nutriólogo.
+ */
+export async function guardarCalculo(
+  nutritionistId: string,
+  patientId: string,
+  snapshot: SnapshotCalculo,
+) {
+  const paciente = await buscarPaciente(nutritionistId, patientId);
+  if (!paciente) return null;
+
+  const metas = {
+    caloriasDiarias: snapshot.resultado.objetivoCalorias,
+    proteinaG: snapshot.resultado.proteina_g,
+    carbosG: snapshot.resultado.carbos_g,
+    grasaG: snapshot.resultado.grasa_g,
+    // El snapshot es un documento versionado de `packages/shared`; Prisma lo
+    // guarda tal cual en la columna jsonb.
+    calculoSnapshot: snapshot as unknown as Prisma.InputJsonValue,
+  };
+
+  const plan = await planVigente(patientId);
+  if (plan) {
+    return prisma.mealPlan.update({ where: { id: plan.id }, data: metas });
+  }
+
+  return prisma.mealPlan.create({
+    data: { patientId, estado: 'BORRADOR', origen: 'MANUAL', ...metas },
+  });
 }
 
 export async function agregarMedicion(

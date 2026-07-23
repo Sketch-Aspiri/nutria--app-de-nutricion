@@ -1,7 +1,28 @@
 /**
  * @jest-environment node
  */
-import { EXTRAS_VACIOS, type PacienteApi, aPacienteDominio } from './pacientes';
+import {
+  EXTRAS_VACIOS,
+  type MedicionApi,
+  type PacienteApi,
+  aPacienteDominio,
+  resultadoDeCalculo,
+} from './pacientes';
+
+function medicionApi(overrides: Partial<MedicionApi> = {}): MedicionApi {
+  return {
+    id: 'm1',
+    fecha: '2026-07-20',
+    peso_kg: null,
+    altura_cm: null,
+    cintura_cm: null,
+    cadera_cm: null,
+    grasa_pct: null,
+    musculo_pct: null,
+    pliegues: null,
+    ...overrides,
+  };
+}
 
 function pacienteApi(overrides: Partial<PacienteApi> = {}): PacienteApi {
   return {
@@ -30,6 +51,7 @@ function pacienteApi(overrides: Partial<PacienteApi> = {}): PacienteApi {
     },
     mediciones: [],
     ultima_medicion: null,
+    calculo: null,
     ...overrides,
   };
 }
@@ -52,16 +74,13 @@ describe('aPacienteDominio', () => {
   it('toma la antropometría de la última medición', () => {
     const paciente = aPacienteDominio(
       pacienteApi({
-        ultima_medicion: {
-          id: 'm1',
-          fecha: '2026-07-20',
+        ultima_medicion: medicionApi({
           peso_kg: 72.5,
           altura_cm: 168,
           cintura_cm: 80,
           cadera_cm: 95,
           grasa_pct: 28,
-          musculo_pct: null,
-        },
+        }),
       }),
       EXTRAS_VACIOS,
     );
@@ -79,16 +98,8 @@ describe('aPacienteDominio', () => {
   });
 
   it('ordena el historial de peso de la medición más antigua a la más reciente', () => {
-    const medicion = (id: string, fecha: string, peso: number) => ({
-      id,
-      fecha,
-      peso_kg: peso,
-      altura_cm: null,
-      cintura_cm: null,
-      cadera_cm: null,
-      grasa_pct: null,
-      musculo_pct: null,
-    });
+    const medicion = (id: string, fecha: string, peso: number) =>
+      medicionApi({ id, fecha, peso_kg: peso });
 
     const paciente = aPacienteDominio(
       pacienteApi({
@@ -108,18 +119,7 @@ describe('aPacienteDominio', () => {
   it('omite del historial las mediciones que no registraron peso', () => {
     const paciente = aPacienteDominio(
       pacienteApi({
-        mediciones: [
-          {
-            id: 'm1',
-            fecha: '2026-07-20',
-            peso_kg: null,
-            altura_cm: 170,
-            cintura_cm: null,
-            cadera_cm: null,
-            grasa_pct: null,
-            musculo_pct: null,
-          },
-        ],
+        mediciones: [medicionApi({ altura_cm: 170 })],
       }),
       EXTRAS_VACIOS,
     );
@@ -178,5 +178,58 @@ describe('aPacienteDominio', () => {
 
     expect(paciente.email).toBe('');
     expect(paciente.telefono).toBe('');
+  });
+
+  it('toma los pliegues de la medición más reciente que los tenga', () => {
+    const paciente = aPacienteDominio(
+      pacienteApi({
+        mediciones: [
+          medicionApi({ id: 'm2', fecha: '2026-07-20', peso_kg: 70 }),
+          medicionApi({
+            id: 'm1',
+            fecha: '2026-05-20',
+            peso_kg: 72,
+            pliegues: { tricipital: 20, bicipital: 10, subescapular: 22, suprailiaco: 24 },
+          }),
+        ],
+      }),
+      EXTRAS_VACIOS,
+    );
+
+    expect(paciente.antropometria.pliegues).toEqual({
+      tricipital: 20,
+      bicipital: 10,
+      subescapular: 22,
+      suprailiaco: 24,
+    });
+  });
+
+  it('deja los pliegues en nulo cuando ninguna medición los registró', () => {
+    const paciente = aPacienteDominio(
+      pacienteApi({ mediciones: [medicionApi({ peso_kg: 70 })] }),
+      EXTRAS_VACIOS,
+    );
+
+    expect(paciente.antropometria.pliegues).toBeNull();
+  });
+
+  it('expone el resultado energético del cálculo guardado', () => {
+    const paciente = aPacienteDominio(
+      pacienteApi({
+        calculo: {
+          meal_plan_id: 'p1',
+          guardado_en: '2026-07-22T15:00:00.000Z',
+          snapshot: { resultado: { objetivoCalorias: 1750 } } as never,
+        },
+      }),
+      EXTRAS_VACIOS,
+    );
+
+    expect(paciente.calculo?.objetivoCalorias).toBe(1750);
+  });
+
+  it('deja el cálculo en nulo mientras el paciente no tenga uno guardado', () => {
+    expect(aPacienteDominio(pacienteApi(), EXTRAS_VACIOS).calculo).toBeNull();
+    expect(resultadoDeCalculo(null)).toBeNull();
   });
 });

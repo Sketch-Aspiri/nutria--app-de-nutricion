@@ -1,9 +1,15 @@
 import type {
+  CalculoNutricional,
+  EcuacionBmr,
   GeneroDb,
+  GrupoSmae,
+  ModoProteina,
   NivelActividadDb,
   ObjetivoDb,
   Paciente,
+  Pliegues,
   RegistroPeso,
+  SnapshotCalculo,
 } from '@nutria/shared';
 import { generoDesdeDb, nivelActividadDesdeDb, objetivoDesdeDb } from '@nutria/shared';
 
@@ -21,6 +27,14 @@ export type MedicionApi = {
   cadera_cm: number | null;
   grasa_pct: number | null;
   musculo_pct: number | null;
+  pliegues: Pliegues | null;
+};
+
+/** Cálculo guardado: el snapshot versionado más los datos de su persistencia. */
+export type CalculoApi = {
+  meal_plan_id: string;
+  guardado_en: string;
+  snapshot: SnapshotCalculo;
 };
 
 export type PacienteApi = {
@@ -49,11 +63,12 @@ export type PacienteApi = {
   } | null;
   mediciones: MedicionApi[];
   ultima_medicion: MedicionApi | null;
+  calculo: CalculoApi | null;
 };
 
 export type PacienteResumenApi = Omit<
   PacienteApi,
-  'expediente_medico' | 'preferencias_alimentarias' | 'mediciones' | 'ultima_medicion'
+  'expediente_medico' | 'preferencias_alimentarias' | 'mediciones' | 'ultima_medicion' | 'calculo'
 > & { objetivo: ObjetivoDb | null };
 
 export type ErrorApi = {
@@ -113,17 +128,21 @@ function historialDePeso(mediciones: MedicionApi[]): RegistroPeso[] {
     .reverse();
 }
 
+/** Los pliegues se toman de la medición más reciente que los tenga registrados. */
+function ultimosPliegues(mediciones: MedicionApi[]): Pliegues | null {
+  return mediciones.find((m) => m.pliegues)?.pliegues ?? null;
+}
+
 /**
- * Campos que todavía no viven en la base (cálculo, plan, seguimiento, recetas).
+ * Campos que todavía no viven en la base (plan, seguimiento, recetas, notas).
  * Los aporta el almacén puente del cliente hasta que sus fases los migren.
  */
 export type ExtrasPaciente = Pick<
   Paciente,
-  'calculo' | 'planActivo' | 'planEjercicio' | 'notasConsulta' | 'seguimiento'
+  'planActivo' | 'planEjercicio' | 'notasConsulta' | 'seguimiento'
 >;
 
 export const EXTRAS_VACIOS: ExtrasPaciente = {
-  calculo: null,
   planActivo: null,
   planEjercicio: null,
   notasConsulta: [],
@@ -165,6 +184,7 @@ export function aPacienteDominio(api: PacienteApi, extras: ExtrasPaciente): Paci
       cintura: ultima?.cintura_cm ?? 0,
       cadera: ultima?.cadera_cm ?? 0,
       grasaCorporal: ultima?.grasa_pct ?? 0,
+      pliegues: ultimosPliegues(api.mediciones),
       historial: historialDePeso(api.mediciones),
     },
     preferencias: {
@@ -176,8 +196,15 @@ export function aPacienteDominio(api: PacienteApi, extras: ExtrasPaciente): Paci
         (preferencias?.presupuesto_tiempo as Paciente['preferencias']['presupuestoTiempo']) ??
         'Medio',
     },
+    // Del snapshot guardado solo el resultado energético entra al dominio; el
+    // detalle auditable (comparativa, equivalentes) lo lee `TabCalculo` aparte.
+    calculo: resultadoDeCalculo(api.calculo),
     ...extras,
   };
+}
+
+export function resultadoDeCalculo(calculo: CalculoApi | null): CalculoNutricional | null {
+  return calculo?.snapshot?.resultado ?? null;
 }
 
 export type CrearPacientePayload = {
@@ -225,12 +252,32 @@ export function crearPacienteApi(payload: CrearPacientePayload): Promise<Pacient
   });
 }
 
-export function agregarMedicionApi(
-  id: string,
-  medicion: NonNullable<CrearPacientePayload['antropometria']>,
-): Promise<MedicionApi> {
+export type MedicionPayload = NonNullable<CrearPacientePayload['antropometria']> & {
+  pliegues?: Pliegues | null;
+};
+
+export function agregarMedicionApi(id: string, medicion: MedicionPayload): Promise<MedicionApi> {
   return pedir<MedicionApi>(`/api/v1/patients/${id}/measurements`, {
     method: 'POST',
     body: JSON.stringify(medicion),
+  });
+}
+
+/**
+ * Opciones del cálculo. Solo el método: los resultados los produce el servidor
+ * a partir del expediente, para que el snapshot guardado sea auditable.
+ */
+export type OpcionesCalculo = {
+  ecuacion?: EcuacionBmr;
+  modo_proteina?: ModoProteina;
+  proteina_g_por_kg?: number | null;
+  usar_peso_ajustado?: boolean;
+  minimos_equivalentes?: Partial<Record<GrupoSmae, number>>;
+};
+
+export function guardarCalculoApi(id: string, opciones: OpcionesCalculo): Promise<CalculoApi> {
+  return pedir<CalculoApi>(`/api/v1/patients/${id}/calculations`, {
+    method: 'POST',
+    body: JSON.stringify(opciones),
   });
 }

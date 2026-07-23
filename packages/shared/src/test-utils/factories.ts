@@ -21,7 +21,15 @@ export function crearPacienteDePrueba(overrides: Partial<Paciente> = {}): Pacien
       nivelActividad: 'Moderado',
       objetivo: 'Mantenimiento',
     },
-    antropometria: { peso: 65, altura: 165, cintura: 0, cadera: 0, grasaCorporal: 0, historial: [] },
+    antropometria: {
+      peso: 65,
+      altura: 165,
+      cintura: 0,
+      cadera: 0,
+      grasaCorporal: 0,
+      pliegues: null,
+      historial: [],
+    },
     preferencias: {
       tipoDieta: 'Omnívoro',
       alergias: ['Ninguna'],

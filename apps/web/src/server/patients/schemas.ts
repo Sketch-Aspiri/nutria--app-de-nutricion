@@ -88,6 +88,42 @@ export const actualizarPacienteSchema = z
     message: 'No hay nada que actualizar.',
   });
 
+const ECUACIONES = [
+  'mifflin_st_jeor',
+  'harris_benedict',
+  'fao_oms',
+  'katch_mcardle',
+] as const;
+const GRUPOS_EQUIVALENTES = [
+  'verduras',
+  'frutas',
+  'cereales',
+  'leguminosas',
+  'origen_animal',
+  'leche',
+  'aceites',
+  'azucares',
+] as const;
+
+/**
+ * Opciones del cálculo. El cliente elige el método, nunca manda resultados:
+ * el servidor recalcula desde el expediente para que el snapshot sea auditable.
+ */
+export const calculoSchema = z.object({
+  ecuacion: z.enum(ECUACIONES).optional(),
+  modo_proteina: z.enum(['porcentaje', 'g_por_kg']).optional(),
+  // Fuera de 0.4–3 g/kg no hay indicación clínica: es un error de captura.
+  proteina_g_por_kg: z.number().min(0.4).max(3).nullish(),
+  usar_peso_ajustado: z.boolean().optional(),
+  // Parcial: el nutriólogo sube el mínimo de los grupos que le interesan y el
+  // resto conserva el piso por defecto del módulo de equivalentes.
+  minimos_equivalentes: z
+    .partialRecord(z.enum(GRUPOS_EQUIVALENTES), z.number().min(0).max(20))
+    .optional(),
+});
+
+export type CalculoInput = z.infer<typeof calculoSchema>;
+
 export type CrearPacienteInput = z.infer<typeof crearPacienteSchema>;
 export type ActualizarPacienteInput = z.infer<typeof actualizarPacienteSchema>;
 export type MedicionInput = z.infer<typeof medicionSchema>;

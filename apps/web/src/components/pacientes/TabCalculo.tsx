@@ -1,108 +1,226 @@
 'use client';
 
-import { AlertTriangle, Calculator, CheckCircle2, Flame } from 'lucide-react';
-import { useState } from 'react';
+import { AlertTriangle, Calculator, Check, Loader2, Save } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
-import { calcularTDEE, type Paciente } from '@nutria/shared';
+import type {
+  DatosSnapshot,
+  EcuacionBmr,
+  ModoProteina,
+  Paciente,
+  SnapshotCalculo,
+} from '@nutria/shared';
+import { ECUACION_POR_DEFECTO, construirSnapshotCalculo } from '@nutria/shared';
 
+import { ComparativaEcuaciones } from '@/components/pacientes/calculo/ComparativaEcuaciones';
+import { FormPliegues } from '@/components/pacientes/calculo/FormPliegues';
+import { PanelAntropometria } from '@/components/pacientes/calculo/PanelAntropometria';
+import { PanelEquivalentes } from '@/components/pacientes/calculo/PanelEquivalentes';
+import { PanelResultado } from '@/components/pacientes/calculo/PanelResultado';
 import { Btn } from '@/components/ui/Btn';
 import { SectionCard } from '@/components/ui/SectionCard';
-import { useAppState } from '@/store/app-state';
+import { inputClass as inp, labelClass as lbl } from '@/components/ui/campos';
+import { useGuardarCalculo } from '@/hooks/usePacientes';
+import { ApiError, type CalculoApi } from '@/services/pacientes';
 
-function Dato({ etiqueta, valor, ancho }: { etiqueta: string; valor: React.ReactNode; ancho?: string }) {
-  return (
-    <div className={`bg-stone-50 rounded-lg p-3 ${ancho ?? ''}`}>
-      <div className="text-stone-400 text-xs">{etiqueta}</div>
-      <div className="text-emerald-950 font-medium">{valor}</div>
-    </div>
-  );
+type Opciones = {
+  ecuacion: EcuacionBmr;
+  modoProteina: ModoProteina;
+  proteinaGPorKg: string;
+  usarPesoAjustado: boolean;
+};
+
+/** Al abrir la pestaña se reproduce el último cálculo guardado, no un default. */
+function opcionesDesde(calculo: CalculoApi | null): Opciones {
+  const entradas = calculo?.snapshot?.entradas;
+  return {
+    ecuacion: calculo?.snapshot?.resultado.ecuacion ?? ECUACION_POR_DEFECTO,
+    modoProteina: entradas?.modoProteina ?? 'porcentaje',
+    proteinaGPorKg: entradas?.proteinaGPorKg?.toString() ?? '',
+    usarPesoAjustado: entradas?.usarPesoAjustado ?? false,
+  };
 }
 
-export function TabCalculo({ paciente }: { paciente: Paciente }) {
-  const { updatePatient } = useAppState();
-  const [error, setError] = useState<string | null>(null);
+function entradaDeCalculo(paciente: Paciente, opciones: Opciones): DatosSnapshot {
   const a = paciente.antropometria;
-  const m = paciente.medico;
-  const res = paciente.calculo;
+  const gPorKg = Number(opciones.proteinaGPorKg);
 
-  const calcular = () => {
-    setError(null);
-    try {
-      const c = calcularTDEE({
-        peso: a.peso,
-        altura: a.altura,
-        edad: paciente.edad,
-        genero: paciente.genero,
-        nivelActividad: m.nivelActividad,
-        objetivo: m.objetivo,
-      });
-      updatePatient(paciente.id, { calculo: c });
-    } catch {
-      setError('El expediente está incompleto: se necesitan peso, altura y edad válidos.');
-    }
+  return {
+    peso: a.peso,
+    altura: a.altura,
+    edad: paciente.edad,
+    genero: paciente.genero,
+    nivelActividad: paciente.medico.nivelActividad,
+    objetivo: paciente.medico.objetivo,
+    condiciones: paciente.medico.condiciones,
+    cintura: a.cintura || undefined,
+    cadera: a.cadera || undefined,
+    grasaPct: a.grasaCorporal || undefined,
+    pliegues: a.pliegues,
+    ecuacion: opciones.ecuacion,
+    modoProteina: opciones.modoProteina,
+    proteinaGPorKg: Number.isFinite(gPorKg) && gPorKg > 0 ? gPorKg : undefined,
+    usarPesoAjustado: opciones.usarPesoAjustado,
   };
+}
 
-  return (
-    <div className="space-y-4 max-w-2xl">
-      <SectionCard title="Gasto energético — Mifflin-St Jeor" icon={Calculator}>
-        <p className="text-sm text-stone-500 mb-3">
-          Cálculo determinístico a partir del expediente. No es una estimación de la IA — es una
-          fórmula clínica que puedes defender ante el paciente.
-        </p>
-        <div className="grid grid-cols-3 gap-3 text-sm mb-4">
-          <Dato etiqueta="Peso" valor={`${a.peso} kg`} />
-          <Dato etiqueta="Altura" valor={`${a.altura} cm`} />
-          <Dato etiqueta="Edad" valor={`${paciente.edad} años`} />
-          <Dato etiqueta="Actividad" valor={m.nivelActividad} />
-          <Dato etiqueta="Objetivo" valor={m.objetivo} ancho="col-span-2" />
-        </div>
-        <Btn onClick={calcular}>
-          <Calculator size={16} /> Calcular requerimiento
-        </Btn>
-        {error && (
-          <div className="flex items-center gap-2 text-xs text-orange-600 mt-3">
-            <AlertTriangle size={13} /> {error}
-          </div>
-        )}
-      </SectionCard>
+/**
+ * Pestaña de cálculo clínico.
+ *
+ * La vista previa se calcula en el navegador con las mismas funciones puras de
+ * `packages/shared` que usa el backend, para que cambiar de ecuación sea
+ * instantáneo. Al guardar, el servidor **recalcula desde el expediente** y
+ * archiva su propio snapshot: lo que se audita nunca son números del cliente.
+ */
+export function TabCalculo({
+  paciente,
+  calculo,
+}: {
+  paciente: Paciente;
+  calculo: CalculoApi | null;
+}) {
+  const [opciones, setOpciones] = useState<Opciones>(() => opcionesDesde(calculo));
+  const guardar = useGuardarCalculo(paciente.id);
 
-      {res && (
-        <SectionCard title="Resultado" icon={Flame}>
-          <div className="grid grid-cols-3 gap-4 mb-5">
-            <div>
-              <div className="font-mono text-xl text-stone-500">{res.bmr}</div>
-              <div className="text-xs text-stone-400">BMR (kcal)</div>
-            </div>
-            <div>
-              <div className="font-mono text-xl text-stone-500">{res.tdee}</div>
-              <div className="text-xs text-stone-400">TDEE / mantenimiento</div>
-            </div>
-            <div>
-              <div className="font-mono text-2xl text-emerald-900">{res.objetivoCalorias}</div>
-              <div className="text-xs text-stone-400">Objetivo diario</div>
-            </div>
-          </div>
-          <div className="text-xs uppercase tracking-wide text-stone-400 mb-2">
-            Distribución de macros
-          </div>
-          <div className="flex gap-4">
-            <div className="flex-1 bg-lime-50 border border-lime-200 rounded-lg p-3">
-              <div className="font-mono text-emerald-900 text-lg">{res.proteina_g}g</div>
-              <div className="text-xs text-stone-500">Proteína · {res.pPct}%</div>
-            </div>
-            <div className="flex-1 bg-emerald-50 border border-emerald-200 rounded-lg p-3">
-              <div className="font-mono text-emerald-900 text-lg">{res.carbos_g}g</div>
-              <div className="text-xs text-stone-500">Carbos · {res.cPct}%</div>
-            </div>
-            <div className="flex-1 bg-orange-50 border border-orange-200 rounded-lg p-3">
-              <div className="font-mono text-orange-700 text-lg">{res.grasa_g}g</div>
-              <div className="text-xs text-stone-500">Grasa · {res.gPct}%</div>
-            </div>
-          </div>
-          <div className="text-xs text-emerald-700 bg-emerald-50 rounded-lg px-3 py-2 mt-4 flex items-center gap-2">
-            <CheckCircle2 size={13} /> Estos valores se usan como meta al generar el plan alimenticio.
+  const vistaPrevia = useMemo<
+    { ok: true; snapshot: SnapshotCalculo } | { ok: false; motivo: string }
+  >(() => {
+    try {
+      return { ok: true, snapshot: construirSnapshotCalculo(entradaDeCalculo(paciente, opciones)) };
+    } catch {
+      return {
+        ok: false,
+        motivo:
+          'El expediente está incompleto: se necesitan peso, altura y fecha de nacimiento válidos.',
+      };
+    }
+  }, [paciente, opciones]);
+
+  const cambiar = <Clave extends keyof Opciones>(clave: Clave, valor: Opciones[Clave]) =>
+    setOpciones((previas) => ({ ...previas, [clave]: valor }));
+
+  const enviar = () =>
+    guardar.mutate({
+      ecuacion: opciones.ecuacion,
+      modo_proteina: opciones.modoProteina,
+      proteina_g_por_kg: Number(opciones.proteinaGPorKg) || null,
+      usar_peso_ajustado: opciones.usarPesoAjustado,
+    });
+
+  if (!vistaPrevia.ok) {
+    return (
+      <div className="space-y-4 max-w-3xl">
+        <SectionCard title="Gasto energético" icon={Calculator}>
+          <div className="flex items-start gap-2 text-sm text-orange-700">
+            <AlertTriangle size={15} className="shrink-0 mt-0.5" />
+            {vistaPrevia.motivo}
           </div>
         </SectionCard>
+        <FormPliegues pacienteId={paciente.id} antropometria={paciente.antropometria} />
+      </div>
+    );
+  }
+
+  const { snapshot } = vistaPrevia;
+
+  return (
+    <div className="space-y-4 max-w-3xl">
+      <SectionCard title="Gasto energético" icon={Calculator}>
+        <p className="text-sm text-stone-500">
+          Cálculo determinístico a partir del expediente ({paciente.antropometria.peso} kg,{' '}
+          {paciente.antropometria.altura} cm, {paciente.edad} años,{' '}
+          {paciente.medico.nivelActividad.toLowerCase()}, objetivo{' '}
+          {paciente.medico.objetivo.toLowerCase()}). No es una estimación de la IA — es una fórmula
+          clínica que puedes defender ante el paciente.
+        </p>
+      </SectionCard>
+
+      <PanelAntropometria resumen={snapshot.antropometria} />
+
+      <ComparativaEcuaciones
+        filas={snapshot.comparativa}
+        seleccionada={opciones.ecuacion}
+        onSeleccionar={(ecuacion) => cambiar('ecuacion', ecuacion)}
+      />
+
+      <SectionCard title="Ajustes clínicos" icon={Calculator}>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label className={lbl} htmlFor="modo-proteina">
+              Cómo fijar la proteína
+            </label>
+            <select
+              id="modo-proteina"
+              className={inp}
+              value={opciones.modoProteina}
+              onChange={(evento) => cambiar('modoProteina', evento.target.value as ModoProteina)}
+            >
+              <option value="porcentaje">Porcentaje de las calorías</option>
+              <option value="g_por_kg">Gramos por kilo de peso</option>
+            </select>
+          </div>
+          <div>
+            <label className={lbl} htmlFor="proteina-g-kg">
+              Proteína (g/kg)
+            </label>
+            <input
+              id="proteina-g-kg"
+              type="number"
+              min="0.4"
+              max="3"
+              step="0.1"
+              inputMode="decimal"
+              className={inp}
+              placeholder="Sugerida por el objetivo"
+              disabled={opciones.modoProteina !== 'g_por_kg'}
+              value={opciones.proteinaGPorKg}
+              onChange={(evento) => cambiar('proteinaGPorKg', evento.target.value)}
+            />
+          </div>
+        </div>
+        <label
+          htmlFor="usar-peso-ajustado"
+          className="flex items-center gap-2 text-sm text-stone-600 mt-4 w-fit"
+        >
+          <input
+            id="usar-peso-ajustado"
+            type="checkbox"
+            className="accent-emerald-800"
+            checked={opciones.usarPesoAjustado}
+            onChange={(evento) => cambiar('usarPesoAjustado', evento.target.checked)}
+          />
+          Calcular con peso ajustado ({snapshot.antropometria.pesoAjustado} kg)
+        </label>
+      </SectionCard>
+
+      <PanelResultado resultado={snapshot.resultado} />
+      <PanelEquivalentes distribucion={snapshot.equivalentes} />
+      <FormPliegues pacienteId={paciente.id} antropometria={paciente.antropometria} />
+
+      <div className="flex items-center gap-3">
+        <Btn onClick={enviar} disabled={guardar.isPending}>
+          {guardar.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+          Guardar cálculo en el plan
+        </Btn>
+        {calculo && !guardar.isPending && (
+          <span className="flex items-center gap-1.5 text-xs text-stone-500">
+            <Check size={13} className="text-emerald-700" />
+            Último guardado:{' '}
+            {new Date(calculo.guardado_en).toLocaleString('es-MX', {
+              dateStyle: 'medium',
+              timeStyle: 'short',
+            })}
+          </span>
+        )}
+      </div>
+
+      {guardar.error && (
+        <div className="flex items-start gap-2 text-sm text-orange-700">
+          <AlertTriangle size={15} className="shrink-0 mt-0.5" />
+          {guardar.error instanceof ApiError
+            ? guardar.error.message
+            : 'No pudimos guardar el cálculo. Intenta de nuevo.'}
+        </div>
       )}
     </div>
   );

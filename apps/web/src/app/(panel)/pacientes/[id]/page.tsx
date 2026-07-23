@@ -25,7 +25,7 @@ type TabId = (typeof TABS)[number]['id'];
 
 export default function PacienteDetallePage() {
   const params = useParams<{ id: string }>();
-  const { paciente, cargando } = usePaciente(params.id);
+  const { paciente, calculo, cargando } = usePaciente(params.id);
   const [tab, setTab] = useState<TabId>('expediente');
 
   if (cargando) {
@@ -79,7 +79,7 @@ export default function PacienteDetallePage() {
         ))}
       </div>
       {tab === 'expediente' && <TabExpediente paciente={paciente} />}
-      {tab === 'calculo' && <TabCalculo paciente={paciente} />}
+      {tab === 'calculo' && <TabCalculo paciente={paciente} calculo={calculo} />}
       {tab === 'plan' && <TabPlan paciente={paciente} />}
       {tab === 'seguimiento' && <TabSeguimiento paciente={paciente} />}
       {tab === 'recetas' && <TabRecetas paciente={paciente} />}

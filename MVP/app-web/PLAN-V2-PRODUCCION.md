@@ -313,7 +313,7 @@ Además: tests unitarios/integración de handlers con la BD (≥ 80 % en `src/se
 |---|---|---|
 | **0. Fundaciones** ✅ | 1 | Prisma + Neon conectados; schema completo migrado; Auth.js con registro/login/verificación; middleware de sesión; CI corriendo |
 | **1. Pacientes reales** ✅ | 2 | CRUD pacientes + expediente + antropometría contra BD; wizard conectado; el store `localStorage` eliminado de estas vistas; E2E #2 y #9 en verde |
-| **2. Fórmulas + cálculo** | 3 | Módulo `nutricion/` ampliado con tests; TabCalculo con selector de ecuación y equivalentes; snapshot persistido; E2E #3 |
+| **2. Fórmulas + cálculo** ✅ | 3 | Módulo `nutricion/` ampliado con tests; TabCalculo con selector de ecuación y equivalentes; snapshot persistido; E2E #3 |
 | **3. Base de alimentos** | 3–4 | Seed tanda 1 (150 núcleo MX) + tanda 2 (USDA); imágenes en Blob; búsqueda pg_trgm; FoodPicker contra API; CRUD alimentos propios |
 | **4. Planes + PDF + plantillas** | 4–5 | Editor de plan sobre BD con items ligados a foods; plantillas; PDF real (react-pdf) con marca blanca; E2E #4 |
 | **5. IA Claude** | 5 | Servicio AI con streaming, salida estructurada validada, seudonimización, `ai_usage` y límites; los 5 casos de uso; E2E #10 |
@@ -415,6 +415,54 @@ por API, y no puede editarlos ni archivarlos. Las cuentas de prueba se borran al
 **Fuera de alcance deliberado**: el tope de 3 pacientes del plan Free. Imponerlo antes de que exista
 la ruta de pago (fase 7) dejaría al nutriólogo sin salida. La agenda, los mensajes y la facturación
 arrancan vacíos: sus datos de demostración apuntaban a pacientes ficticios que ya no existen.
+
+### Fase 2 — Fórmulas + cálculo (completada)
+
+- **Módulo `packages/shared/src/nutricion/`**: el archivo único se dividió en cinco piezas con sus
+  tests co-ubicados. `energia.ts` (Mifflin-St Jeor, Harris-Benedict revisada de Roza-Shizgal 1984,
+  FAO/OMS/UNU por tramos de edad y sexo, Katch-McArdle sobre masa magra, y `compararEcuaciones`),
+  `antropometria.ts` (IMC con cortes OMS **y** el de talla baja de la NOM-008, cintura/cadera,
+  cintura/talla, Durnin-Womersley + Siri, peso ideal, peso ajustado), `requerimientos.ts`
+  (distribución de macros, proteína en g/kg por objetivo, agua), `equivalentes.ts` (reparto en los
+  ocho grupos del SMAE) y `calculo.ts` + `snapshot.ts` como orquestadores.
+- **Ningún default clínico silencioso**: el peso ajustado **no** se aplica solo aunque el IMC lo
+  sugiera — la UI lo recomienda, el nutriólogo lo activa. Cuando una regla recorta un valor (tope
+  renal de 0.8 g/kg de proteína, macros que no caben en las kcal, equivalentes que ya exceden un
+  macro), el recorte sale en `advertencias`, nunca ocurre en silencio. Las ecuaciones que no se
+  pueden calcular se devuelven marcadas con el motivo en vez de omitirse.
+- **Snapshot auditable**: `construirSnapshotCalculo` devuelve entradas + resultado + valoración
+  antropométrica + comparativa + equivalentes en un documento versionado (`version: 1`). Guardar
+  solo las kcal no permitiría reconstruir meses después con qué peso y qué ecuación se llegó a
+  ellas, y el expediente clínico lo exige (NOM-004-SSA3).
+- **Persistencia**: `POST /api/v1/patients/{id}/calculations` guarda el snapshot en
+  `meal_plans.calculo_snapshot` del plan vigente (el activo, o el último borrador, o uno nuevo),
+  junto con las metas de kcal y macros que produce. El cuerpo lleva **solo el método** (ecuación,
+  modo de proteína, mínimos por grupo): el servidor recalcula desde el expediente, porque un
+  snapshot construido con cifras del navegador no sería auditable. Un expediente sin peso, altura o
+  fecha de nacimiento responde **422 `EXPEDIENTE_INCOMPLETO`** — la petición es válida, lo que falta
+  es el dato clínico.
+- **`TabCalculo`**: selector de ecuación que es a la vez comparativa (los cuatro BMR/TDEE lado a
+  lado), panel de valoración antropométrica, ajustes clínicos (modo de proteína, g/kg, peso
+  ajustado), resultado con agua y advertencias, tabla de equivalentes SMAE con su desviación, y
+  captura de los cuatro pliegues. La vista previa se calcula en el navegador con las mismas
+  funciones puras que usa el backend, así que cambiar de ecuación es instantáneo. El componente se
+  dividió en `components/pacientes/calculo/` para respetar el límite de ~200 líneas.
+- **Pliegues**: se guardan como una **nueva toma de medidas fechada**, no como parche de la
+  anterior, y arrastran peso/altura/circunferencias vigentes — si no, la toma nueva sería la más
+  reciente sin peso y el resto del panel se quedaría sin datos.
+- **Almacén puente**: `calculo` salió de `ExtrasPaciente`; el `localStorage` ya no guarda cálculos.
+
+Verificado: **147 tests unitarios en `packages/shared`** (98.6 % de líneas, 88 % de ramas) y 64 en
+`apps/web`, type-check limpio, build de producción exitoso y **7 tests E2E nuevos** (#3) contra la
+base real: valores de BMR/TDEE/macros calculados a mano desde las fórmulas publicadas, IMC
+clasificado con sus índices de riesgo, cambio de ecuación en caliente, Katch-McArdle habilitándose
+al capturar los pliegues, reparto en equivalentes dentro del ±5 %, snapshot persistido y recuperado
+al recargar, y expediente incompleto que lo dice en vez de inventar. Los 14 E2E del proyecto pasan.
+
+**Fuera de alcance deliberado**: los mínimos por grupo de equivalentes se aceptan en la API pero no
+tienen control en la UI todavía — el editor de plan de la fase 4 es su lugar natural. La
+comparativa no incluye ecuaciones de composición corporal por bioimpedancia: no hay de dónde leer
+ese dato hasta que exista integración con básculas.
 
 ---
 

@@ -23,12 +23,21 @@ export type RegistroPeso = {
   peso: number;
 };
 
+/** Pliegues cutáneos en milímetros (los cuatro de Durnin-Womersley). */
+export type Pliegues = {
+  tricipital?: number;
+  bicipital?: number;
+  subescapular?: number;
+  suprailiaco?: number;
+};
+
 export type Antropometria = {
   peso: number;
   altura: number;
   cintura: number;
   cadera: number;
   grasaCorporal: number;
+  pliegues: Pliegues | null;
   historial: RegistroPeso[];
 };
 
@@ -40,7 +49,14 @@ export type PreferenciasAlimentarias = {
   presupuestoTiempo: 'Bajo' | 'Medio' | 'Alto';
 };
 
+/** Ecuaciones de gasto energético basal disponibles en `TabCalculo`. */
+export type EcuacionBmr = 'mifflin_st_jeor' | 'harris_benedict' | 'fao_oms' | 'katch_mcardle';
+
+/** Cómo se fija la proteína: por porcentaje de las calorías o por g/kg de peso. */
+export type ModoProteina = 'porcentaje' | 'g_por_kg';
+
 export type CalculoNutricional = {
+  ecuacion: EcuacionBmr;
   bmr: number;
   tdee: number;
   objetivoCalorias: number;
@@ -50,6 +66,15 @@ export type CalculoNutricional = {
   pPct: number;
   cPct: number;
   gPct: number;
+  /** Peso que entró a la ecuación: el real, o el ajustado si se pidió. */
+  pesoUsado: number;
+  pesoAjustadoAplicado: boolean;
+  factorActividad: number;
+  ajusteObjetivo: number;
+  proteinaGPorKg: number;
+  aguaMl: number;
+  /** Lo que el nutriólogo debe revisar: macros recortados, topes clínicos, etc. */
+  advertencias: string[];
 };
 
 export type ComidaPlan = {
