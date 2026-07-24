@@ -135,16 +135,17 @@ function ultimosPliegues(mediciones: MedicionApi[]): Pliegues | null {
 }
 
 /**
- * Campos que todavía no viven en la base (seguimiento, recetas y notas).
- * El plan salió de este almacén en la fase 4 y se consulta por su propia API.
+ * Lo último que sigue viviendo en el almacén del navegador: las recetas y las
+ * notas de consulta.
+ *
+ * El plan salió en la fase 4; el seguimiento (adherencia, comidas, ejercicio),
+ * el plan de actividad, la agenda y los mensajes salieron en la fase 6 y se
+ * leen de la API. Los campos de `seguimiento` que quedan aquí solo alimentan
+ * `TabRecetas`.
  */
-export type ExtrasPaciente = Pick<
-  Paciente,
-  'planEjercicio' | 'notasConsulta' | 'seguimiento'
->;
+export type ExtrasPaciente = Pick<Paciente, 'notasConsulta' | 'seguimiento'>;
 
 export const EXTRAS_VACIOS: ExtrasPaciente = {
-  planEjercicio: null,
   notasConsulta: [],
   seguimiento: {
     adherencia: 0,

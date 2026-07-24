@@ -104,32 +104,76 @@ test('persiste un plan con food real, lo activa, descarga como PDF y lo comparte
   await page.goto(`/pacientes/${pacienteId}`);
   await page.getByRole('button', { name: 'Plan alimenticio' }).click();
 
-  await page.route('**/api/ai', async (route) => {
-    const body = route.request().postDataJSON() as { prompt: string };
-    // La IA recibe contexto clínico seudonimizado, nunca identidad o contacto.
-    expect(body.prompt).not.toContain('Paciente Plan E2E');
-    expect(body.prompt).not.toContain('paciente-plan-e2e@nutria.test');
-    expect(body.prompt).not.toContain('5500000000');
+  /**
+   * El borrador ya llega resuelto por el servidor: `food_id` contra el
+   * catálogo y nutrimentos calculados. La generación va con streaming, así que
+   * la respuesta simulada es SSE y el resultado viaja en el evento `final`.
+   */
+  const BORRADOR_IA = {
+    calorias_diarias: 1800,
+    proteina_g: 120,
+    carbos_g: 205,
+    grasa_g: 60,
+    nota: 'Borrador ficticio generado para revisión profesional.',
+    comidas: [
+      {
+        orden: 1,
+        nombre: 'Desayuno de prueba',
+        horario: '08:00',
+        // El alérgeno vive en el item, no en la descripción de la comida: el
+        // test lo corrige editando ese campo y la alerta debe desaparecer.
+        descripcion: 'Propuesta ficticia para revisión profesional.',
+        items: [
+          {
+            food_id: null,
+            descripcion_libre: 'Preparación ficticia con cacahuate · 1 porción',
+            cantidad_porciones: 1,
+            energia_kcal: 1800,
+            proteina_g: 120,
+            carbohidratos_g: 205,
+            lipidos_g: 60,
+            food: null,
+          },
+        ],
+      },
+    ],
+    totales: {
+      energia_kcal: 1800,
+      proteina_g: 120,
+      carbohidratos_g: 205,
+      lipidos_g: 60,
+    },
+  };
+
+  await page.route('**/api/v1/ai/generate', async (route) => {
+    const peticion = route.request().postDataJSON() as {
+      tipo: string;
+      patient_id: string;
+    };
+    // La UI manda intención —tipo y paciente—, nunca el prompt: armarlo y
+    // seudonimizarlo es responsabilidad del servidor.
+    expect(peticion.tipo).toBe('PLAN');
+    expect(peticion.patient_id).toBe(pacienteId);
+    const enviado = JSON.stringify(peticion);
+    expect(enviado).not.toContain('Paciente Plan E2E');
+    expect(enviado).not.toContain('paciente-plan-e2e@nutria.test');
+    expect(enviado).not.toContain('5500000000');
+
+    const final = {
+      tipo: 'PLAN',
+      formato: 'estructurado',
+      datos: BORRADOR_IA,
+      texto: null,
+      advertencias: [],
+      cuota: { usadas: 1, limite: 15, restantes: 14, agotada: false },
+    };
 
     await route.fulfill({
       status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        text: JSON.stringify({
-          calorias_diarias: 1800,
-          macros: { proteina_g: 120, carbos_g: 205, grasa_g: 60 },
-          comidas: [
-            {
-              nombre: 'Desayuno de prueba',
-              horario: '08:00',
-              descripcion: 'Preparación ficticia con cacahuate para revisión.',
-              porcion: '1 porción',
-              calorias: 1800,
-            },
-          ],
-          nota_ia: 'Borrador ficticio generado para revisión profesional.',
-        }),
-      }),
+      headers: { 'content-type': 'text/event-stream' },
+      body:
+        `event: progreso\ndata: ${JSON.stringify({ tipo: 'progreso', caracteres: 320 })}\n\n` +
+        `event: final\ndata: ${JSON.stringify(final)}\n\n`,
     });
   });
 

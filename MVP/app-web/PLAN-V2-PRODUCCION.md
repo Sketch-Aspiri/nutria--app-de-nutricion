@@ -317,7 +317,7 @@ Además: tests unitarios/integración de handlers con la BD (≥ 80 % en `src/se
 | **3. Base de alimentos** ✅ | 3–4 | Seed tanda 1 (150 núcleo MX) + tanda 2 (USDA); imágenes en Blob; búsqueda pg_trgm; FoodPicker contra API; CRUD alimentos propios |
 | **4. Planes + PDF + plantillas** ✅ | 4–5 | Editor de plan sobre BD con items ligados a foods; plantillas; PDF real (react-pdf) con marca blanca; E2E #4 |
 | **5. IA Claude** ✅ | 5 | Servicio AI con streaming, salida estructurada validada, seudonimización, `ai_usage` y límites; los 5 casos de uso; E2E #10 |
-| **6. Agenda, mensajes, seguimiento** | 6 | Citas + recordatorios (cron + Resend); mensajes con polling; seguimiento leyendo logs reales; E2E #5, #6, #7 |
+| **6. Agenda, mensajes, seguimiento** ✅ | 6 | Citas + recordatorios (cron + Resend); mensajes con polling; seguimiento leyendo logs reales; E2E #5, #6, #7 |
 | **7. Stripe** | 7 | Checkout, portal, webhooks, entitlements en servidor; paywall; E2E #8 |
 | **8. Endurecimiento y lanzamiento** | 8 | Cifrado de columnas, auditoría security-auditor, Sentry, avisos de privacidad, seed tanda 3, carga de prueba, dominio productivo, **onboarding de 3–5 nutriólogos piloto** |
 
@@ -633,6 +633,100 @@ respete, que un plan superior amplíe el límite y que la cuota de un nutriólog
 3. **`ai_usage` cuenta una generación aunque haya reintento interno**, pero suma los tokens de ambos
    intentos. El nutriólogo paga por el resultado, no por los tropiezos del modelo; el costo real
    queda igualmente auditable en las columnas de tokens.
+
+### Fase 6 — Agenda, mensajes, seguimiento (completada)
+
+- **Agenda** (`src/server/appointments/`, `api/v1/appointments/`): alta, listado filtrable por rango
+  y estado, reprogramación, y tres cierres (`/cancel`, `/complete`, `/no_show`) que comparten
+  handler. El **empalme de horarios** se resuelve en SQL con aritmética de intervalos
+  (`inicio_a < fin_b AND fin_a > inicio_b`), porque Prisma no compara columnas entre sí; se rechaza
+  con `409 APPOINTMENT_CONFLICT`. Una cita ya cerrada no se vuelve a cerrar: es el registro de lo
+  que pasó en la consulta, y para corregir un cierre equivocado está `PATCH`. Reprogramar limpia
+  `recordatorio_enviado_at`, porque el paciente tiene en su correo una hora que dejó de ser cierta.
+- **Recordatorios** (`recordatorios.ts` + `api/v1/cron/appointment_reminders`, `vercel.json` cada
+  15 min): se avisa 24 h antes, con tope de 50 envíos por corrida. `recordatorio_enviado_at` es la
+  marca de idempotencia y **se escribe antes de enviar**: si el proveedor falla, el paciente se
+  queda sin recordatorio, pero un timeout tras un envío exitoso no le manda el mismo correo cada
+  cuarto de hora. Ante la duda se prefiere el silencio al acoso. La ruta exige
+  `Authorization: Bearer $CRON_SECRET` con comparación en tiempo constante, y **sin el secreto
+  configurado responde 503**: dejarla abierta la convertiría en un amplificador de correo gratuito.
+  El correo no lleva ningún dato clínico — nombre, cuándo y cómo.
+- **Mensajes** (`src/server/messages/`, `api/v1/conversations`, `api/v1/patients/{id}/messages`):
+  bandeja con la última línea y el conteo de pendientes por hilo, envío, y acuse de lectura. El
+  **emisor lo fija el servidor** a partir de la sesión; aceptarlo del cuerpo dejaría al nutriólogo
+  escribir mensajes en nombre del paciente. Sondeo de 30 s en la bandeja y 15 s en el hilo abierto
+  (tiempo real queda para V2.1, sección 8). El listado incremental se ancla al `created_at` del
+  último mensaje que el cliente ya tiene.
+- **Seguimiento** (`src/server/tracking/`, `TabSeguimiento` + `seguimiento/*`): comidas, peso y
+  ejercicio que el paciente registra, más el plan de actividad que le propone el nutriólogo.
+  **Adherencia y racha no se almacenan**: se calculan en cada consulta con
+  `packages/shared/adherencia` sobre `meal_logs` contra el plan activo. Guardarlas como columnas
+  las dejaría desfasadas en cuanto el paciente registrara algo tarde. Sin plan activo el panel dice
+  "aún no hay plan", no un 0 % que se leería como abandono. El tope diario evita que registrar
+  cinco comidas un día disfrace una semana incompleta, y **no haber registrado hoy no rompe la
+  racha**: el día en curso todavía no termina.
+- **Zona horaria del consultorio** (`nutritionist_profiles.zona_horaria`, default
+  `America/Mexico_City`): el día natural de la adherencia y el formato del recordatorio se resuelven
+  en la zona del nutriólogo, no en UTC ni en la del servidor.
+- **Autorización compartida** (`src/server/patients/ownership.ts`): los tres módulos cuelgan del
+  paciente, así que la comprobación de pertenencia se resolvió una sola vez, dentro de la misma
+  consulta filtrada por `nutritionistId`. Quien llama traduce el `null` a **404, nunca 403**:
+  distinguirlos revelaría qué identificadores existen.
+- **Migración** `20260723_agenda_mensajes_seguimiento`: agrega `zona_horaria`, `meal_plans.activado_at`
+  (con backfill desde `updated_at` para los planes ya activos) y dos índices — `(estado, inicio)`
+  para el barrido del cron, que no filtra por nutriólogo, y `(nutritionist_id, created_at)` para la
+  bandeja.
+
+Verificado: **332 tests en `apps/web` + 286 en `packages/shared`, todos en verde**, `tsc --noEmit`
+limpio en ambos paquetes, y los **tres E2E de la fase corriendo de punta a punta** contra un
+PostgreSQL 16 desechable en Docker:
+
+- **#5 `e2e/seguimiento.spec.ts`** — siembra 12 comidas en 4 de los 7 días de la ventana contra un
+  plan activo de 3 comidas y comprueba que el panel muestre 57 % y racha de 4, que la API responda
+  lo mismo que pinta la UI, que el comentario del nutriólogo persista sin tocar lo que escribió el
+  paciente, y que otro nutriólogo reciba 404 al comentar o consultar adherencia.
+- **#6 `e2e/agenda.spec.ts`** — agenda una cita desde el panel, verifica el instante guardado,
+  rechaza el horario empalmado por API, corre el cron (401 sin secreto, 1 envío con él), afirma
+  sobre el correo recibido —incluido que **no** lleve notas ni objetivo—, comprueba que la segunda
+  corrida no reenvíe, cancela la cita y verifica el aislamiento entre cuentas.
+- **#7 `e2e/mensajes.spec.ts`** — bandeja con 2 pendientes, acuse de lectura, borrador de IA que no
+  se envía solo, envío real, lectura desde una segunda sesión del navegador, llegada de un mensaje
+  nuevo **por sondeo sin recargar**, intento de suplantación del emisor y aislamiento por 404.
+
+**Desviaciones respecto al plan original**, y por qué:
+
+1. **Buzón de correo de pruebas** (`EMAIL_OUTBOX_FILE` en `src/server/email.ts`). El plan pide un
+   "assert sobre outbox de test" para el E2E #6, y no existía forma de observar el correo desde
+   Playwright: Resend se llama desde el servidor. Con esa variable definida, el correo se anexa a un
+   archivo en vez de salir. La define únicamente `playwright.config.ts`; se prefirió una variable
+   explícita a un `NODE_ENV !== 'production'` porque en CI los E2E corren precisamente contra el
+   build de producción.
+2. **Bug corregido en `playwright.config.ts`**: Playwright reevalúa la configuración dentro de cada
+   worker, y el worker hereda la env que ese mismo archivo ya había modificado. La guarda de
+   seguridad de base de datos comparaba `E2E_DATABASE_URL` contra un `DATABASE_URL` que para
+   entonces era ella misma, y **abortaba toda la suite**. Las conexiones reales de la app se
+   preservan ahora en `E2E_APP_*` durante la primera evaluación, sin debilitar la comprobación.
+3. **La videollamada sigue siendo un enlace externo** (`video_url` de Zoom/Meet/Whereby), como
+   decide la sección 14. La modal del panel abre la sala; no hay WebRTC propio.
+
+**Specs de fases anteriores puestos al día**: al volverse ejecutable la suite salieron a la luz
+**5 tests desfasados de la aplicación** —fallos de los specs, no del producto— que se corrigieron
+para dejar la regresión en verde de punta a punta:
+
+1. `alta-paciente` (2): el asistente pide **fecha de nacimiento**, no "Edad". El spec captura la
+   fecha, verifica que la UI derive los años y que lo persistido sea la fecha. Es la decisión de la
+   fase 1: una edad almacenada queda obsoleta al día siguiente del cumpleaños y descuadraría el TDEE.
+2. `base-alimentos` (1): el buscador ya no es un panel "Base de alimentos" sino el botón **Buscar
+   alimento** de cada comida, y la pestaña de plan exige un requerimiento calculado antes de abrir
+   el editor —no inventa metas—. El spec siembra medidas, guarda el cálculo y comprueba que el
+   alimento llegue con su porción y sus nutrimentos del catálogo.
+3. `calculo-clinico` (1): el aviso de expediente incompleto dejó de ser genérico y ahora **enumera
+   lo que falta**; el spec afirma sobre el mensaje concreto y sobre el atajo "Completar expediente".
+4. `plan-alimenticio` (1): interceptaba `**/api/ai`, el proxy que la fase 5 eliminó. Ahora simula
+   `/api/v1/ai/generate` con **SSE** y el borrador ya resuelto por el servidor, y verifica que la UI
+   mande intención en vez del prompt.
+
+Suite completa: **32 de 32 E2E en verde** contra una base limpia.
 
 ---
 

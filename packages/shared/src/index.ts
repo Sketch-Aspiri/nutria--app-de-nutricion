@@ -1,4 +1,5 @@
 export * from './types';
+export * from './fechas';
 export * from './catalogos';
 export * from './dominio';
 export * from './alimentos';

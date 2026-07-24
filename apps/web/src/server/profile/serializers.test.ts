@@ -22,6 +22,7 @@ describe('serializarPerfil', () => {
         marcaNombre: 'Consulta Prueba',
         marcaColor: '#166534',
         marcaLogoUrl: null,
+        zonaHoraria: 'America/Mexico_City',
         createdAt: ahora,
         updatedAt: ahora,
       } satisfies NutritionistProfile,

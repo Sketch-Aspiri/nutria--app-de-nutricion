@@ -46,7 +46,6 @@ function pacienteConAlergias(alergias: string[]): Paciente {
     },
     calculo: null,
     planActivo: null,
-    planEjercicio: null,
     notasConsulta: [],
     seguimiento: {
       adherencia: 0,

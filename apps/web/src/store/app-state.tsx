@@ -2,19 +2,21 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-import type { Cita, Factura, MensajeChat } from '@nutria/shared';
+import type { Factura } from '@nutria/shared';
 
 import { EXTRAS_VACIOS, type ExtrasPaciente } from '@/services/pacientes';
 
-import { CITAS_DEMO, FACTURAS_DEMO, MENSAJES_DEMO } from './datos-demo';
+import { FACTURAS_DEMO } from './datos-demo';
 
 /**
  * Almacén puente.
  *
- * Los pacientes, su expediente y su cálculo nutricional ya viven en PostgreSQL
- * (ver `usePacientes`). Aquí solo quedan las partes que sus fases todavía no
- * migran: seguimiento, recetas y notas de cada paciente, además de agenda,
- * mensajes y facturación. Planes, plantillas y marca salieron en la fase 4.
+ * Los pacientes, su expediente, su cálculo y sus planes ya viven en PostgreSQL.
+ * Aquí solo quedan las recetas y las notas de consulta de cada paciente, más
+ * la facturación, que migra en la fase 7.
+ *
+ * Planes, plantillas y marca salieron en la fase 4; la agenda, los mensajes,
+ * el seguimiento y el plan de actividad, en la fase 6.
  */
 
 const STORAGE_KEY = 'nutria-web-state-v2';
@@ -23,8 +25,6 @@ type ExtrasPorPaciente = Record<string, ExtrasPaciente>;
 
 type PersistedState = {
   extras: ExtrasPorPaciente;
-  citas: Cita[];
-  mensajes: Record<string, MensajeChat[]>;
   facturas: Factura[];
 };
 
@@ -35,8 +35,6 @@ export type ExtrasPatch =
 type AppState = PersistedState & {
   hydrated: boolean;
   updatePatient: (id: string, patch: ExtrasPatch) => void;
-  setCitas: React.Dispatch<React.SetStateAction<Cita[]>>;
-  setMensajes: React.Dispatch<React.SetStateAction<Record<string, MensajeChat[]>>>;
   setFacturas: React.Dispatch<React.SetStateAction<Factura[]>>;
 };
 
@@ -52,7 +50,6 @@ function limpiarExtras(valor: unknown): ExtrasPorPaciente {
       return [
         id,
         {
-          planEjercicio: candidato.planEjercicio ?? null,
           notasConsulta: Array.isArray(candidato.notasConsulta) ? candidato.notasConsulta : [],
           seguimiento: candidato.seguimiento ?? EXTRAS_VACIOS.seguimiento,
         },
@@ -68,11 +65,6 @@ function leerEstadoGuardado(): PersistedState | null {
     const guardado = JSON.parse(raw) as Partial<PersistedState>;
     return {
       extras: limpiarExtras(guardado.extras),
-      citas: Array.isArray(guardado.citas) ? guardado.citas : [],
-      mensajes:
-        guardado.mensajes && typeof guardado.mensajes === 'object'
-          ? guardado.mensajes
-          : {},
       facturas: Array.isArray(guardado.facturas) ? guardado.facturas : [],
     };
   } catch {
@@ -84,16 +76,12 @@ function leerEstadoGuardado(): PersistedState | null {
 export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
   const [extras, setExtras] = useState<ExtrasPorPaciente>({});
-  const [citas, setCitas] = useState<Cita[]>(CITAS_DEMO);
-  const [mensajes, setMensajes] = useState<Record<string, MensajeChat[]>>(MENSAJES_DEMO);
   const [facturas, setFacturas] = useState<Factura[]>(FACTURAS_DEMO);
 
   useEffect(() => {
     const guardado = leerEstadoGuardado();
     if (guardado) {
       setExtras(guardado.extras ?? {});
-      setCitas(guardado.citas);
-      setMensajes(guardado.mensajes);
       setFacturas(guardado.facturas);
     }
     setHydrated(true);
@@ -101,13 +89,13 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!hydrated) return;
-    const estado: PersistedState = { extras, citas, mensajes, facturas };
+    const estado: PersistedState = { extras, facturas };
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(estado));
     } catch {
       // Sin espacio o storage bloqueado: la app sigue funcionando en memoria.
     }
-  }, [hydrated, extras, citas, mensajes, facturas]);
+  }, [hydrated, extras, facturas]);
 
   const updatePatient = useCallback((id: string, patch: ExtrasPatch) => {
     setExtras((previos) => {
@@ -121,15 +109,11 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     () => ({
       hydrated,
       extras,
-      citas,
-      mensajes,
       facturas,
       updatePatient,
-      setCitas,
-      setMensajes,
       setFacturas,
     }),
-    [hydrated, extras, citas, mensajes, facturas, updatePatient],
+    [hydrated, extras, facturas, updatePatient],
   );
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;

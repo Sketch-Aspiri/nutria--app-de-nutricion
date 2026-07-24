@@ -195,6 +195,10 @@ model NutritionistProfile {
   marcaNombre        String?  @map("marca_nombre")
   marcaColor         String   @default("#065f46") @map("marca_color")
   marcaLogoUrl       String?  @map("marca_logo_url")
+  // La agenda, los recordatorios y el día natural de la adherencia se resuelven
+  // en la zona del consultorio. Tomar la del servidor (UTC en Vercel) movería
+  // una cita de las 20:00 al día siguiente.
+  zonaHoraria        String   @default("America/Mexico_City") @map("zona_horaria")
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 
@@ -490,6 +494,10 @@ model MealPlan {
   origen          ContentOrigin  @default(MANUAL)
   // Copia del cálculo (BMR, TDEE, ecuación usada) al momento de crear el plan.
   calculoSnapshot Json?          @map("calculo_snapshot")
+  // Desde cuándo rige el plan. La adherencia no puede usar `created_at` (fecha
+  // del borrador) ni `updated_at` (cambia con cada edición): le reclamaría al
+  // paciente días en los que todavía no tenía plan.
+  activadoAt      DateTime?      @map("activado_at")
   compartidoAt    DateTime?      @map("compartido_at")
   pdfUrl          String?        @map("pdf_url")
   createdAt       DateTime       @default(now()) @map("created_at")
@@ -668,6 +676,9 @@ model Appointment {
 
   @@index([nutritionistId, inicio])
   @@index([patientId, inicio])
+  // El cron de recordatorios barre todas las citas próximas sin filtrar por
+  // nutriólogo; sin este índice haría un scan completo cada 15 minutos.
+  @@index([estado, inicio])
   @@map("appointments")
 }
 
@@ -685,6 +696,8 @@ model Message {
   patient      Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
   @@index([patientId, createdAt])
+  // La bandeja lista el último mensaje de cada conversación del nutriólogo.
+  @@index([nutritionistId, createdAt])
   @@map("messages")
 }
 

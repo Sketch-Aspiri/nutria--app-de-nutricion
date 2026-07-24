@@ -695,10 +695,11 @@ describe('repositorio de planes', () => {
       },
       data: { estado: 'ARCHIVADO' },
     });
+    // `activadoAt` marca desde qué día mide la adherencia (fase 6).
     expect(db.mealPlan.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: PLAN_ID },
-        data: { estado: 'ACTIVO' },
+        data: { estado: 'ACTIVO', activadoAt: expect.any(Date) },
       }),
     );
     expect(db.$transaction).toHaveBeenCalledWith(expect.any(Function), {

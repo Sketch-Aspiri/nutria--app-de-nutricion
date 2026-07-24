@@ -20,6 +20,7 @@ function planPrueba(): PlanParaPdf {
     nota: 'Fixture ficticio',
     origen: 'MANUAL',
     calculoSnapshot: null,
+    activadoAt: null,
     compartidoAt: null,
     pdfUrl: null,
     createdAt: new Date('2026-07-23'),

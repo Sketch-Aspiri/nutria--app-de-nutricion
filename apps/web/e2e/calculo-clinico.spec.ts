@@ -188,6 +188,11 @@ test('guarda el cálculo en la base y lo recupera al volver', async ({ page }) =
 test('un expediente sin medidas no calcula: lo dice en vez de inventar', async ({ page }) => {
   await abrirCalculo(page, await sembrarPaciente(false));
 
-  await expect(page.getByText('El expediente está incompleto', { exact: false })).toBeVisible();
+  // El aviso enumera lo que falta en vez de dar un genérico: el paciente
+  // sembrado sí tiene fecha de nacimiento, así que solo faltan las medidas.
+  await expect(
+    page.getByText('Falta capturar peso y altura en el expediente'),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Completar expediente' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Guardar cálculo en el plan' })).toHaveCount(0);
 });

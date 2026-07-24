@@ -12,10 +12,21 @@ if (existsSync(rutaEnv)) {
   process.loadEnvFile(rutaEnv);
 }
 
+/**
+ * Playwright vuelve a evaluar esta configuración dentro de cada worker, y el
+ * worker hereda la env que este mismo archivo ya modificó. Si la validación
+ * leyera `DATABASE_URL` ahí, se estaría comparando contra sí misma y siempre
+ * denunciaría un empalme. Las conexiones reales de la app se preservan en la
+ * primera evaluación para que la comprobación siga siendo la misma en ambos
+ * procesos.
+ */
+process.env.E2E_APP_DATABASE_URL ??= process.env.DATABASE_URL ?? '';
+process.env.E2E_APP_DIRECT_URL ??= process.env.DIRECT_URL ?? '';
+
 const validacionBaseE2E = validarBaseE2E({
   e2eDatabaseUrl: process.env.E2E_DATABASE_URL,
-  databaseUrl: process.env.DATABASE_URL,
-  directUrl: process.env.DIRECT_URL,
+  databaseUrl: process.env.E2E_APP_DATABASE_URL,
+  directUrl: process.env.E2E_APP_DIRECT_URL,
   permiteMutaciones: process.env.E2E_ALLOW_DB_MUTATION === 'true',
   databaseIdPermitida: process.env.E2E_DATABASE_ID,
 });
@@ -33,6 +44,19 @@ process.env.DIRECT_URL = E2E_DATABASE_URL;
 
 const PUERTO = Number(process.env.E2E_PORT ?? 3000);
 const BASE_URL = `http://localhost:${PUERTO}`;
+
+/**
+ * Correo y cron en los E2E (fase 6).
+ *
+ * El buzón sustituye a Resend: los recordatorios se anexan a un archivo que
+ * los tests leen, en vez de mandarle correo real a nadie. El secreto de cron
+ * se fija aquí para que la ruta programada exista en el entorno de prueba; sin
+ * él respondería 503 y el flujo del recordatorio no se podría ejercitar.
+ */
+const BUZON_CORREO = path.join(__dirname, 'test-results', 'buzon-correo.jsonl');
+const CRON_SECRET_E2E = process.env.CRON_SECRET ?? 'cron-secreto-e2e';
+process.env.EMAIL_OUTBOX_FILE = BUZON_CORREO;
+process.env.CRON_SECRET = CRON_SECRET_E2E;
 
 export default defineConfig({
   testDir: './e2e',
@@ -61,6 +85,8 @@ export default defineConfig({
       AUTH_URL: BASE_URL,
       DATABASE_URL: E2E_DATABASE_URL,
       DIRECT_URL: E2E_DATABASE_URL,
+      EMAIL_OUTBOX_FILE: BUZON_CORREO,
+      CRON_SECRET: CRON_SECRET_E2E,
     },
   },
 });

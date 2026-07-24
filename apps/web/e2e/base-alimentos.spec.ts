@@ -125,28 +125,41 @@ test('el alimento propio de una nutrióloga no existe para otro nutriólogo', as
 test('el buscador de la pestaña de plan trae la base real', async ({ page }) => {
   await iniciarSesion(page, nutriologa);
 
+  // El plan necesita un expediente que permita calcular: sin requerimiento
+  // guardado, la pestaña se niega a abrir el editor en vez de inventar metas.
   const paciente = await prisma.patient.create({
     data: {
       nutritionistId: nutriologa.id,
       nombre: 'Paciente Para Plan',
+      fechaNacimiento: new Date('1990-01-15'),
       genero: 'FEMENINO',
-      medicalRecord: { create: { objetivo: 'MANTENIMIENTO' } },
+      medicalRecord: { create: { objetivo: 'MANTENIMIENTO', nivelActividad: 'LIGERO' } },
       foodPreference: { create: {} },
+      measurements: {
+        create: { fecha: new Date(), pesoKg: 65, alturaCm: 165 },
+      },
     },
     select: { id: true },
   });
 
   await page.goto(`/pacientes/${paciente.id}`);
+  await page.getByRole('button', { name: 'Cálculo' }).click();
+  await page.getByRole('button', { name: 'Guardar cálculo en el plan' }).click();
+  await expect(page.getByText('Último guardado:')).toBeVisible();
+
   await page.getByRole('button', { name: 'Plan alimenticio' }).click();
-  await page.getByRole('button', { name: 'Base de alimentos' }).click();
+  // El buscador cuelga de cada comida del plan; se usa el de la primera.
+  await page.getByRole('button', { name: 'Buscar alimento' }).first().click();
 
   await page.getByLabel('Buscar alimento').fill('frijol');
   await expect(page.getByText('Frijol negro cocido')).toBeVisible();
 
   await page.getByRole('button', { name: 'Agregar Frijol negro cocido' }).click();
 
-  // El alimento pasa al borrador del plan con su porción real de la base.
-  await expect(page.getByText('1/2 taza (86 g)').first()).toBeVisible();
+  // El alimento pasa al borrador con la porción y los nutrimentos de la base,
+  // no con valores capturados a mano.
+  await expect(page.getByText('1/2 taza · 86 g por porción')).toBeVisible();
+  await expect(page.getByRole('spinbutton', { name: 'Kcal' })).toHaveValue('114');
 });
 
 test('un alimento propio se retira sin borrar el histórico', async ({ page }) => {

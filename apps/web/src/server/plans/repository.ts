@@ -584,7 +584,10 @@ async function activarPlanEnTransaccion(
 
   return tx.mealPlan.update({
     where: { id },
-    data: { estado: 'ACTIVO' },
+    // `activadoAt` es el día desde el que la adherencia mide. Reactivar un plan
+    // archivado reinicia la cuenta, que es lo correcto: el paciente no debe
+    // arrastrar los días en que ese plan no estuvo vigente.
+    data: { estado: 'ACTIVO', activadoAt: new Date() },
     include: planDetalleInclude,
   });
 }

@@ -14,6 +14,7 @@ describe('serializadores de planes', () => {
       nota: null,
       origen: 'MANUAL',
       calculoSnapshot: null,
+      activadoAt: fecha,
       compartidoAt: fecha,
       pdfUrl: null,
       createdAt: fecha,

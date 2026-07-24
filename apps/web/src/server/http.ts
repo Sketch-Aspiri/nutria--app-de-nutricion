@@ -46,6 +46,12 @@ export const ErrorCode = {
   AI_INVALID_OUTPUT: 'AI_INVALID_OUTPUT',
   /** 422: el documento excede el máximo seguro de comidas o items. */
   PLAN_PDF_TOO_LARGE: 'PLAN_PDF_TOO_LARGE',
+  /** 409: el horario se traslapa con otra consulta del mismo nutriólogo. */
+  APPOINTMENT_CONFLICT: 'APPOINTMENT_CONFLICT',
+  /** 409: la cita ya está cerrada y su estado no admite otra transición. */
+  APPOINTMENT_NOT_EDITABLE: 'APPOINTMENT_NOT_EDITABLE',
+  /** 422: el paciente no tiene plan activo contra el cual medir adherencia. */
+  SIN_PLAN_ACTIVO: 'SIN_PLAN_ACTIVO',
   INTERNAL_ERROR: 'INTERNAL_ERROR',
 } as const;
 

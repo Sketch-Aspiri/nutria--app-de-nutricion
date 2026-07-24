@@ -15,6 +15,22 @@ import {
 
 let nutriologa: CuentaPrueba;
 
+const EDAD_ESPERADA = 34;
+
+/**
+ * El expediente guarda **fecha de nacimiento**, no edad: una edad almacenada
+ * queda obsoleta al día siguiente del cumpleaños y descuadraría el TDEE. La
+ * fecha se calcula hacia atrás desde hoy —restando un día de más para no caer
+ * justo sobre el cumpleaños— para que el test dé la misma edad cualquier día
+ * que se corra.
+ */
+function nacimientoParaEdad(edad: number): string {
+  const nacimiento = new Date();
+  nacimiento.setFullYear(nacimiento.getFullYear() - edad);
+  nacimiento.setDate(nacimiento.getDate() - 1);
+  return nacimiento.toISOString().slice(0, 10);
+}
+
 test.beforeAll(async () => {
   nutriologa = await crearNutriologo('alta', 'Nutrióloga de Prueba');
 });
@@ -31,8 +47,11 @@ test('da de alta un paciente con expediente completo y lo persiste', async ({ pa
   await page.getByRole('button', { name: 'Nuevo paciente' }).click();
 
   // Paso 1 — datos generales
+  const nacimiento = nacimientoParaEdad(EDAD_ESPERADA);
   await page.getByLabel('Nombre completo').fill('Paciente E2E Uno');
-  await page.getByLabel('Edad').fill('34');
+  await page.getByLabel('Fecha de nacimiento').fill(nacimiento);
+  // El asistente deriva la edad de la fecha y la muestra al capturarla.
+  await expect(page.getByText(`${EDAD_ESPERADA} años`)).toBeVisible();
   await page.getByLabel('Género').selectOption('Femenino');
   await page.getByLabel('Teléfono').fill('5512345678');
   await page.getByLabel('Email').fill('paciente-e2e@nutria.test');
@@ -63,7 +82,7 @@ test('da de alta un paciente con expediente completo y lo persiste', async ({ pa
   // Redirige al expediente recién creado.
   await page.waitForURL(/\/pacientes\/[0-9a-f-]{36}$/);
   await expect(page.getByRole('heading', { name: 'Paciente E2E Uno' })).toBeVisible();
-  await expect(page.getByText('34 años')).toBeVisible();
+  await expect(page.getByText(`${EDAD_ESPERADA} años`)).toBeVisible();
 
   // Los datos quedaron en la base, no en el navegador: se comprueban directo.
   const guardado = await prisma.patient.findFirst({
@@ -72,6 +91,8 @@ test('da de alta un paciente con expediente completo y lo persiste', async ({ pa
   });
 
   expect(guardado).not.toBeNull();
+  // Lo persistido es la fecha capturada; la edad se deriva al leerla.
+  expect(guardado?.fechaNacimiento?.toISOString().slice(0, 10)).toBe(nacimiento);
   expect(guardado?.medicalRecord?.objetivo).toBe('PERDIDA_DE_GRASA');
   expect(guardado?.medicalRecord?.nivelActividad).toBe('LIGERO');
   expect(guardado?.medicalRecord?.condiciones).toEqual(['Hipertensión']);

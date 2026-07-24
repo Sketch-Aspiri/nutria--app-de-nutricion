@@ -41,7 +41,6 @@ export function crearPacienteDePrueba(overrides: Partial<Paciente> = {}): Pacien
     },
     calculo: null,
     planActivo: null,
-    planEjercicio: null,
     notasConsulta: [],
     seguimiento: {
       adherencia: 0,

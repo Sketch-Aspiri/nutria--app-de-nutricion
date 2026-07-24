@@ -95,11 +95,6 @@ export type PlanAlimenticio = {
   compartido?: string | null;
 };
 
-export type PlanEjercicio = {
-  texto: string;
-  compartido: string | null;
-};
-
 export type NotaConsulta = {
   fecha: string;
   motivo: string;
@@ -164,26 +159,12 @@ export type Paciente = {
   preferencias: PreferenciasAlimentarias;
   calculo: CalculoNutricional | null;
   planActivo: PlanAlimenticio | null;
-  planEjercicio: PlanEjercicio | null;
   notasConsulta: NotaConsulta[];
   seguimiento: Seguimiento;
 };
 
-export type Cita = {
-  id: number;
-  pacienteId: string;
-  paciente: string;
-  fecha: string;
-  hora: string;
-  tipo: string;
-  recordatorio: boolean;
-};
-
-export type MensajeChat = {
-  de: 'paciente' | 'nutriologo';
-  texto: string;
-  hora: string;
-};
+// Las citas y los mensajes ya no tienen tipo de dominio propio: viven en la
+// base y su contrato es el de la API (`services/agenda.ts`, `services/mensajes.ts`).
 
 export type Factura = {
   id: number;
