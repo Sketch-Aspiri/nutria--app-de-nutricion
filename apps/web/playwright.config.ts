@@ -87,6 +87,10 @@ export default defineConfig({
       DIRECT_URL: E2E_DATABASE_URL,
       EMAIL_OUTBOX_FILE: BUZON_CORREO,
       CRON_SECRET: CRON_SECRET_E2E,
+      // Los E2E ejercitan los planes y sus topes (flujos #8 y #10). En beta no
+      // hay límite que probar, así que el servidor de prueba corre siempre en
+      // modo producción, sin importar cómo esté configurado el entorno real.
+      BILLING_MODE: 'produccion',
     },
   },
 });

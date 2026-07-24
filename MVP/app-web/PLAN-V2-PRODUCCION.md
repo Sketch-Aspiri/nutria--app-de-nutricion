@@ -318,7 +318,7 @@ Además: tests unitarios/integración de handlers con la BD (≥ 80 % en `src/se
 | **4. Planes + PDF + plantillas** ✅ | 4–5 | Editor de plan sobre BD con items ligados a foods; plantillas; PDF real (react-pdf) con marca blanca; E2E #4 |
 | **5. IA Claude** ✅ | 5 | Servicio AI con streaming, salida estructurada validada, seudonimización, `ai_usage` y límites; los 5 casos de uso; E2E #10 |
 | **6. Agenda, mensajes, seguimiento** ✅ | 6 | Citas + recordatorios (cron + Resend); mensajes con polling; seguimiento leyendo logs reales; E2E #5, #6, #7 |
-| **7. Stripe** | 7 | Checkout, portal, webhooks, entitlements en servidor; paywall; E2E #8 |
+| **7. Stripe** ✅ | 7 | Checkout, portal, webhooks, entitlements en servidor; paywall; E2E #8 |
 | **8. Endurecimiento y lanzamiento** | 8 | Cifrado de columnas, auditoría security-auditor, Sentry, avisos de privacidad, seed tanda 3, carga de prueba, dominio productivo, **onboarding de 3–5 nutriólogos piloto** |
 
 Cada fase = un PR enfocado (regla del repo: cambios pequeños), con `/code-review` antes de merge.
@@ -727,6 +727,69 @@ para dejar la regresión en verde de punta a punta:
    mande intención en vez del prompt.
 
 Suite completa: **32 de 32 E2E en verde** contra una base limpia.
+
+---
+
+### Fase 7 — Stripe (completada)
+
+Construido en `apps/web` y `packages/shared`:
+
+- **Catálogo y entitlements compartidos** (`packages/shared/src/suscripcion/planes.ts`): precios,
+  inclusiones y topes de los tres planes, más `calcularEntitlements`, la función pura que decide
+  qué puede hacer una cuenta. Vive en el paquete compartido porque el servidor la aplica y la UI
+  la muestra; duplicar los números garantizaría que un día dejen de coincidir.
+- **Interruptor de etapa comercial** (`BILLING_MODE`, leído en `src/server/billing/config.ts`).
+  En `beta` —el valor por omisión— todas las cuentas son Free y **sin límites**: pacientes,
+  plantillas y generaciones de IA ilimitadas, y PDF con marca propia incluido. En `produccion`
+  entran en vigor los topes de la sección 9 sin tocar una línea de código. Se lee de `process.env`
+  en cada llamada, no al importar el módulo, para que los tests y los E2E puedan alternarlo.
+- **Checkout y portal** (`src/server/billing/servicio.ts`, `POST /api/v1/billing/checkout` y
+  `/portal`): Stripe Checkout en modo suscripción con Stripe Tax e `trial_period_days` tomado del
+  catálogo, y Customer Portal para cambio de plan, tarjeta y cancelación. Cero UI propia de medios
+  de pago. Los endpoints devuelven la URL en lugar de redirigir: la llamada sale de un `fetch` del
+  panel, y un 303 desde ahí lo seguiría el `fetch`, no el navegador.
+- **Webhook** (`POST /api/webhooks/stripe`, `src/server/billing/webhook.ts`): firma verificada
+  contra el cuerpo **crudo** e idempotencia por `event.id` apoyada en la llave primaria de la nueva
+  tabla `stripe_events` —no en un `findUnique` previo, que dejaría una carrera entre dos entregas
+  paralelas—. Si el procesamiento falla, la marca se retira para que el reintento de Stripe sirva.
+  Es la única entrada que escribe `subscriptions.plan`.
+- **Entitlements en servidor** (`getEntitlements`): el alta de pacientes y la creación de
+  plantillas responden **402 PLAN_LIMIT** al llegar al cupo, la cuota de IA respeta el modo, y el
+  PDF con marca propia se decide aquí y no en el perfil de marca.
+- **UI**: página `/suscripcion` (plan vigente, consumo del mes con barras, catálogo con selector
+  mensual/anual, avisos de retorno del checkout), enlace en la barra lateral, y el badge del
+  encabezado —que era un modal decorativo con datos inventados— leyendo la suscripción real. El
+  asistente de alta muestra el paywall con la salida a los planes cuando el servidor devuelve 402.
+
+Verificado: `tsc --noEmit` limpio, **365 tests** de `apps/web` y **302** de `packages/shared` en
+verde (26 nuevos sobre configuración, traducción de eventos de Stripe, idempotencia del webhook y
+catálogo de planes), `next build` exitoso y **38 de 38 E2E** contra una base limpia.
+
+**Decisiones y desviaciones**, y por qué:
+
+1. **La beta arranca sin límites, y es el valor por omisión.** El plan V2 describe los topes de
+   Free; el producto entra a piloto con nutriólogos reales antes de cobrar. `BILLING_MODE=beta`
+   deja los topes escritos y probados pero inactivos. El default es `beta` a propósito: un
+   despliegue sin configurar debe resultar en una app usable, no en una app que cobra mal.
+2. **`CuotaIA.limite` pasó a `number | null`.** `null` significa "sin tope", que es distinto de
+   cero. La alternativa (`Infinity`) se serializa a `null` en JSON de todas formas; es mejor que el
+   contrato lo diga que descubrirlo del lado del navegador.
+3. **`PAST_DUE` conserva el acceso.** Stripe reintenta el cobro varios días; cortarle el expediente
+   a un nutriólogo por una tarjeta vencida es peor que cobrarle tarde. Cuando Stripe se rinde el
+   estado pasa a `UNPAID` o `CANCELED` y ahí sí se degrada a Free.
+4. **Un `price_id` desconocido y activo no degrada a nadie.** Un precio creado a mano en el panel de
+   Stripe se asume Pro y queda registrado en `stripe_price_id` para diagnosticarlo. Lo contrario
+   dejaría sin plan a alguien que sí está pagando.
+5. **`current_period_end` se lee del item, no de la suscripción**, como exige la versión de API del
+   SDK de Stripe 19.
+6. **El E2E #8 no automatiza la pasarela de Stripe.** El checkout ocurre en un dominio de Stripe y
+   su resultado llega como webhook; el spec escribe en `subscriptions` exactamente lo que el
+   webhook escribiría, y verifica el 402 del cupo, el paywall en la UI, la ampliación con Pro, la
+   cancelación programada y el retorno a Free. El salto por la pasarela se valida a mano con
+   `stripe listen` y tarjetas de prueba (guía de configuración de Stripe).
+7. **Marca blanca en Free**: el PDF conserva nombre, cédula y especialidad del profesional —eso es
+   identificación clínica del expediente, no branding— y pierde solo el logotipo y el color propios.
+8. **CFDI 4.0 sigue pospuesto a V2.1** (Facturapi), como ya documentaba la sección 9.
 
 ---
 

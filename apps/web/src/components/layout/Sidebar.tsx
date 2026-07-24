@@ -2,6 +2,7 @@
 
 import {
   Calendar,
+  CreditCard,
   LayoutTemplate,
   LogOut,
   MessageCircle,
@@ -24,6 +25,7 @@ const NAV_ITEMS = [
   { href: '/alimentos', label: 'Alimentos', icon: Utensils },
   { href: '/plantillas', label: 'Plantillas', icon: LayoutTemplate },
   { href: '/marca', label: 'Marca y datos', icon: Palette },
+  { href: '/suscripcion', label: 'Suscripción', icon: CreditCard },
 ];
 
 export function Sidebar() {

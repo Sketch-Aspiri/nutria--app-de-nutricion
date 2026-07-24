@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { MAX_COMIDAS_PLAN, MAX_ITEMS_POR_COMIDA } from '@/domain/planLimits';
+import { MAX_NOTA_PLAN } from '@/server/plans/schemas';
 
 import type { EsquemaJson } from './cliente';
 
@@ -90,18 +91,51 @@ export type GenerarPlanActividadInput = z.infer<typeof generarPlanActividadSchem
  * verifica después que el `food_id` exista de verdad; el modelo no puede crear
  * alimentos nuevos en la base.
  */
+/**
+ * Los topes de longitud llevan mensaje propio.
+ *
+ * El motivo del rechazo se le devuelve al modelo en el reintento y se le
+ * muestra al nutriólogo cuando el borrador se degrada a texto. El "Invalid
+ * input" genérico de Zod no le sirve a ninguno de los dos: el modelo no sabe
+ * qué corregir y vuelve a fallar igual.
+ */
 export const itemBorradorSchema = z.object({
   food_id: z.string().nullable(),
-  descripcion: z.string().trim().min(1).max(300),
+  descripcion: z
+    .string()
+    .trim()
+    .min(1, 'Cada alimento necesita una descripción.')
+    .max(300, 'La descripción del alimento no debe pasar de 300 caracteres.'),
   cantidad_porciones: z.number().positive().max(50),
 });
 
 export const comidaBorradorSchema = z.object({
-  nombre: z.string().trim().min(1).max(80),
-  horario: z.string().trim().max(30),
-  descripcion: z.string().trim().max(500),
+  nombre: z
+    .string()
+    .trim()
+    .min(1, 'Cada tiempo de comida necesita nombre.')
+    .max(80, 'El nombre del tiempo de comida no debe pasar de 80 caracteres.'),
+  horario: z.string().trim().max(30, 'El horario no debe pasar de 30 caracteres.'),
+  descripcion: z
+    .string()
+    .trim()
+    .max(500, 'La indicación de la comida no debe pasar de 500 caracteres.'),
   items: z.array(itemBorradorSchema).min(1).max(MAX_ITEMS_POR_COMIDA),
 });
+
+/**
+ * Tope de la nota de revisión.
+ *
+ * Se le pide al modelo que enumere todo lo que el nutriólogo debe verificar
+ * antes de aprobar, y en un expediente con comorbilidades esa lista es larga
+ * con razón. Con 1 000 caracteres se rechazaban borradores clínicamente
+ * correctos por la longitud de su propia advertencia.
+ *
+ * El límite es el del plan, no uno propio: esta nota se guarda en
+ * `meal_plans.nota`, y un borrador más largo pasaría la validación de la IA
+ * para después reventar al guardar, que es peor que rechazarlo a tiempo.
+ */
+export const MAX_NOTA_BORRADOR = MAX_NOTA_PLAN;
 
 export const planBorradorSchema = z.object({
   calorias_diarias: z.number().int().min(600).max(6_000),
@@ -109,7 +143,13 @@ export const planBorradorSchema = z.object({
   carbos_g: z.number().int().min(0).max(1_000),
   grasa_g: z.number().int().min(0).max(400),
   comidas: z.array(comidaBorradorSchema).min(1).max(MAX_COMIDAS_PLAN),
-  nota: z.string().trim().max(1_000),
+  nota: z
+    .string()
+    .trim()
+    .max(
+      MAX_NOTA_BORRADOR,
+      `La nota de revisión no debe pasar de ${MAX_NOTA_BORRADOR} caracteres; resume los puntos clave.`,
+    ),
 });
 
 export type PlanBorrador = z.infer<typeof planBorradorSchema>;
@@ -184,7 +224,9 @@ export const PLAN_JSON_SCHEMA: EsquemaJson = {
     },
     nota: {
       type: 'string',
-      description: 'Qué debe revisar el nutriólogo antes de aprobar este borrador.',
+      // La salida estructurada ignora `maxLength`, así que el límite viaja en
+      // la descripción: es lo único que el modelo llega a leer.
+      description: `Qué debe revisar el nutriólogo antes de aprobar este borrador. Máximo ${MAX_NOTA_BORRADOR} caracteres.`,
     },
   },
   required: ['calorias_diarias', 'proteina_g', 'carbos_g', 'grasa_g', 'comidas', 'nota'],

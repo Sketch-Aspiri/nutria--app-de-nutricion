@@ -30,6 +30,13 @@ const MES = '2026-07';
 beforeEach(() => {
   jest.clearAllMocks();
   mockPrisma.aiUsage.updateMany.mockResolvedValue({ count: 1 });
+  // Estas pruebas describen el racionamiento, que solo existe fuera de la beta
+  // comercial. El modo se fija explícitamente para no depender del default.
+  process.env.BILLING_MODE = 'produccion';
+});
+
+afterAll(() => {
+  delete process.env.BILLING_MODE;
 });
 
 describe('planDelUsuario', () => {
@@ -130,6 +137,22 @@ describe('reservarGeneracion', () => {
       permitida: true,
       cuota: { limite: 500, restantes: 300 },
     });
+  });
+
+  it('en la beta comercial cuenta el consumo pero no rechaza a nadie', async () => {
+    process.env.BILLING_MODE = 'beta';
+    mockPrisma.subscription.findUnique.mockResolvedValue({ plan: 'FREE', status: 'ACTIVE' });
+    mockPrisma.aiUsage.upsert.mockResolvedValue({ generaciones: 900 });
+
+    const resultado = await reservarGeneracion(USER_ID, AHORA);
+
+    expect(resultado).toMatchObject({
+      permitida: true,
+      cuota: { limite: null, ilimitada: true, agotada: false, usadas: 900 },
+    });
+    // El consumo se sigue registrando: sirve para dimensionar el costo real.
+    expect(mockPrisma.aiUsage.upsert).toHaveBeenCalled();
+    expect(mockPrisma.aiUsage.updateMany).not.toHaveBeenCalled();
   });
 });
 

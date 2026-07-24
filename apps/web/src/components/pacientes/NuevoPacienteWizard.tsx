@@ -1,6 +1,7 @@
 'use client';
 
 import { ChevronRight } from 'lucide-react';
+import Link from 'next/link';
 import { useState } from 'react';
 
 import { generoADb, nivelActividadADb, objetivoADb } from '@nutria/shared';
@@ -65,6 +66,9 @@ export function NuevoPacienteWizard({ onClose, onCreado }: NuevoPacienteWizardPr
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormPaciente>(FORM_PACIENTE_INICIAL);
   const [error, setError] = useState('');
+  // El 402 del cupo del plan no se resuelve corrigiendo el formulario, así que
+  // en vez de solo mostrar el mensaje se ofrece la salida: la página de planes.
+  const [topeDePlan, setTopeDePlan] = useState(false);
   const crear = useCrearPaciente();
 
   const set = <Clave extends keyof FormPaciente>(clave: Clave, valor: FormPaciente[Clave]) =>
@@ -72,10 +76,12 @@ export function NuevoPacienteWizard({ onClose, onCreado }: NuevoPacienteWizardPr
 
   const guardar = async () => {
     setError('');
+    setTopeDePlan(false);
     try {
       const paciente = await crear.mutateAsync(construirPayload(form));
       onCreado(paciente.id);
     } catch (fallo: unknown) {
+      setTopeDePlan(fallo instanceof ApiError && fallo.code === 'PLAN_LIMIT');
       setError(
         fallo instanceof ApiError
           ? fallo.message
@@ -106,9 +112,21 @@ export function NuevoPacienteWizard({ onClose, onCreado }: NuevoPacienteWizardPr
       {error && (
         <div
           role="alert"
-          className="mx-6 mt-4 bg-red-50 border border-red-200 text-red-800 text-xs rounded-lg px-3 py-2.5"
+          className={`mx-6 mt-4 text-xs rounded-lg px-3 py-2.5 border ${
+            topeDePlan
+              ? 'bg-amber-50 border-amber-200 text-amber-900'
+              : 'bg-red-50 border-red-200 text-red-800'
+          }`}
         >
           {error}
+          {topeDePlan && (
+            <Link
+              href="/suscripcion"
+              className="block mt-2 font-medium underline underline-offset-2"
+            >
+              Ver planes
+            </Link>
+          )}
         </div>
       )}
       <div className="flex justify-between p-6 pt-5">

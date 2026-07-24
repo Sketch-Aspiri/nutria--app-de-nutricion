@@ -1,4 +1,5 @@
 import { requiereNutriologo } from '@/server/auth/guards';
+import { getEntitlements } from '@/server/billing/entitlements';
 import {
   MAX_COMIDAS_PLAN,
   MAX_ITEMS_PLAN,
@@ -71,8 +72,11 @@ export async function GET(request: Request, { params }: Contexto) {
       );
     }
 
+    // La marca propia en el PDF es característica de pago; el entitlement se
+    // resuelve aquí y no en el perfil, que solo guarda logo y color.
+    const { marcaBlanca } = await getEntitlements(sesion.userId);
     const pdf = await ejecutarRenderPdfProtegido(async () =>
-      renderMealPlanPdf(await crearDatosPlanPdf(plan)),
+      renderMealPlanPdf(await crearDatosPlanPdf(plan, { marcaBlanca })),
     );
     const archivo = nombreArchivoPlan(plan.patient.nombre);
     const descargar = new URL(request.url).searchParams.get('download') === '1';

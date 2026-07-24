@@ -41,6 +41,27 @@ describe('OpenAPI de la fase 4', () => {
     expect(JSON.stringify(generar?.responses?.['429'])).toContain('AI_LIMIT_REACHED');
   });
 
+  it('documenta los endpoints de facturación de la fase 7', () => {
+    expect(Object.keys(openApiDocument.paths ?? {})).toEqual(
+      expect.arrayContaining([
+        '/api/v1/billing/subscription',
+        '/api/v1/billing/checkout',
+        '/api/v1/billing/portal',
+      ]),
+    );
+  });
+
+  it('declara los límites nulos de la beta y los errores de facturación', () => {
+    const suscripcion = JSON.stringify(openApiDocument.components?.schemas?.Suscripcion);
+    const checkout = openApiDocument.paths?.['/api/v1/billing/checkout']?.post;
+
+    // `limite: null` es parte del contrato: significa "sin tope", no "cero".
+    expect(JSON.stringify(openApiDocument.components?.schemas?.LimiteUso)).toContain('null');
+    expect(suscripcion).toContain('"modo"');
+    expect(JSON.stringify(checkout?.responses?.['409'])).toContain('BILLING_NOT_AVAILABLE');
+    expect(JSON.stringify(checkout?.responses?.['503'])).toContain('BILLING_NOT_CONFIGURED');
+  });
+
   it('publica la estructura reutilizable de las plantillas', () => {
     const plantilla = openApiDocument.components?.schemas?.PlanTemplate;
 

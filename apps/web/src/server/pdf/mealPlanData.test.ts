@@ -70,10 +70,9 @@ function planPrueba(): PlanParaPdf {
 
 describe('crearDatosPlanPdf', () => {
   it('lleva marca, paciente, metas y snapshots de items al renderer', async () => {
-    const data = await crearDatosPlanPdf(
-      planPrueba(),
-      new Date('2026-07-23T12:00:00Z'),
-    );
+    const data = await crearDatosPlanPdf(planPrueba(), {
+      generadoEn: new Date('2026-07-23T12:00:00Z'),
+    });
 
     expect(data.marca).toMatchObject({
       nombre: 'Consulta Ejemplo',
@@ -134,7 +133,7 @@ describe('crearDatosPlanPdf', () => {
     plan.patient.nutritionist.nutritionistProfile!.marcaLogoUrl = url;
     const resolver = jest.fn(async () => LOGO_PNG);
 
-    const data = await crearDatosPlanPdf(plan, new Date(), resolver);
+    const data = await crearDatosPlanPdf(plan, { resolverLogo: resolver });
 
     expect(resolver).toHaveBeenCalledWith(
       url,

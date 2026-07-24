@@ -1,4 +1,5 @@
 import { requiereNutriologo } from '@/server/auth/guards';
+import { getEntitlements } from '@/server/billing/entitlements';
 import {
   ErrorCode,
   internalError,
@@ -60,8 +61,18 @@ export async function POST(request: Request) {
   if (!parsed.success) return validationError(parsed.error);
 
   try {
-    // El tope de pacientes del plan Free se aplica en la fase 7, junto con la
-    // ruta de upgrade: imponerlo antes dejaría al nutriólogo sin salida.
+    // El cupo del plan se comprueba en el servidor, no escondiendo el botón:
+    // el alta también se puede llamar por API. Durante la beta comercial
+    // `alcanzado` es siempre `false` y esto no estorba a nadie.
+    const entitlements = await getEntitlements(sesion.userId);
+    if (entitlements.pacientes.alcanzado) {
+      return jsonError(
+        402,
+        ErrorCode.PLAN_LIMIT,
+        `Tu plan ${entitlements.plan} incluye ${entitlements.pacientes.limite} pacientes activos. Mejora tu plan o archiva a un paciente para dar de alta a otro.`,
+      );
+    }
+
     const paciente = await crearPaciente(sesion.userId, parsed.data);
     return jsonCreated(serializarPacienteDetalle(paciente));
   } catch (error: unknown) {

@@ -212,6 +212,8 @@ model Subscription {
   userId               String             @unique @map("user_id") @db.Uuid
   stripeCustomerId     String?            @unique @map("stripe_customer_id")
   stripeSubscriptionId String?            @unique @map("stripe_subscription_id")
+  /** Precio contratado en Stripe; distingue Pro mensual de Pro anual al mostrar el plan. */
+  stripePriceId        String?            @map("stripe_price_id")
   plan                 SubscriptionPlan   @default(FREE)
   status               SubscriptionStatus @default(ACTIVE)
   currentPeriodEnd     DateTime?          @map("current_period_end")
@@ -723,6 +725,23 @@ model Invoice {
 
   @@index([nutritionistId, estado])
   @@map("invoices")
+}
+
+/**
+ * Eventos de Stripe ya procesados, para que el webhook sea idempotente.
+ *
+ * Stripe reintenta la entrega ante cualquier respuesta que no sea 2xx, y puede
+ * mandar el mismo evento dos veces sin que nada haya fallado. El identificador
+ * del evento es la llave primaria: insertarlo es la operación que decide si el
+ * webhook trabaja o se salta el evento.
+ */
+model StripeEvent {
+  id          String   @id
+  tipo        String
+  processedAt DateTime @default(now()) @map("processed_at")
+
+  @@index([processedAt])
+  @@map("stripe_events")
 }
 
 // Bitácora de acceso a expedientes. `metadata` nunca contiene datos de salud.

@@ -1,7 +1,8 @@
 import type { SubscriptionPlan } from '@prisma/client';
 
-import { type CuotaIA, calcularCuota, mesDeUso } from '@nutria/shared';
+import { type CuotaIA, calcularCuota, esSuscripcionVigente, mesDeUso } from '@nutria/shared';
 
+import { modoFacturacion } from '@/server/billing/config';
 import { prisma } from '@/server/db';
 
 import type { UsoTokens } from './cliente';
@@ -15,14 +16,12 @@ import type { UsoTokens } from './cliente';
  */
 
 /** Sin fila en `subscriptions` (o con la suscripción cancelada) el plan es FREE. */
-const PLANES_VIGENTES: ReadonlyArray<string> = ['ACTIVE', 'TRIALING', 'PAST_DUE'];
-
 export async function planDelUsuario(userId: string): Promise<SubscriptionPlan> {
   const suscripcion = await prisma.subscription.findUnique({
     where: { userId },
     select: { plan: true, status: true },
   });
-  if (!suscripcion || !PLANES_VIGENTES.includes(suscripcion.status)) return 'FREE';
+  if (!suscripcion || !esSuscripcionVigente(suscripcion.status)) return 'FREE';
   return suscripcion.plan;
 }
 
@@ -36,7 +35,7 @@ export async function consultarCuota(userId: string, ahora = new Date()): Promis
       select: { generaciones: true },
     }),
   ]);
-  return calcularCuota(plan, registro?.generaciones ?? 0);
+  return calcularCuota(plan, registro?.generaciones ?? 0, modoFacturacion());
 }
 
 /**
@@ -61,10 +60,13 @@ export async function reservarGeneracion(
     select: { generaciones: true },
   });
 
-  const cuota = calcularCuota(plan, registro.generaciones);
-  if (registro.generaciones > cuota.limite) {
+  const modo = modoFacturacion();
+  const cuota = calcularCuota(plan, registro.generaciones, modo);
+  // `limite === null` es la beta comercial: se sigue contando el consumo (sirve
+  // para dimensionar el costo real de la IA), pero no se rechaza a nadie.
+  if (cuota.limite !== null && registro.generaciones > cuota.limite) {
     await devolverGeneracion(userId, ahora);
-    return { permitida: false, cuota: calcularCuota(plan, cuota.limite) };
+    return { permitida: false, cuota: calcularCuota(plan, cuota.limite, modo) };
   }
   return { permitida: true, cuota };
 }

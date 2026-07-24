@@ -1,4 +1,5 @@
 import { requiereNutriologo } from '@/server/auth/guards';
+import { getEntitlements } from '@/server/billing/entitlements';
 import {
   ErrorCode,
   internalError,
@@ -61,6 +62,16 @@ export async function POST(request: Request) {
   if (!parsed.success) return validationError(parsed.error);
 
   try {
+    // Mismo criterio que el alta de pacientes: el cupo se aplica en el servidor.
+    const entitlements = await getEntitlements(sesion.userId);
+    if (entitlements.plantillas.alcanzado) {
+      return jsonError(
+        402,
+        ErrorCode.PLAN_LIMIT,
+        `Tu plan ${entitlements.plan} incluye ${entitlements.plantillas.limite} plantillas guardadas. Mejora tu plan o borra una plantilla para crear otra.`,
+      );
+    }
+
     const plantilla = await crearPlantilla(sesion.userId, parsed.data);
     return jsonCreated(serializarPlantilla(plantilla));
   } catch (error: unknown) {

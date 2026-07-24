@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import type { ZodError } from 'zod';
 
+import { logger } from '@/server/logger';
+
 /**
  * Helpers de respuesta para los handlers de `/api/v1`, según `rules/api-conventions.md`:
  * recurso individual = objeto directo; listado = { data, meta }; error = { error: { code, message, details } }.
@@ -21,7 +23,12 @@ export const ErrorCode = {
   TOKEN_EXPIRED: 'TOKEN_EXPIRED',
   EMAIL_NOT_VERIFIED: 'EMAIL_NOT_VERIFIED',
   RATE_LIMITED: 'RATE_LIMITED',
+  /** 402: el plan vigente no alcanza para la acción (cupo de pacientes, plantillas). */
   PLAN_LIMIT: 'PLAN_LIMIT',
+  /** 409: no hay checkout ni portal que abrir (beta, plan sin precio, sin suscripción). */
+  BILLING_NOT_AVAILABLE: 'BILLING_NOT_AVAILABLE',
+  /** 503: falta STRIPE_SECRET_KEY o STRIPE_WEBHOOK_SECRET en el servidor. */
+  BILLING_NOT_CONFIGURED: 'BILLING_NOT_CONFIGURED',
   /** 422: la petición es correcta, pero el expediente no tiene los datos clínicos. */
   EXPEDIENTE_INCOMPLETO: 'EXPEDIENTE_INCOMPLETO',
   /** 422: el plan menciona un alérgeno declarado por el paciente. */
@@ -129,11 +136,19 @@ export function zodDetails(error: ZodError): ErrorDetails {
 }
 
 export function validationError(error: ZodError): NextResponse {
+  const details = zodDetails(error);
+  // Solo los campos que fallaron, nunca lo que traían: un rechazo del plan o
+  // del expediente llevaría peso, notas clínicas o alergias al log. Con esto,
+  // un 400 en producción se diagnostica sin pedirle al usuario que reproduzca.
+  logger.warn('Validación rechazada', {
+    operation: 'validacion',
+    code: Object.keys(details).join(', ') || '_',
+  });
   return jsonError(
     400,
     ErrorCode.VALIDATION_ERROR,
     'Algunos datos no son válidos. Revisa el formulario.',
-    zodDetails(error),
+    details,
   );
 }
 

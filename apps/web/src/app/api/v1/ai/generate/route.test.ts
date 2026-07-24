@@ -23,7 +23,14 @@ const mockGenerar = generarContenido as jest.Mock;
 
 const USER_ID = 'a1b2c3d4-0000-4000-8000-000000000001';
 const PATIENT_ID = 'b1b2c3d4-0000-4000-8000-000000000002';
-const CUOTA = { plan: 'FREE' as const, limite: 15, usadas: 15, restantes: 0, agotada: true };
+const CUOTA = {
+  plan: 'FREE' as const,
+  limite: 15,
+  usadas: 15,
+  restantes: 0,
+  agotada: true,
+  ilimitada: false,
+};
 
 function peticion(cuerpo: unknown): Request {
   return new Request('http://localhost/api/v1/ai/generate', {

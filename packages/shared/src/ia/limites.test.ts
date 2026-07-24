@@ -35,4 +35,22 @@ describe('calcularCuota', () => {
     expect(calcularCuota('PRO', -3).usadas).toBe(0);
     expect(calcularCuota('PRO', Number.NaN).usadas).toBe(0);
   });
+
+  it('en modo beta no raciona: sin límite y nunca agotada', () => {
+    expect(calcularCuota('FREE', 400, 'beta')).toMatchObject({
+      limite: null,
+      restantes: null,
+      usadas: 400,
+      agotada: false,
+      ilimitada: true,
+    });
+  });
+
+  it('vuelve a racionar en cuanto el modo es producción', () => {
+    expect(calcularCuota('FREE', 400, 'produccion')).toMatchObject({
+      limite: 15,
+      agotada: true,
+      ilimitada: false,
+    });
+  });
 });

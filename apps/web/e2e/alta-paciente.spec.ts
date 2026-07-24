@@ -103,7 +103,7 @@ test('da de alta un paciente con expediente completo y lo persiste', async ({ pa
   expect(guardado?.measurements[0]?.alturaCm).toBe(162);
 });
 
-test('el paciente sigue ahí tras recargar y en una sesión nueva', async ({ page, context }) => {
+test('el paciente sigue ahí tras recargar y en una sesión nueva', async ({ page, browser }) => {
   await iniciarSesion(page, nutriologa);
 
   await expect(page.getByText('Paciente E2E Uno')).toBeVisible();
@@ -111,10 +111,19 @@ test('el paciente sigue ahí tras recargar y en una sesión nueva', async ({ pag
   await page.reload();
   await expect(page.getByText('Paciente E2E Uno')).toBeVisible();
 
-  // Contexto limpio (sin localStorage ni cookies previas): el dato viene del servidor.
-  await context.clearCookies();
-  const otraPagina = await context.newPage();
-  await iniciarSesion(otraPagina, nutriologa);
-  await expect(otraPagina.getByText('Paciente E2E Uno')).toBeVisible();
-  await otraPagina.close();
+  /**
+   * Contexto nuevo (sin localStorage ni cookies previas): el dato viene del
+   * servidor. Es un contexto propio y no un `clearCookies()` sobre el de arriba
+   * porque el panel tiene peticiones en vuelo cuya respuesta trae la cookie de
+   * sesión renovada; si llega después del borrado, lo deshace y la "sesión
+   * nueva" ya venía autenticada.
+   */
+  const otroContexto = await browser.newContext();
+  try {
+    const otraPagina = await otroContexto.newPage();
+    await iniciarSesion(otraPagina, nutriologa);
+    await expect(otraPagina.getByText('Paciente E2E Uno')).toBeVisible();
+  } finally {
+    await otroContexto.close();
+  }
 });

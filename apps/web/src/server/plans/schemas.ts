@@ -93,12 +93,25 @@ export const estructuraPlantillaSchema = z.object({
   comidas: z.array(comidaPlanSchema).max(MAX_COMIDAS_PLAN).default([]),
 });
 
+/**
+ * Tope de la nota del plan.
+ *
+ * Lo que la IA escribe como nota de revisión termina guardado aquí, así que
+ * `MAX_NOTA_BORRADOR` se deriva de esta constante: si el borrador admitiera
+ * más, produciría planes que el editor muestra pero que no se pueden guardar.
+ */
+export const MAX_NOTA_PLAN = 2_000;
+
 const camposPlanSchema = z.object({
   calorias_diarias: caloriasPlanSchema,
   proteina_g: macroPlanSchema,
   carbos_g: macroPlanSchema,
   grasa_g: macroPlanSchema,
-  nota: z.string().trim().max(2_000).nullish(),
+  nota: z
+    .string()
+    .trim()
+    .max(MAX_NOTA_PLAN, `La nota no debe pasar de ${MAX_NOTA_PLAN} caracteres.`)
+    .nullish(),
   origen: z.enum(ORIGENES_PLAN),
   estado: z.enum(ESTADOS_PLAN),
 });

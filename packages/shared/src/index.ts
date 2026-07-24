@@ -7,3 +7,4 @@ export * from './nutricion';
 export * from './alergias';
 export * from './adherencia';
 export * from './ia/index';
+export * from './suscripcion/index';

@@ -43,6 +43,15 @@ test.beforeAll(async () => {
     },
   });
 
+  // El PDF con marca propia es característica de pago (fase 7): en Free el
+  // documento sale con la identidad de nutria. Este flujo prueba el plan y su
+  // exportación, no el paywall, así que la cuenta va en Pro. El entitlement en
+  // sí se cubre en `suscripcion.spec.ts`.
+  await prisma.subscription.update({
+    where: { userId: nutriologa.id },
+    data: { plan: 'PRO', status: 'ACTIVE' },
+  });
+
   const sufijo = Date.now().toString(36);
   alimentoNombre = `Avena clínica E2E ${sufijo}`;
   const alimento = await prisma.food.create({

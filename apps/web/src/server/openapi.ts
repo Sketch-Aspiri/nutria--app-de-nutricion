@@ -9,6 +9,7 @@ import {
   estructuraPlantillaSchema,
 } from '@/server/plans/schemas';
 import { generarSchema } from '@/server/ai/schemas';
+import { checkoutSchema } from '@/server/billing/schemas';
 import { actualizarPerfilSchema } from '@/server/profile/schemas';
 
 const uuid = z.string().uuid();
@@ -153,10 +154,12 @@ const perfilSchema = z
 const cuotaIaSchema = z
   .object({
     plan: z.enum(['FREE', 'PRO', 'CLINICA']),
-    limite: z.number().int(),
+    // `null` = sin tope (beta comercial); ver `packages/shared/src/ia/limites.ts`.
+    limite: z.number().int().nullable(),
     usadas: z.number().int(),
-    restantes: z.number().int(),
+    restantes: z.number().int().nullable(),
     agotada: z.boolean(),
+    ilimitada: z.boolean(),
   })
   .meta({ id: 'CuotaIA' });
 
@@ -176,6 +179,55 @@ const generacionIaSchema = z
     cuota: cuotaIaSchema,
   })
   .meta({ id: 'GeneracionIA' });
+
+const limiteUsoSchema = z
+  .object({
+    usados: z.number().int(),
+    /** `null` = ilimitado. */
+    limite: z.number().int().nullable(),
+    restantes: z.number().int().nullable(),
+    alcanzado: z.boolean(),
+  })
+  .meta({ id: 'LimiteUso' });
+
+const planCatalogoSchema = z
+  .object({
+    clave: z.enum(['FREE', 'PRO', 'CLINICA']),
+    nombre: z.string(),
+    descripcion: z.string(),
+    precios: z.array(
+      z.object({
+        periodo: z.enum(['MENSUAL', 'ANUAL']),
+        centavos: z.number().int(),
+        moneda: z.string(),
+      }),
+    ),
+    incluye: z.array(z.string()),
+    dias_prueba: z.number().int(),
+    contratable: z.boolean(),
+  })
+  .meta({ id: 'PlanCatalogo' });
+
+const suscripcionSchema = z
+  .object({
+    plan: z.enum(['FREE', 'PRO', 'CLINICA']),
+    estado: z.enum(['ACTIVE', 'TRIALING', 'PAST_DUE', 'CANCELED', 'UNPAID']),
+    modo: z.enum(['beta', 'produccion']),
+    periodo_fin: fechaHora.nullable(),
+    cancela_al_final: z.boolean(),
+    pagos_habilitados: z.boolean(),
+    tiene_suscripcion_stripe: z.boolean(),
+    entitlements: z.object({
+      pacientes: limiteUsoSchema,
+      plantillas: limiteUsoSchema,
+      ia: cuotaIaSchema,
+      marca_blanca: z.boolean(),
+    }),
+    catalogo: z.array(planCatalogoSchema),
+  })
+  .meta({ id: 'Suscripcion' });
+
+const urlStripeSchema = z.object({ url: z.url() }).meta({ id: 'UrlStripe' });
 
 const json = <T extends z.ZodType>(schema: T) => ({
   'application/json': { schema },
@@ -236,6 +288,45 @@ export const openApiDocument = createDocument({
         summary: 'Consulta la cuota de IA del mes en curso',
         responses: {
           '200': respuesta('Cuota vigente', cuotaIaConEstadoSchema),
+          ...erroresComunes,
+        },
+      },
+    },
+    '/api/v1/billing/subscription': {
+      get: {
+        tags: ['Facturación'],
+        summary: 'Plan vigente, entitlements y catálogo de planes',
+        responses: {
+          '200': respuesta('Suscripción del nutriólogo', suscripcionSchema),
+          ...erroresComunes,
+        },
+      },
+    },
+    '/api/v1/billing/checkout': {
+      post: {
+        tags: ['Facturación'],
+        summary: 'Abre Stripe Checkout y devuelve la URL de pago',
+        requestBody: { required: true, content: json(checkoutSchema) },
+        responses: {
+          '200': respuesta('URL de la sesión de checkout', urlStripeSchema),
+          '400': respuesta('JSON inválido o validación fallida', errorSchema),
+          '409': respuesta(
+            'Beta comercial o plan sin precio configurado (BILLING_NOT_AVAILABLE)',
+            errorSchema,
+          ),
+          '503': respuesta('Falta STRIPE_SECRET_KEY (BILLING_NOT_CONFIGURED)', errorSchema),
+          ...erroresComunes,
+        },
+      },
+    },
+    '/api/v1/billing/portal': {
+      post: {
+        tags: ['Facturación'],
+        summary: 'Abre el Customer Portal de Stripe',
+        responses: {
+          '200': respuesta('URL del portal de facturación', urlStripeSchema),
+          '409': respuesta('El usuario no tiene suscripción de pago (BILLING_NOT_AVAILABLE)', errorSchema),
+          '503': respuesta('Falta STRIPE_SECRET_KEY (BILLING_NOT_CONFIGURED)', errorSchema),
           ...erroresComunes,
         },
       },

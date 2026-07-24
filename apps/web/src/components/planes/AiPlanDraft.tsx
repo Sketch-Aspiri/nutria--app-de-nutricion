@@ -78,7 +78,8 @@ export function AiPlanDraft({ paciente, onGenerated }: AiPlanDraftProps) {
         </p>
       )}
 
-      {cuota.data && !cuota.data.agotada && (
+      {/* `limite === null` es la beta comercial: no hay cuenta regresiva que dar. */}
+      {cuota.data && !cuota.data.agotada && cuota.data.limite !== null && (
         <p className="mt-2 text-[11px] text-stone-400">
           Te quedan {cuota.data.restantes} de {cuota.data.limite} generaciones de IA este mes.
         </p>

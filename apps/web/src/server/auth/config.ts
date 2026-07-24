@@ -18,6 +18,7 @@ const RUTAS_PANEL = [
   '/facturacion',
   '/plantillas',
   '/marca',
+  '/suscripcion',
 ];
 
 /** Rutas de autenticación: quien ya tiene sesión activa no debería verlas. */

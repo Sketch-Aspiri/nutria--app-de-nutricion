@@ -7,25 +7,46 @@ import { cargarLogoMarcaParaPdf } from '@/server/profile/logoStorage';
 const COLOR_PREDETERMINADO = '#065f46';
 export { logoSeguro };
 
+export type OpcionesPdfPlan = {
+  generadoEn?: Date;
+  resolverLogo?: typeof cargarLogoMarcaParaPdf;
+  /**
+   * Marca blanca: quitar el logotipo y el color de nutria y poner los del
+   * consultorio. Es una característica de pago, así que la decide
+   * `getEntitlements` en el servidor y no el perfil de marca.
+   *
+   * Sin ella el documento conserva el nombre, la cédula y la especialidad del
+   * profesional —eso es identificación clínica del expediente, no branding— y
+   * solo pierde el logotipo y el color propios.
+   */
+  marcaBlanca?: boolean;
+};
+
 /** Traduce el agregado Prisma al contrato pequeño y estable del renderer. */
 export async function crearDatosPlanPdf(
   plan: PlanParaPdf,
-  generadoEn = new Date(),
-  resolverLogo = cargarLogoMarcaParaPdf,
+  opciones: OpcionesPdfPlan = {},
 ): Promise<MealPlanPdfData> {
+  const {
+    generadoEn = new Date(),
+    resolverLogo = cargarLogoMarcaParaPdf,
+    marcaBlanca = true,
+  } = opciones;
+
   const perfil = plan.patient.nutritionist.nutritionistProfile;
   const profesional =
     perfil?.nombreCompleto || plan.patient.nutritionist.name || 'Profesional de nutrición';
-  const logoUrl = await resolverLogo(
-    perfil?.marcaLogoUrl ?? null,
-    plan.patient.nutritionist.id,
-  );
+  const logoUrl = marcaBlanca
+    ? await resolverLogo(perfil?.marcaLogoUrl ?? null, plan.patient.nutritionist.id)
+    : null;
 
   return {
     generadoEn,
     marca: {
-      nombre: perfil?.marcaNombre || perfil?.nombreCompleto || 'nutria',
-      color: perfil?.marcaColor || COLOR_PREDETERMINADO,
+      nombre: marcaBlanca
+        ? perfil?.marcaNombre || perfil?.nombreCompleto || 'nutria'
+        : 'nutria',
+      color: (marcaBlanca && perfil?.marcaColor) || COLOR_PREDETERMINADO,
       logoUrl,
       profesional,
       cedulaProfesional: perfil?.cedulaProfesional ?? null,

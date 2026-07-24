@@ -1,5 +1,6 @@
 import { SISTEMA_BASE, TOLERANCIA_ENERGIA } from './config';
 import type { AlimentoCatalogo, ContextoPaciente } from './contexto';
+import { MAX_NOTA_BORRADOR } from './schemas';
 
 /**
  * Construcción de los prompts, en el servidor.
@@ -93,7 +94,7 @@ export function promptPlan(
     '',
     `ENFOQUE PEDIDO POR EL NUTRIÓLOGO: ${notas?.trim() || 'ninguno en particular'}`,
     '',
-    `Genera el borrador con ${contexto.comidasPorDia} tiempos de comida. En \`nota\`, escribe qué debe revisar el nutriólogo antes de aprobarlo.`,
+    `Genera el borrador con ${contexto.comidasPorDia} tiempos de comida. En \`nota\`, escribe qué debe revisar el nutriólogo antes de aprobarlo: los puntos que de verdad requieren su criterio, sin repetir lo que ya se ve en el plan, y sin pasar de ${MAX_NOTA_BORRADOR} caracteres.`,
   ].join('\n');
 }
 
