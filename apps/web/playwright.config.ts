@@ -55,8 +55,13 @@ const BASE_URL = `http://localhost:${PUERTO}`;
  */
 const BUZON_CORREO = path.join(__dirname, 'test-results', 'buzon-correo.jsonl');
 const CRON_SECRET_E2E = process.env.CRON_SECRET ?? 'cron-secreto-e2e';
+const ENCRYPTION_KEY_E2E =
+  process.env.ENCRYPTION_KEY ??
+  'MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=';
 process.env.EMAIL_OUTBOX_FILE = BUZON_CORREO;
 process.env.CRON_SECRET = CRON_SECRET_E2E;
+process.env.ENCRYPTION_KEY = ENCRYPTION_KEY_E2E;
+process.env.ENCRYPTION_KEY_ID = 'e2e';
 
 export default defineConfig({
   testDir: './e2e',
@@ -87,6 +92,8 @@ export default defineConfig({
       DIRECT_URL: E2E_DATABASE_URL,
       EMAIL_OUTBOX_FILE: BUZON_CORREO,
       CRON_SECRET: CRON_SECRET_E2E,
+      ENCRYPTION_KEY: ENCRYPTION_KEY_E2E,
+      ENCRYPTION_KEY_ID: 'e2e',
       // Los E2E ejercitan los planes y sus topes (flujos #8 y #10). En beta no
       // hay límite que probar, así que el servidor de prueba corre siempre en
       // modo producción, sin importar cómo esté configurado el entorno real.

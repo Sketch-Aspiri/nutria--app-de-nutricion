@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import { prisma } from '@/server/db';
 import { logger } from '@/server/logger';
+import { ipDe, rateLimit } from '@/server/rate-limit';
 
 import { authConfig } from './config';
 import { normalizarEmail, verifyPassword } from './password';
@@ -32,11 +33,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         email: { label: 'Correo', type: 'email' },
         password: { label: 'Contraseña', type: 'password' },
       },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         const parsed = credencialesSchema.safeParse(credentials);
         if (!parsed.success) return null;
 
         const email = normalizarEmail(parsed.data.email);
+        const [sourceLimit, accountLimit] = await Promise.all([
+          rateLimit(`login:source:${ipDe(request)}`, 15, 15 * 60 * 1000),
+          // El tope por cuenta frena ataques distribuidos sin permitir que diez
+          // peticiones bloqueen deliberadamente a un usuario legítimo.
+          rateLimit(`login:account:${email}`, 100, 15 * 60 * 1000),
+        ]);
+        if (!sourceLimit.permitido || !accountLimit.permitido) return null;
+
         const usuario = await prisma.user.findUnique({ where: { email } });
 
         if (!usuario || usuario.deletedAt) {

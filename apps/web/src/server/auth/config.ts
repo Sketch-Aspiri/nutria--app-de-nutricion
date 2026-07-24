@@ -12,6 +12,7 @@ const SESION_MAX_SEGUNDOS = 60 * 60 * 8;
 
 /** Prefijos que exigen sesión con correo verificado. */
 const RUTAS_PANEL = [
+  '/inicio',
   '/pacientes',
   '/agenda',
   '/mensajes',

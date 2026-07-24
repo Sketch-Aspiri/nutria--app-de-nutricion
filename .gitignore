@@ -10,4 +10,11 @@ blob-report/
 .env
 .env.local
 .env.*.local
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+credentials.json
+service-account*.json
 .DS_Store

@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 
+import { PRIVACY_NOTICE_VERSION } from '@/config/privacy';
 import { hashPassword, normalizarEmail, passwordSchema } from '@/server/auth/password';
 import { asegurarCuentaNutriologo } from '@/server/auth/provisioning';
 import { crearTokenVerificacion } from '@/server/auth/tokens';
@@ -32,7 +33,11 @@ const registroSchema = z.object({
 
 /** POST /api/v1/auth/register — alta de una cuenta de nutriólogo. */
 export async function POST(request: Request) {
-  const limite = rateLimit(`register:${ipDe(request)}`, MAX_ALTAS_POR_IP, VENTANA_MS);
+  const limite = await rateLimit(
+    `register:${ipDe(request)}`,
+    MAX_ALTAS_POR_IP,
+    VENTANA_MS,
+  );
   if (!limite.permitido) {
     return jsonError(
       429,
@@ -62,6 +67,8 @@ export async function POST(request: Request) {
         passwordHash,
         name: parsed.data.nombre_completo,
         role: 'NUTRITIONIST',
+        privacyNoticeAcceptedAt: new Date(),
+        privacyNoticeVersion: PRIVACY_NOTICE_VERSION,
       },
       select: { id: true },
     });

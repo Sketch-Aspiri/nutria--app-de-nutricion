@@ -1,27 +1,51 @@
 'use client';
 
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 
-import type { NotaConsulta, Paciente } from '@nutria/shared';
+import type { Paciente } from '@nutria/shared';
 
+import {
+  crearNotaClinica,
+  firmarNotaClinica,
+  listarNotasClinicas,
+  type NuevaNotaClinica,
+} from '@/services/consultas';
 import { generarIA } from '@/services/ia';
-import { useAppState } from '@/store/app-state';
 
-type NotaEstructurada = Omit<NotaConsulta, 'fecha'>;
+type NotaEstructurada = Pick<
+  NuevaNotaClinica,
+  'motivo' | 'hallazgos' | 'plan' | 'seguimiento'
+>;
 
 /**
- * Convierte texto libre (notas o dictado) en una nota clínica estructurada.
+ * Estructura una nota con IA y siempre la persiste cifrada en PostgreSQL.
  *
- * El texto se manda tal cual al servidor, que lo seudonimiza antes de armar el
- * prompt: una nota dictada casi siempre menciona al paciente por su nombre.
- *
- * Si la IA falla o su salida no valida, se guarda el texto como nota libre: el
- * trabajo del nutriólogo no se pierde por un error del proveedor.
+ * Si el proveedor falla, conserva el texto como nota manual. Las copias en
+ * localStorage se eliminaron: un navegador compartido no debe guardar PHI.
  */
 export function useNotaClinica(paciente: Paciente) {
-  const { updatePatient } = useAppState();
+  const queryClient = useQueryClient();
   const [procesando, setProcesando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const queryKey = ['consultation-notes', paciente.id] as const;
+
+  const notes = useQuery({
+    queryKey,
+    queryFn: () => listarNotasClinicas(paciente.id),
+  });
+
+  const save = useMutation({
+    mutationFn: (input: NuevaNotaClinica) =>
+      crearNotaClinica(paciente.id, input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey }),
+  });
+
+  const sign = useMutation({
+    mutationFn: (noteId: string) =>
+      firmarNotaClinica(paciente.id, noteId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey }),
+  });
 
   const procesar = useCallback(
     async (texto: string) => {
@@ -29,13 +53,10 @@ export function useNotaClinica(paciente: Paciente) {
       setProcesando(true);
       setError(null);
 
-      const guardar = (nota: NotaEstructurada) =>
-        updatePatient(paciente.id, (p) => ({
-          notasConsulta: [
-            { fecha: new Date().toLocaleDateString('es-MX'), ...nota },
-            ...p.notasConsulta,
-          ],
-        }));
+      const guardar = (
+        nota: NotaEstructurada,
+        origen: NuevaNotaClinica['origen'],
+      ) => save.mutateAsync({ ...nota, origen });
 
       try {
         const salida = await generarIA<NotaEstructurada>({
@@ -44,31 +65,56 @@ export function useNotaClinica(paciente: Paciente) {
           texto,
         });
         if (salida.formato === 'estructurado' && salida.datos) {
-          guardar(salida.datos);
+          await guardar(salida.datos, 'IA');
         } else {
-          // Degradada a texto: se conserva lo que devolvió la IA y se avisa
-          // para que el nutriólogo la acomode a mano.
-          guardar({
-            motivo: 'Nota sin estructurar',
-            hallazgos: salida.texto?.trim() || texto,
-            plan: '—',
-            seguimiento: '—',
-          });
-          setError('La IA no pudo estructurar la nota. Se guardó como nota libre para editarla.');
+          await guardar(
+            {
+              motivo: 'Nota sin estructurar',
+              hallazgos: salida.texto?.trim() || texto,
+              plan: '—',
+              seguimiento: '—',
+            },
+            'MANUAL',
+          );
+          setError(
+            'La IA no pudo estructurar la nota. Se guardó cifrada como nota libre.',
+          );
         }
-      } catch (fallo: unknown) {
-        guardar({ motivo: 'Nota libre', hallazgos: texto, plan: '—', seguimiento: '—' });
-        setError(
-          fallo instanceof Error
-            ? fallo.message
-            : 'No se pudo contactar al asistente. La nota se guardó sin estructurar.',
-        );
+      } catch {
+        try {
+          await guardar(
+            {
+              motivo: 'Nota libre',
+              hallazgos: texto,
+              plan: '—',
+              seguimiento: '—',
+            },
+            'MANUAL',
+          );
+          setError(
+            'La IA no respondió. La nota se guardó cifrada como texto libre.',
+          );
+        } catch (saveError: unknown) {
+          setError(
+            saveError instanceof Error
+              ? saveError.message
+              : 'No se pudo guardar la nota clínica.',
+          );
+        }
       } finally {
         setProcesando(false);
       }
     },
-    [paciente.id, updatePatient],
+    [paciente.id, save],
   );
 
-  return { procesar, procesando, error };
+  return {
+    procesar,
+    procesando,
+    error,
+    notas: notes.data?.data ?? [],
+    cargando: notes.isLoading,
+    firmar: sign.mutateAsync,
+    firmando: sign.isPending,
+  };
 }

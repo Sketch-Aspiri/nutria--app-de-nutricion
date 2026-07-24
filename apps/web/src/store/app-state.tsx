@@ -50,7 +50,9 @@ function limpiarExtras(valor: unknown): ExtrasPorPaciente {
       return [
         id,
         {
-          notasConsulta: Array.isArray(candidato.notasConsulta) ? candidato.notasConsulta : [],
+          // Las notas clínicas viven cifradas en PostgreSQL. Se descartan
+          // copias antiguas para no conservar datos de salud en localStorage.
+          notasConsulta: [],
           seguimiento: candidato.seguimiento ?? EXTRAS_VACIOS.seguimiento,
         },
       ];

@@ -39,12 +39,11 @@ const videoUrlSchema = z
   .url('El enlace de la videollamada no es válido.')
   .refine((valor) => {
     try {
-      const protocolo = new URL(valor).protocol;
-      return protocolo === 'https:' || protocolo === 'http:';
+      return new URL(valor).protocol === 'https:';
     } catch {
       return false;
     }
-  }, 'El enlace de la videollamada debe empezar con http:// o https://');
+  }, 'El enlace de la videollamada debe empezar con https://');
 
 export const crearCitaSchema = z.object({
   patient_id: idSchema,

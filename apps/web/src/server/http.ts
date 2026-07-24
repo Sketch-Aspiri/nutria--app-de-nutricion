@@ -23,6 +23,7 @@ export const ErrorCode = {
   TOKEN_EXPIRED: 'TOKEN_EXPIRED',
   EMAIL_NOT_VERIFIED: 'EMAIL_NOT_VERIFIED',
   RATE_LIMITED: 'RATE_LIMITED',
+  EXPORT_TOO_LARGE: 'EXPORT_TOO_LARGE',
   /** 402: el plan vigente no alcanza para la acción (cupo de pacientes, plantillas). */
   PLAN_LIMIT: 'PLAN_LIMIT',
   /** 409: no hay checkout ni portal que abrir (beta, plan sin precio, sin suscripción). */

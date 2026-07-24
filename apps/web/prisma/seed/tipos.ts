@@ -64,6 +64,8 @@ export type FilaAlimento = {
   ig?: number;
   /** Equivalentes SMAE que aporta la porción. */
   eq: Equivalentes;
+  /** Imagen de la fuente con licencia y atribución documentadas. */
+  imagen?: string;
 };
 
 /** `undefined` (no capturado) y `null` (sin dato) son lo mismo para la base. */
@@ -111,6 +113,7 @@ export function filaAAlimento(
     vitaminaCMg: opcional(fila.vc),
     indiceGlicemico: opcional(fila.ig),
     equivalentes: fila.eq,
+    imagenUrl: fila.imagen ?? null,
     fuente: fuenteEnBase(fuente),
     fuenteRef: fila.ref,
     esPublico: true,

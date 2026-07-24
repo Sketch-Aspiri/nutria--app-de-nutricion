@@ -27,7 +27,11 @@ const reenvioSchema = z.object({
  * Responde igual exista o no la cuenta, para no revelar qué correos están dados de alta.
  */
 export async function POST(request: Request) {
-  const limite = rateLimit(`resend:${ipDe(request)}`, MAX_REENVIOS_POR_IP, VENTANA_MS);
+  const limite = await rateLimit(
+    `resend:${ipDe(request)}`,
+    MAX_REENVIOS_POR_IP,
+    VENTANA_MS,
+  );
   if (!limite.permitido) {
     return jsonError(
       429,

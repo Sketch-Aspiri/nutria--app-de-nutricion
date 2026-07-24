@@ -234,6 +234,8 @@ export type CrearPacientePayload = {
     comidas_por_dia?: number;
     presupuesto_tiempo?: 'Bajo' | 'Medio' | 'Alto';
   };
+  consentimiento_datos_sensibles: boolean;
+  consentimiento_metodo: 'ESCRITO' | 'ELECTRONICO';
   antropometria?: {
     peso_kg?: number | null;
     altura_cm?: number | null;

@@ -12,6 +12,7 @@ import {
 } from '@nutria/shared';
 
 import { prisma } from '@/server/db';
+import { decryptText, ENCRYPTION_CONTEXT } from '@/server/crypto';
 import { esIdValido } from '@/server/patients/repository';
 
 import { MAX_ALIMENTOS_EN_PROMPT } from './config';
@@ -142,8 +143,20 @@ export async function cargarContextoPaciente(
     condiciones: textosDe(medico?.condiciones).map((condicion) =>
       seudonimizarTexto(condicion, identificadores),
     ),
-    antecedentes: seudonimizarOpcional(medico?.antecedentes, identificadores),
-    medicamentos: seudonimizarOpcional(medico?.medicamentos, identificadores),
+    antecedentes: seudonimizarOpcional(
+      decryptText(
+        medico?.antecedentes ?? null,
+        ENCRYPTION_CONTEXT.medicalAntecedentes,
+      ),
+      identificadores,
+    ),
+    medicamentos: seudonimizarOpcional(
+      decryptText(
+        medico?.medicamentos ?? null,
+        ENCRYPTION_CONTEXT.medicalMedicamentos,
+      ),
+      identificadores,
+    ),
     tipoDieta: seudonimizarOpcional(preferencias?.tipoDieta, identificadores),
     alergias: textosDe(preferencias?.alergias).map((alergia) =>
       seudonimizarTexto(alergia, identificadores),

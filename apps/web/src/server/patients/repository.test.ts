@@ -19,6 +19,7 @@ jest.mock('@/server/db', () => ({
 const NUTRITIONIST_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const PATIENT_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const DRAFT_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+const ENCRYPTION_KEY = Buffer.alloc(32, 8).toString('base64');
 
 const db = prisma as unknown as {
   patient: { findFirst: jest.Mock };
@@ -42,6 +43,8 @@ const snapshot = {
 
 describe('persistencia del cálculo en planes', () => {
   beforeEach(() => {
+    process.env.ENCRYPTION_KEY = ENCRYPTION_KEY;
+    process.env.ENCRYPTION_KEY_ID = 'test';
     jest.clearAllMocks();
     db.patient.findFirst.mockResolvedValue({ id: PATIENT_ID });
   });
@@ -100,6 +103,8 @@ describe('texto libre del objetivo en el expediente', () => {
   }
 
   beforeEach(() => {
+    process.env.ENCRYPTION_KEY = ENCRYPTION_KEY;
+    process.env.ENCRYPTION_KEY_ID = 'test';
     jest.clearAllMocks();
   });
 

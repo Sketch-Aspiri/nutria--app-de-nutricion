@@ -2,6 +2,7 @@
 
 import {
   Calendar,
+  Compass,
   CreditCard,
   LayoutTemplate,
   LogOut,
@@ -18,6 +19,7 @@ import { usePathname } from 'next/navigation';
 import { usePerfil } from '@/hooks/usePerfil';
 
 const NAV_ITEMS = [
+  { href: '/inicio', label: 'Inicio', icon: Compass },
   { href: '/pacientes', label: 'Pacientes', icon: Users },
   { href: '/agenda', label: 'Agenda', icon: Calendar },
   { href: '/mensajes', label: 'Mensajes', icon: MessageCircle },

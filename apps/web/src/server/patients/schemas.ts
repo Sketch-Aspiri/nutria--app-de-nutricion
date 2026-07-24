@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { PRIVACY_NOTICE_VERSION } from '@/config/privacy';
+
 /**
  * Validación de los cuerpos de `/api/v1/patients`. Campos en snake_case según
  * `rules/api-conventions.md`. Nada llega a Prisma sin pasar por aquí.
@@ -74,6 +76,12 @@ export const crearPacienteSchema = z.object({
   expediente_medico: expedienteMedicoSchema.optional(),
   preferencias_alimentarias: preferenciasSchema.optional(),
   antropometria: medicionSchema.optional(),
+  consentimiento_datos_sensibles: z.literal(true, {
+    message:
+      'Confirma que el paciente recibió el aviso y otorgó su consentimiento para tratar datos de salud.',
+  }),
+  consentimiento_metodo: z.enum(['ESCRITO', 'ELECTRONICO']).default('ESCRITO'),
+  aviso_privacidad_version: z.literal(PRIVACY_NOTICE_VERSION).optional(),
 });
 
 export const actualizarPacienteSchema = z

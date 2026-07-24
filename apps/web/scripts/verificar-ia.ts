@@ -28,7 +28,7 @@ async function main(): Promise<void> {
     console.error('  Se obtiene en https://console.anthropic.com/settings/keys');
     process.exit(1);
   }
-  console.log(`Llave detectada (…${apiKey.slice(-4)}). Probando los modelos configurados:\n`);
+  console.log('Llave detectada. Probando los modelos configurados:\n');
 
   const cliente = new Anthropic({ apiKey, maxRetries: 1, timeout: 30_000 });
   let hayFallos = false;

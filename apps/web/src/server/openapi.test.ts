@@ -1,6 +1,16 @@
 import { openApiDocument } from './openapi';
 
 describe('OpenAPI de la fase 4', () => {
+  it('documenta las rutas endurecidas del expediente', () => {
+    expect(openApiDocument.paths).toHaveProperty(
+      '/api/v1/patients/{id}/consultation_notes',
+    );
+    expect(openApiDocument.paths).toHaveProperty(
+      '/api/v1/patients/{id}/consultation_notes/{noteId}/sign',
+    );
+    expect(openApiDocument.paths).toHaveProperty('/api/v1/patients/{id}/export');
+  });
+
   it('documenta todos los endpoints de planes, PDF y plantillas', () => {
     expect(Object.keys(openApiDocument.paths ?? {})).toEqual(
       expect.arrayContaining([

@@ -1,5 +1,7 @@
 /* eslint-disable no-console */
 
+import * as Sentry from '@sentry/nextjs';
+
 /**
  * Punto único de logging del servidor. En la fase 8 aquí se conecta Sentry.
  *
@@ -15,7 +17,16 @@ export const logger = {
     console.warn(`[nutria] ${mensaje}`, contextoSeguro(contexto));
   },
   error(mensaje: string, error?: unknown): void {
-    console.error(`[nutria] ${mensaje}`, errorSeguro(error));
+    const safeError = errorSeguro(error);
+    console.error(`[nutria] ${mensaje}`, safeError);
+    Sentry.captureException(new Error(mensaje), {
+      tags: {
+        error_code:
+          typeof safeError === 'object' && 'codigo' in safeError
+            ? safeError.codigo
+            : 'UNEXPECTED',
+      },
+    });
   },
 };
 

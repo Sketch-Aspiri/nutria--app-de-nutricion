@@ -1,4 +1,5 @@
 import { requiereNutriologo } from '@/server/auth/guards';
+import { recordAuditEvent } from '@/server/audit';
 import {
   ErrorCode,
   internalError,
@@ -23,7 +24,7 @@ export const dynamic = 'force-dynamic';
 type Contexto = { params: Promise<{ id: string }> };
 
 /** GET /api/v1/patients/{id} — expediente completo. */
-export async function GET(_request: Request, { params }: Contexto) {
+export async function GET(request: Request, { params }: Contexto) {
   const sesion = await requiereNutriologo();
   if (!sesion.ok) return sesion.respuesta;
 
@@ -33,6 +34,13 @@ export async function GET(_request: Request, { params }: Contexto) {
     const paciente = await buscarPaciente(sesion.userId, id);
     // 404 también si es de otro nutriólogo: un 403 revelaría que el id existe.
     if (!paciente) return notFound('No se encontró el paciente.');
+    await recordAuditEvent({
+      userId: sesion.userId,
+      action: 'PATIENT_RECORD_READ',
+      resource: 'patient',
+      resourceId: id,
+      request,
+    });
     return jsonOk(serializarPacienteDetalle(paciente));
   } catch (error: unknown) {
     logger.error('Falló la lectura del paciente', error);
@@ -65,7 +73,7 @@ export async function PATCH(request: Request, { params }: Contexto) {
 }
 
 /** DELETE /api/v1/patients/{id} — archiva; el expediente clínico se conserva. */
-export async function DELETE(_request: Request, { params }: Contexto) {
+export async function DELETE(request: Request, { params }: Contexto) {
   const sesion = await requiereNutriologo();
   if (!sesion.ok) return sesion.respuesta;
 
@@ -74,6 +82,14 @@ export async function DELETE(_request: Request, { params }: Contexto) {
   try {
     const archivado = await archivarPaciente(sesion.userId, id);
     if (!archivado) return notFound('No se encontró el paciente.');
+    await recordAuditEvent({
+      userId: sesion.userId,
+      action: 'PATIENT_PROCESSING_RESTRICTED',
+      resource: 'patient',
+      resourceId: id,
+      request,
+      metadata: { reason: 'archived_by_nutritionist' },
+    });
     return jsonNoContent();
   } catch (error: unknown) {
     logger.error('Falló el archivado del paciente', error);

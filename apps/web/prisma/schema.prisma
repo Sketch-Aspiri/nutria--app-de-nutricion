@@ -160,9 +160,11 @@ model User {
   image           String?
   emailVerified   DateTime? @map("email_verified")
   lastLoginAt     DateTime? @map("last_login_at")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
-  deletedAt       DateTime? @map("deleted_at")
+  privacyNoticeAcceptedAt DateTime? @map("privacy_notice_accepted_at")
+  privacyNoticeVersion    String?   @map("privacy_notice_version")
+  createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @updatedAt @map("updated_at")
+  deletedAt               DateTime? @map("deleted_at")
 
   accounts             Account[]
   sessions             Session[]
@@ -329,9 +331,13 @@ model Patient {
   telefono        String?
   fotoUrl         String?       @map("foto_url")
   estado          PatientStatus @default(ACTIVO)
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
-  deletedAt       DateTime?     @map("deleted_at")
+  sensitiveDataConsentAt      DateTime?     @map("sensitive_data_consent_at")
+  sensitiveDataConsentVersion String?       @map("sensitive_data_consent_version")
+  sensitiveDataConsentMethod  String?       @map("sensitive_data_consent_method")
+  privacyNoticeSentAt         DateTime?     @map("privacy_notice_sent_at")
+  createdAt                   DateTime      @default(now()) @map("created_at")
+  updatedAt                   DateTime      @updatedAt @map("updated_at")
+  deletedAt                   DateTime?     @map("deleted_at")
 
   nutritionist User  @relation("NutritionistPatients", fields: [nutritionistId], references: [id], onDelete: Cascade)
   user         User? @relation("PatientAccount", fields: [userId], references: [id], onDelete: SetNull)

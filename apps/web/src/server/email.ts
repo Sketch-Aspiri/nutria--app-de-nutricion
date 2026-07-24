@@ -171,3 +171,26 @@ export async function enviarRecordatorioCita(
     ),
   );
 }
+
+/**
+ * Copia electrónica del aviso simplificado al dar de alta un expediente.
+ *
+ * El mensaje no enumera condiciones, mediciones ni motivo de consulta. Solo
+ * informa que existe un tratamiento de datos y dónde ejercer derechos ARCO.
+ */
+export function enviarAvisoPrivacidadPaciente(
+  para: string,
+  pacienteNombre: string,
+): Promise<ResultadoEnvio> {
+  const url = `${baseUrl()}/privacidad#pacientes`;
+  return enviar(
+    para,
+    'Aviso de privacidad de nutria',
+    plantilla(
+      `Hola, ${escaparHtml(pacienteNombre)}`,
+      'Tu profesional de nutrición registró un expediente en nutria. El sistema protege datos personales y de salud para prestar y dar seguimiento a la consulta nutricional. Consulta las finalidades, transferencias y medios para ejercer tus derechos ARCO en el aviso integral.',
+      { texto: 'Consultar aviso de privacidad', url },
+      'Este correo no contiene información clínica. Si no reconoces el alta, usa el contacto indicado en el aviso.',
+    ),
+  );
+}

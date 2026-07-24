@@ -319,7 +319,7 @@ Además: tests unitarios/integración de handlers con la BD (≥ 80 % en `src/se
 | **5. IA Claude** ✅ | 5 | Servicio AI con streaming, salida estructurada validada, seudonimización, `ai_usage` y límites; los 5 casos de uso; E2E #10 |
 | **6. Agenda, mensajes, seguimiento** ✅ | 6 | Citas + recordatorios (cron + Resend); mensajes con polling; seguimiento leyendo logs reales; E2E #5, #6, #7 |
 | **7. Stripe** ✅ | 7 | Checkout, portal, webhooks, entitlements en servidor; paywall; E2E #8 |
-| **8. Endurecimiento y lanzamiento** | 8 | Cifrado de columnas, auditoría security-auditor, Sentry, avisos de privacidad, seed tanda 3, carga de prueba, dominio productivo, **onboarding de 3–5 nutriólogos piloto** |
+| **8. Endurecimiento y lanzamiento** ✅ | 8 | Cifrado de columnas, auditoría security-auditor, Sentry, avisos de privacidad, seed tanda 3, carga de prueba, dominio productivo, **onboarding de 3–5 nutriólogos piloto** |
 
 Cada fase = un PR enfocado (regla del repo: cambios pequeños), con `/code-review` antes de merge.
 
@@ -790,6 +790,74 @@ catálogo de planes), `next build` exitoso y **38 de 38 E2E** contra una base li
 7. **Marca blanca en Free**: el PDF conserva nombre, cédula y especialidad del profesional —eso es
    identificación clínica del expediente, no branding— y pierde solo el logotipo y el color propios.
 8. **CFDI 4.0 sigue pospuesto a V2.1** (Facturapi), como ya documentaba la sección 9.
+
+---
+
+### Fase 8 — Endurecimiento y lanzamiento (completada)
+
+Construido en `apps/web` y en la operación del monorepo:
+
+- **Cifrado de columnas clínicas** (`src/server/crypto.ts`): sobre versionado
+  AES-256-GCM con clave identificable, IV aleatorio y AAD. Antecedentes,
+  medicamentos, mensajes y notas de consulta se cifran antes de persistir y se
+  descifran sólo después de comprobar pertenencia. El backfill
+  `scripts/encrypt-clinical-data.ts` detecta texto legado y sobres de claves
+  anteriores, permite comprobar sin mutar y soporta rotación expand-contract.
+- **Notas clínicas reales e inmutables** (`src/server/consultations/` y
+  `/api/v1/patients/{id}/consultation_notes`): la nota dejó de vivir en
+  `localStorage`; persiste cifrada, puede firmarse y una nota firmada ya no se
+  edita ni elimina. El contrato quedó incluido en OpenAPI.
+- **Privacidad y trazabilidad**: consentimiento explícito para datos sensibles,
+  versión y fecha del aviso, aviso integral en `/privacidad`, correo de aviso,
+  exportación ARCO con restricción de frecuencia/tamaño y auditoría sin PHI para
+  lecturas, consentimientos, restricciones, exportaciones y notas. La migración
+  `20260724_phase8_privacy_consent` es aditiva y reversible por contrato.
+- **Sentry con minimización de datos**: integración web/server/edge,
+  `global-error`, errores sintéticos y sanitización de usuario, request,
+  cookies, cabeceras, breadcrumbs, contextos, spans y stacks. El muestreo de
+  trazas queda en cero para evitar que datos clínicos entren por instrumentación.
+- **Endurecimiento de borde**: rate limit distribuido con Upstash, llaves HMAC
+  para no almacenar correo/IP, cierre seguro en producción, protección dual de
+  login por origen y cuenta, límites de exportación, URLs externas sólo HTTPS y
+  cabeceras CSP/HSTS/referrer/permissions/frame.
+- **Dependencias y cadena de suministro**: Next 16.2.11, cero vulnerabilidades en
+  `npm audit`, acciones de CI fijadas por SHA, permisos mínimos, auditoría alta
+  obligatoria y Dependabot semanal para npm y GitHub Actions.
+- **Seed tanda 3** (`prisma/seed/off/`): importador reproducible de hasta 300
+  productos mexicanos de Open Food Facts API v2, con cache versionable,
+  atribución ODbL, mapeo nutricional, control de ritmo y descarte de registros
+  incompletos. Requiere un `OFF_USER_AGENT` real antes de descargar; no se
+  inventó una identidad de contacto.
+- **Carga y readiness**: runner Node y escenario k6 con umbrales, más
+  `launch:check` para dominio HTTPS, URLs, claves, proveedores, privacidad,
+  Open Food Facts, Stripe y cache. En carga local health atendió **1 147
+  solicitudes/10 s**, 10 VUs, 0 % de error y p95 de 87 ms.
+- **Lanzamiento y pilotos** (`LANZAMIENTO-FASE-8.md`): orden preview → migración
+  → backfill → smoke/carga → producción, DNS/TLS y proveedores, rotación y
+  recuperación. `/inicio` guía al nutriólogo con progreso calculado de datos
+  reales y `pilot:status` valida una cohorte explícita de 3–5 correos mostrando
+  únicamente alias.
+- **Auditoría security-auditor/cyber-neo**: revisión paralela de SAST, SCA,
+  autorización, secretos, auth, cifrado y observabilidad. El resultado y los
+  riesgos residuales están en `SECURITY-AUDIT-FASE-8.md`.
+
+Verificado: **387 tests en `apps/web` + 302 en `packages/shared`, 689/689 en
+verde**, `tsc --noEmit` limpio en todos los workspaces, esquema Prisma válido,
+`npm audit` con cero vulnerabilidades y `git diff --check` limpio. Una
+compilación productiva previa terminó correctamente; su repetición final no pudo
+descargar las tres Google Fonts por la red restringida del entorno.
+
+**Cierre operativo honesto**: se marca terminada la fase de ingeniería. El
+go-live no se simuló ni se declara ejecutado: `launch:check` está en 8/24 en el
+entorno local porque faltan dominio/HTTPS y credenciales de Sentry, Upstash,
+Resend, cron, privacidad y OFF. Tampoco se inventaron 3–5 identidades ni su
+consentimiento. El responsable del dominio debe completar esos controles,
+importar la tanda real de 300, ejecutar migración/backfill con backup, repetir
+carga autenticada en preview y obtener `pilot:status` al 100 % antes de promover
+a producción. Los riesgos técnicos que requieren una decisión adicional
+(vincular ciphertext a UUID, flujo legal ARCO, evidencia directa de
+consentimiento, MFA, CSP con nonce y cifrado de otros campos libres) quedan
+registrados como condiciones de salida comercial.
 
 ---
 

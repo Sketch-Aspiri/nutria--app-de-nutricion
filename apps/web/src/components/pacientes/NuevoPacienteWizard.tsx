@@ -22,7 +22,10 @@ import { ApiError, type CrearPacientePayload } from '@/services/pacientes';
 
 const PASOS = ['Datos generales', 'Expediente médico', 'Antropometría', 'Preferencias alimentarias'];
 
-export function construirPayload(form: FormPaciente): CrearPacientePayload {
+export function construirPayload(
+  form: FormPaciente,
+  consentimientoDatosSensibles = false,
+): CrearPacientePayload {
   return {
     nombre: form.nombre.trim(),
     fecha_nacimiento: form.fechaNacimiento || null,
@@ -54,6 +57,8 @@ export function construirPayload(form: FormPaciente): CrearPacientePayload {
       cadera_cm: numeroOpcional(form.cadera),
       grasa_pct: numeroOpcional(form.grasaCorporal),
     },
+    consentimiento_datos_sensibles: consentimientoDatosSensibles,
+    consentimiento_metodo: 'ESCRITO',
   };
 }
 
@@ -69,6 +74,7 @@ export function NuevoPacienteWizard({ onClose, onCreado }: NuevoPacienteWizardPr
   // El 402 del cupo del plan no se resuelve corrigiendo el formulario, así que
   // en vez de solo mostrar el mensaje se ofrece la salida: la página de planes.
   const [topeDePlan, setTopeDePlan] = useState(false);
+  const [consentimiento, setConsentimiento] = useState(false);
   const crear = useCrearPaciente();
 
   const set = <Clave extends keyof FormPaciente>(clave: Clave, valor: FormPaciente[Clave]) =>
@@ -78,7 +84,7 @@ export function NuevoPacienteWizard({ onClose, onCreado }: NuevoPacienteWizardPr
     setError('');
     setTopeDePlan(false);
     try {
-      const paciente = await crear.mutateAsync(construirPayload(form));
+      const paciente = await crear.mutateAsync(construirPayload(form, consentimiento));
       onCreado(paciente.id);
     } catch (fallo: unknown) {
       setTopeDePlan(fallo instanceof ApiError && fallo.code === 'PLAN_LIMIT');
@@ -108,6 +114,29 @@ export function NuevoPacienteWizard({ onClose, onCreado }: NuevoPacienteWizardPr
         {step === 1 && <CamposExpedienteMedico form={form} set={set} />}
         {step === 2 && <CamposAntropometria form={form} set={set} />}
         {step === 3 && <CamposPreferencias form={form} set={set} />}
+        {step === 3 && (
+          <label className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 text-xs leading-5 text-emerald-950">
+            <input
+              type="checkbox"
+              required
+              checked={consentimiento}
+              onChange={(event) => setConsentimiento(event.target.checked)}
+              className="mt-1"
+            />
+            <span>
+              Confirmo que entregué al paciente el{' '}
+              <Link
+                href="/privacidad#pacientes"
+                target="_blank"
+                className="font-semibold underline underline-offset-2"
+              >
+                aviso de privacidad
+              </Link>{' '}
+              y que otorgó por escrito su consentimiento expreso para tratar datos personales
+              sensibles de salud.
+            </span>
+          </label>
+        )}
       </div>
       {error && (
         <div
@@ -142,7 +171,10 @@ export function NuevoPacienteWizard({ onClose, onCreado }: NuevoPacienteWizardPr
             Siguiente <ChevronRight size={15} />
           </Btn>
         ) : (
-          <Btn disabled={crear.isPending} onClick={() => void guardar()}>
+          <Btn
+            disabled={crear.isPending || !consentimiento}
+            onClick={() => void guardar()}
+          >
             {crear.isPending ? 'Guardando…' : 'Crear paciente'}
           </Btn>
         )}

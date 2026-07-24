@@ -25,6 +25,7 @@ const NUTRITIONIST_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const OTRO_NUTRIOLOGO = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
 const PATIENT_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const MENSAJE_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+const ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64');
 
 type MetodoMock = jest.Mock<Promise<unknown>, unknown[]>;
 const db = prisma as unknown as {
@@ -42,6 +43,8 @@ const db = prisma as unknown as {
 const PAGINACION = { skip: 0, take: 50 };
 
 beforeEach(() => {
+  process.env.ENCRYPTION_KEY = ENCRYPTION_KEY;
+  process.env.ENCRYPTION_KEY_ID = 'test';
   jest.clearAllMocks();
   db.message.findMany.mockResolvedValue([]);
   db.message.count.mockResolvedValue(0);
@@ -104,6 +107,7 @@ describe('enviarMensaje', () => {
     // nombre del paciente.
     expect(data.emisor).toBe('NUTRITIONIST');
     expect(data.leidoAt).toBeInstanceOf(Date);
+    expect(data.texto).not.toBe('Nos vemos el jueves');
   });
 
   it('devuelve null para un paciente ajeno', async () => {

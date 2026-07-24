@@ -103,6 +103,12 @@ function datosBase(paciente: Patient) {
     telefono: paciente.telefono,
     foto_url: paciente.fotoUrl,
     estado: paciente.estado,
+    consentimiento_datos_sensibles: {
+      otorgado_en: paciente.sensitiveDataConsentAt?.toISOString() ?? null,
+      version_aviso: paciente.sensitiveDataConsentVersion,
+      metodo: paciente.sensitiveDataConsentMethod,
+      aviso_enviado_en: paciente.privacyNoticeSentAt?.toISOString() ?? null,
+    },
     created_at: paciente.createdAt.toISOString(),
     updated_at: paciente.updatedAt.toISOString(),
   };

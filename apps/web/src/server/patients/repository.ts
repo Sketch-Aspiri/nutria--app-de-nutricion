@@ -2,6 +2,12 @@ import { Prisma } from '@prisma/client';
 
 import type { SnapshotCalculo } from '@nutria/shared';
 
+import { PRIVACY_NOTICE_VERSION } from '@/config/privacy';
+import {
+  decryptText,
+  encryptText,
+  ENCRYPTION_CONTEXT,
+} from '@/server/crypto';
 import { prisma } from '@/server/db';
 
 import type {
@@ -39,6 +45,31 @@ const RELACIONES_DETALLE = {
     take: 1,
   },
 } satisfies Prisma.PatientInclude;
+
+type WithMedicalRecord = {
+  medicalRecord?: {
+    antecedentes: string | null;
+    medicamentos: string | null;
+  } | null;
+};
+
+function decryptMedicalRecord<T extends WithMedicalRecord>(patient: T): T {
+  if (!patient.medicalRecord) return patient;
+  return {
+    ...patient,
+    medicalRecord: {
+      ...patient.medicalRecord,
+      antecedentes: decryptText(
+        patient.medicalRecord.antecedentes,
+        ENCRYPTION_CONTEXT.medicalAntecedentes,
+      ),
+      medicamentos: decryptText(
+        patient.medicalRecord.medicamentos,
+        ENCRYPTION_CONTEXT.medicalMedicamentos,
+      ),
+    },
+  };
+}
 
 function normalizarTexto(valor: string | null | undefined): string | null {
   const limpio = valor?.trim();
@@ -97,15 +128,16 @@ export async function listarPacientes(
     prisma.patient.count({ where }),
   ]);
 
-  return { pacientes, total };
+  return { pacientes: pacientes.map(decryptMedicalRecord), total };
 }
 
 export async function buscarPaciente(nutritionistId: string, patientId: string) {
   if (!esIdValido(patientId)) return null;
-  return prisma.patient.findFirst({
+  const patient = await prisma.patient.findFirst({
     where: { id: patientId, nutritionistId, deletedAt: null },
     include: RELACIONES_DETALLE,
   });
+  return patient ? decryptMedicalRecord(patient) : null;
 }
 
 export async function crearPaciente(nutritionistId: string, datos: CrearPacienteInput) {
@@ -122,11 +154,20 @@ export async function crearPaciente(nutritionistId: string, datos: CrearPaciente
       email: normalizarTexto(datos.email),
       telefono: normalizarTexto(datos.telefono),
       fotoUrl: normalizarTexto(datos.foto_url),
+      sensitiveDataConsentAt: new Date(),
+      sensitiveDataConsentVersion: PRIVACY_NOTICE_VERSION,
+      sensitiveDataConsentMethod: datos.consentimiento_metodo,
       medicalRecord: {
         create: {
           condiciones: medico?.condiciones ?? [],
-          antecedentes: normalizarTexto(medico?.antecedentes),
-          medicamentos: normalizarTexto(medico?.medicamentos),
+          antecedentes: encryptText(
+            normalizarTexto(medico?.antecedentes),
+            ENCRYPTION_CONTEXT.medicalAntecedentes,
+          ),
+          medicamentos: encryptText(
+            normalizarTexto(medico?.medicamentos),
+            ENCRYPTION_CONTEXT.medicalMedicamentos,
+          ),
           nivelActividad: medico?.nivel_actividad ?? 'MODERADO',
           objetivo: medico?.objetivo ?? 'MANTENIMIENTO',
           objetivoOtro: objetivoOtroDe(medico?.objetivo, medico?.objetivo_otro),
@@ -159,7 +200,7 @@ export async function crearPaciente(nutritionistId: string, datos: CrearPaciente
         : {}),
     },
     include: RELACIONES_DETALLE,
-  });
+  }).then(decryptMedicalRecord);
 }
 
 /** Devuelve null si el paciente no es de este nutriólogo (el updateMany no afecta filas). */
@@ -215,15 +256,25 @@ export async function actualizarExpedienteMedico(
   const objetivoVigente = datos.objetivo ?? paciente.medicalRecord?.objetivo;
   const tocaObjetivo = datos.objetivo !== undefined || datos.objetivo_otro !== undefined;
 
-  return prisma.medicalRecord.upsert({
+  const medicalRecord = await prisma.medicalRecord.upsert({
     where: { patientId },
     update: {
       ...(datos.condiciones !== undefined ? { condiciones: datos.condiciones } : {}),
       ...(datos.antecedentes !== undefined
-        ? { antecedentes: normalizarTexto(datos.antecedentes) }
+        ? {
+            antecedentes: encryptText(
+              normalizarTexto(datos.antecedentes),
+              ENCRYPTION_CONTEXT.medicalAntecedentes,
+            ),
+          }
         : {}),
       ...(datos.medicamentos !== undefined
-        ? { medicamentos: normalizarTexto(datos.medicamentos) }
+        ? {
+            medicamentos: encryptText(
+              normalizarTexto(datos.medicamentos),
+              ENCRYPTION_CONTEXT.medicalMedicamentos,
+            ),
+          }
         : {}),
       ...(datos.nivel_actividad !== undefined ? { nivelActividad: datos.nivel_actividad } : {}),
       ...(datos.objetivo !== undefined ? { objetivo: datos.objetivo } : {}),
@@ -234,12 +285,39 @@ export async function actualizarExpedienteMedico(
     create: {
       patientId,
       condiciones: datos.condiciones ?? [],
-      antecedentes: normalizarTexto(datos.antecedentes),
-      medicamentos: normalizarTexto(datos.medicamentos),
+      antecedentes: encryptText(
+        normalizarTexto(datos.antecedentes),
+        ENCRYPTION_CONTEXT.medicalAntecedentes,
+      ),
+      medicamentos: encryptText(
+        normalizarTexto(datos.medicamentos),
+        ENCRYPTION_CONTEXT.medicalMedicamentos,
+      ),
       nivelActividad: datos.nivel_actividad ?? 'MODERADO',
       objetivo: datos.objetivo ?? 'MANTENIMIENTO',
       objetivoOtro: objetivoOtroDe(datos.objetivo, datos.objetivo_otro),
     },
+  });
+  return {
+    ...medicalRecord,
+    antecedentes: decryptText(
+      medicalRecord.antecedentes,
+      ENCRYPTION_CONTEXT.medicalAntecedentes,
+    ),
+    medicamentos: decryptText(
+      medicalRecord.medicamentos,
+      ENCRYPTION_CONTEXT.medicalMedicamentos,
+    ),
+  };
+}
+
+export async function markPrivacyNoticeSent(
+  nutritionistId: string,
+  patientId: string,
+): Promise<void> {
+  await prisma.patient.updateMany({
+    where: { id: patientId, nutritionistId, deletedAt: null },
+    data: { privacyNoticeSentAt: new Date() },
   });
 }
 

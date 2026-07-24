@@ -1,5 +1,10 @@
 import type { Message } from '@prisma/client';
 
+import {
+  decryptText,
+  encryptText,
+  ENCRYPTION_CONTEXT,
+} from '@/server/crypto';
 import { prisma } from '@/server/db';
 import { pacientePropio } from '@/server/patients/ownership';
 
@@ -10,6 +15,13 @@ export type ResultadoHilo = {
   mensajes: Message[];
   total: number;
 };
+
+function decryptMessage(message: Message): Message {
+  return {
+    ...message,
+    texto: decryptText(message.texto, ENCRYPTION_CONTEXT.messageText) ?? '',
+  };
+}
 
 export async function listarHilo(
   nutritionistId: string,
@@ -47,7 +59,7 @@ export async function listarHilo(
     prisma.message.count({ where }),
   ]);
 
-  return { mensajes, total };
+  return { mensajes: mensajes.map(decryptMessage), total };
 }
 
 export async function enviarMensaje(
@@ -57,18 +69,19 @@ export async function enviarMensaje(
 ): Promise<Message | null> {
   if (!(await pacientePropio(nutritionistId, patientId))) return null;
 
-  return prisma.message.create({
+  const message = await prisma.message.create({
     data: {
       nutritionistId,
       patientId,
       // El emisor lo fija el servidor a partir de la sesión: aceptarlo del
       // cuerpo dejaría al nutriólogo escribir mensajes en nombre del paciente.
       emisor: 'NUTRITIONIST',
-      texto: datos.texto,
+      texto: encryptText(datos.texto, ENCRYPTION_CONTEXT.messageText) as string,
       // Lo que uno mismo escribe nace leído.
       leidoAt: new Date(),
     },
   });
+  return decryptMessage(message);
 }
 
 /** Marca como leídos los mensajes que mandó el paciente. Devuelve cuántos. */
@@ -127,7 +140,8 @@ export async function listarConversaciones(
       patientId: paciente.id,
       nombre: paciente.nombre,
       fotoUrl: paciente.fotoUrl,
-      ultimoTexto: ultimo?.texto ?? null,
+      ultimoTexto:
+        decryptText(ultimo?.texto ?? null, ENCRYPTION_CONTEXT.messageText) ?? null,
       ultimoEmisor: ultimo?.emisor ?? null,
       ultimoAt: ultimo?.createdAt ?? null,
       sinLeer: sinLeerPorPaciente.get(paciente.id) ?? 0,
@@ -151,8 +165,9 @@ export async function ultimoMensajeDelPaciente(
 ): Promise<Message | null> {
   if (!(await pacientePropio(nutritionistId, patientId))) return null;
 
-  return prisma.message.findFirst({
+  const message = await prisma.message.findFirst({
     where: { nutritionistId, patientId, emisor: 'PATIENT' },
     orderBy: { createdAt: 'desc' },
   });
+  return message ? decryptMessage(message) : null;
 }

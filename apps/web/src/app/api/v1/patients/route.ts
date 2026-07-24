@@ -1,4 +1,5 @@
 import { requiereNutriologo } from '@/server/auth/guards';
+import { recordAuditEvent } from '@/server/audit';
 import { getEntitlements } from '@/server/billing/entitlements';
 import {
   ErrorCode,
@@ -11,7 +12,13 @@ import {
   validationError,
 } from '@/server/http';
 import { logger } from '@/server/logger';
-import { crearPaciente, listarPacientes } from '@/server/patients/repository';
+import { enviarAvisoPrivacidadPaciente } from '@/server/email';
+import {
+  buscarPaciente,
+  crearPaciente,
+  listarPacientes,
+  markPrivacyNoticeSent,
+} from '@/server/patients/repository';
 import { crearPacienteSchema } from '@/server/patients/schemas';
 import {
   serializarPacienteDetalle,
@@ -73,7 +80,29 @@ export async function POST(request: Request) {
       );
     }
 
-    const paciente = await crearPaciente(sesion.userId, parsed.data);
+    let paciente = await crearPaciente(sesion.userId, parsed.data);
+    await recordAuditEvent({
+      userId: sesion.userId,
+      action: 'PATIENT_SENSITIVE_CONSENT_RECORDED',
+      resource: 'patient',
+      resourceId: paciente.id,
+      request,
+      metadata: {
+        notice_version: paciente.sensitiveDataConsentVersion ?? 'unknown',
+        method: paciente.sensitiveDataConsentMethod ?? 'unknown',
+        actor: 'nutritionist_on_behalf_of_patient',
+      },
+    });
+    if (paciente.email) {
+      const notice = await enviarAvisoPrivacidadPaciente(
+        paciente.email,
+        paciente.nombre,
+      );
+      if (notice.enviado) {
+        await markPrivacyNoticeSent(sesion.userId, paciente.id);
+        paciente = (await buscarPaciente(sesion.userId, paciente.id)) ?? paciente;
+      }
+    }
     return jsonCreated(serializarPacienteDetalle(paciente));
   } catch (error: unknown) {
     logger.error('Falló el alta de paciente', error);

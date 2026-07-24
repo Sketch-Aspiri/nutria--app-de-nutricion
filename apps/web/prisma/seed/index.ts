@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import type { FuenteAlimento } from '@nutria/shared';
 
 import { NUCLEO_MX } from './datos/nucleo-mx';
+import { readOffCache } from './off/cache';
 import { filaAAlimento, fuenteEnBase, revisarCatalogo, type FilaAlimento } from './tipos';
 import { leerCacheUsda } from './usda/cache';
 
@@ -41,6 +42,13 @@ const TANDAS: Tanda[] = [
     descripcion: 'Importación de USDA FoodData Central',
     fuente: 'usda',
     filas: leerCacheUsda,
+  },
+  {
+    clave: 'off',
+    descripcion:
+      'Productos empacados de Open Food Facts (ODbL 1.0, México)',
+    fuente: 'off',
+    filas: readOffCache,
   },
 ];
 

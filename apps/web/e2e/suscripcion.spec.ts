@@ -119,7 +119,12 @@ test.describe('Flujo #8 — suscripción, cupo del plan y paywall', () => {
     // El tope se aplica en el handler, no escondiendo el botón: se llama la API
     // directamente, que es lo que haría cualquiera con la sesión en la mano.
     const rechazo = await page.request.post('/api/v1/patients', {
-      data: { nombre: 'Paciente Excedente E2E', genero: 'FEMENINO' },
+      data: {
+        nombre: 'Paciente Excedente E2E',
+        genero: 'FEMENINO',
+        consentimiento_datos_sensibles: true,
+        consentimiento_metodo: 'ESCRITO',
+      },
     });
     expect(rechazo.status()).toBe(402);
     const cuerpo = (await rechazo.json()) as { error: { code: string; message: string } };
@@ -141,6 +146,9 @@ test.describe('Flujo #8 — suscripción, cupo del plan y paywall', () => {
     for (let i = 0; i < 3; i += 1) {
       await page.getByRole('button', { name: 'Siguiente' }).click();
     }
+    await page
+      .getByLabel(/Confirmo que entregué al paciente el aviso de privacidad/i)
+      .check();
     await page.getByRole('button', { name: 'Crear paciente' }).click();
 
     // Next.js monta su propio `role="alert"` para anunciar rutas; se filtra por
@@ -179,7 +187,12 @@ test.describe('Flujo #8 — suscripción, cupo del plan y paywall', () => {
 
     // Con Pro, el alta que antes daba 402 pasa.
     const alta = await page.request.post('/api/v1/patients', {
-      data: { nombre: 'Paciente Con Pro E2E', genero: 'FEMENINO' },
+      data: {
+        nombre: 'Paciente Con Pro E2E',
+        genero: 'FEMENINO',
+        consentimiento_datos_sensibles: true,
+        consentimiento_metodo: 'ESCRITO',
+      },
     });
     expect(alta.status()).toBe(201);
 

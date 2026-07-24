@@ -10,6 +10,7 @@ import {
 } from '@/server/plans/schemas';
 import { generarSchema } from '@/server/ai/schemas';
 import { checkoutSchema } from '@/server/billing/schemas';
+import { createConsultationNoteSchema } from '@/server/consultations/schemas';
 import { actualizarPerfilSchema } from '@/server/profile/schemas';
 
 const uuid = z.string().uuid();
@@ -19,6 +20,13 @@ const idPath = z.object({
 });
 const pacientePath = z.object({
   patientId: uuid.meta({ description: 'Identificador UUID del paciente' }),
+});
+const pacienteIdPath = z.object({
+  id: uuid.meta({ description: 'Identificador UUID del paciente' }),
+});
+const notaPath = z.object({
+  id: uuid.meta({ description: 'Identificador UUID del paciente' }),
+  noteId: uuid.meta({ description: 'Identificador UUID de la nota clínica' }),
 });
 const paginacion = z.object({
   page: z.coerce.number().int().min(1).optional(),
@@ -229,6 +237,26 @@ const suscripcionSchema = z
 
 const urlStripeSchema = z.object({ url: z.url() }).meta({ id: 'UrlStripe' });
 
+const notaConsultaSchema = z
+  .object({
+    id: uuid,
+    patient_id: uuid,
+    fecha: fechaHora,
+    motivo: z.string(),
+    hallazgos: z.string(),
+    plan: z.string(),
+    seguimiento: z.string(),
+    origen: z.enum(['MANUAL', 'IA']),
+    firmada_at: fechaHora.nullable(),
+    created_at: fechaHora,
+  })
+  .meta({ id: 'ConsultationNote' });
+
+const listaNotasSchema = z.object({
+  data: z.array(notaConsultaSchema),
+  meta: metaPaginacionSchema,
+});
+
 const json = <T extends z.ZodType>(schema: T) => ({
   'application/json': { schema },
 });
@@ -258,6 +286,7 @@ export const openApiDocument = createDocument({
     { name: 'Planes' },
     { name: 'Plantillas' },
     { name: 'IA' },
+    { name: 'Expediente' },
   ],
   paths: {
     '/api/v1/ai/generate': {
@@ -373,6 +402,57 @@ export const openApiDocument = createDocument({
           '400': respuesta('JSON inválido o validación fallida', errorSchema),
           '404': respuesta('Paciente, alimento o plantilla no encontrado', errorSchema),
           '422': respuesta('Plan solicitado como activo pero no activable', errorSchema),
+          ...erroresComunes,
+        },
+      },
+    },
+    '/api/v1/patients/{id}/consultation_notes': {
+      get: {
+        tags: ['Expediente'],
+        summary: 'Lista notas clínicas descifradas de un paciente propio',
+        requestParams: { path: pacienteIdPath, query: paginacion },
+        responses: {
+          '200': respuesta('Notas paginadas', listaNotasSchema),
+          '404': respuesta('Paciente no encontrado', errorSchema),
+          ...erroresComunes,
+        },
+      },
+      post: {
+        tags: ['Expediente'],
+        summary: 'Crea una nota clínica cifrada y opcionalmente firmada',
+        requestParams: { path: pacienteIdPath },
+        requestBody: { required: true, content: json(createConsultationNoteSchema) },
+        responses: {
+          '201': respuesta('Nota creada', notaConsultaSchema),
+          '400': respuesta('JSON inválido o validación fallida', errorSchema),
+          '404': respuesta('Paciente no encontrado', errorSchema),
+          ...erroresComunes,
+        },
+      },
+    },
+    '/api/v1/patients/{id}/consultation_notes/{noteId}/sign': {
+      post: {
+        tags: ['Expediente'],
+        summary: 'Firma una nota; la operación es idempotente y el texto queda inmutable',
+        requestParams: { path: notaPath },
+        responses: {
+          '200': respuesta('Nota firmada', notaConsultaSchema),
+          '404': respuesta('Nota no encontrada', errorSchema),
+          ...erroresComunes,
+        },
+      },
+    },
+    '/api/v1/patients/{id}/export': {
+      get: {
+        tags: ['Expediente'],
+        summary: 'Exporta el expediente portable de un paciente propio',
+        requestParams: { path: pacienteIdPath },
+        responses: {
+          '200': {
+            description: 'Expediente JSON descargable; no se almacena en caché',
+            content: { 'application/json': { schema: z.unknown() } },
+          },
+          '404': respuesta('Paciente no encontrado', errorSchema),
           ...erroresComunes,
         },
       },

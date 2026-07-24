@@ -157,8 +157,16 @@ export function RegistroForm() {
             className="mt-0.5"
           />
           <span>
-            Acepto el aviso de privacidad y me comprometo a tratar los datos de salud de mis
-            pacientes conforme a la LFPDPPP.
+            Acepto el{' '}
+            <Link
+              href="/privacidad#profesionales"
+              target="_blank"
+              className="font-medium text-emerald-800 underline underline-offset-2"
+            >
+              aviso de privacidad
+            </Link>{' '}
+            y me comprometo a tratar los datos de salud de mis pacientes conforme a la
+            LFPDPPP.
           </span>
         </label>
         <Btn type="submit" disabled={enviando} className="w-full justify-center">

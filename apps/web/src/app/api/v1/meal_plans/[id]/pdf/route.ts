@@ -37,7 +37,7 @@ export async function GET(request: Request, { params }: Contexto) {
   const sesion = await requiereNutriologo();
   if (!sesion.ok) return sesion.respuesta;
 
-  const limite = rateLimit(
+  const limite = await rateLimit(
     `meal-plan-pdf:${sesion.userId}`,
     MAX_PDFS_POR_MINUTO,
     VENTANA_PDF_MS,

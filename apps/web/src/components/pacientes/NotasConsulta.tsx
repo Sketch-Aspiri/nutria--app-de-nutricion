@@ -1,6 +1,12 @@
 'use client';
 
-import { Loader2, MessageSquarePlus, Sparkles } from 'lucide-react';
+import {
+  CheckCircle2,
+  Loader2,
+  LockKeyhole,
+  MessageSquarePlus,
+  Sparkles,
+} from 'lucide-react';
 import { useState } from 'react';
 
 import type { Paciente } from '@nutria/shared';
@@ -11,7 +17,8 @@ import { useNotaClinica } from '@/hooks/useNotaClinica';
 
 export function NotasConsulta({ paciente }: { paciente: Paciente }) {
   const [nota, setNota] = useState('');
-  const { procesar, procesando } = useNotaClinica(paciente);
+  const { procesar, procesando, notas, cargando, firmar, firmando } =
+    useNotaClinica(paciente);
 
   const generar = async () => {
     await procesar(nota);
@@ -31,11 +38,32 @@ export function NotasConsulta({ paciente }: { paciente: Paciente }) {
         {procesando ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
         Generar resumen con IA
       </Btn>
-      {paciente.notasConsulta.length > 0 && (
+      {cargando && (
+        <div className="mt-4 flex items-center gap-2 text-xs text-stone-400">
+          <Loader2 size={13} className="animate-spin" /> Cargando notas…
+        </div>
+      )}
+      {notas.length > 0 && (
         <div className="mt-4 space-y-3">
-          {paciente.notasConsulta.map((n, i) => (
-            <div key={i} className="border-t border-stone-100 pt-3 text-sm">
-              <div className="text-xs text-stone-400 mb-1">{n.fecha}</div>
+          {notas.map((n) => (
+            <div key={n.id} className="border-t border-stone-100 pt-3 text-sm">
+              <div className="mb-1 flex items-center justify-between gap-3 text-xs text-stone-400">
+                <span>{new Date(n.fecha).toLocaleString('es-MX')}</span>
+                {n.firmada_at ? (
+                  <span className="flex items-center gap-1 text-emerald-700">
+                    <CheckCircle2 size={12} /> Firmada
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={firmando}
+                    onClick={() => void firmar(n.id)}
+                    className="flex items-center gap-1 font-medium text-emerald-800 hover:underline disabled:opacity-50"
+                  >
+                    <LockKeyhole size={12} /> Firmar nota
+                  </button>
+                )}
+              </div>
               <div>
                 <span className="text-stone-500">Motivo: </span>
                 {n.motivo}

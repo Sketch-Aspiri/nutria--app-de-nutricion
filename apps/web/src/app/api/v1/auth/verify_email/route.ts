@@ -21,7 +21,11 @@ const verificarSchema = z.object({
 
 /** POST /api/v1/auth/verify_email — confirma el correo con el token del enlace. */
 export async function POST(request: Request) {
-  const limite = rateLimit(`verify:${ipDe(request)}`, MAX_INTENTOS_POR_IP, VENTANA_MS);
+  const limite = await rateLimit(
+    `verify:${ipDe(request)}`,
+    MAX_INTENTOS_POR_IP,
+    VENTANA_MS,
+  );
   if (!limite.permitido) {
     return jsonError(
       429,

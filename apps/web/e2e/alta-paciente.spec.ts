@@ -77,6 +77,9 @@ test('da de alta un paciente con expediente completo y lo persiste', async ({ pa
   // Exacto: "Gluten" también coincidiría con el tipo de dieta "Sin gluten".
   await page.getByRole('button', { name: 'Gluten', exact: true }).click();
   await page.getByLabel('Alimentos que no le gustan').fill('cilantro');
+  await page
+    .getByLabel(/Confirmo que entregué al paciente el aviso de privacidad/i)
+    .check();
   await page.getByRole('button', { name: 'Crear paciente' }).click();
 
   // Redirige al expediente recién creado.
