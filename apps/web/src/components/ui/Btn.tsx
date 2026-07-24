@@ -1,7 +1,7 @@
 type BtnProps = {
   children: React.ReactNode;
   onClick?: () => void;
-  variant?: 'primary' | 'ghost' | 'outline';
+  variant?: 'primary' | 'ghost' | 'outline' | 'danger';
   disabled?: boolean;
   size?: 'md' | 'sm';
   className?: string;
@@ -24,6 +24,7 @@ export function Btn({
     primary: 'bg-emerald-900 text-white hover:bg-emerald-800',
     ghost: 'text-stone-500 hover:bg-stone-100',
     outline: 'border border-emerald-800 text-emerald-800 hover:bg-emerald-50',
+    danger: 'bg-red-700 text-white hover:bg-red-800',
   };
   return (
     <button

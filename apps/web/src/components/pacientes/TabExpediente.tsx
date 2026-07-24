@@ -3,6 +3,7 @@
 import { ClipboardList, FileText, Sparkles, Utensils } from 'lucide-react';
 
 import type { Paciente } from '@nutria/shared';
+import { etiquetaObjetivo } from '@nutria/shared';
 
 import { GrabadorConsulta } from '@/components/pacientes/GrabadorConsulta';
 import { NotasConsulta } from '@/components/pacientes/NotasConsulta';
@@ -33,6 +34,10 @@ export function TabExpediente({ paciente }: { paciente: Paciente }) {
           <Fila etiqueta="Condiciones" valor={paciente.medico.condiciones.join(', ')} />
           <Fila etiqueta="Medicamentos" valor={paciente.medico.medicamentos || '—'} />
           <Fila etiqueta="Nivel de actividad" valor={paciente.medico.nivelActividad} />
+          <Fila
+            etiqueta="Objetivo"
+            valor={etiquetaObjetivo(paciente.medico.objetivo, paciente.medico.objetivoOtro)}
+          />
           {paciente.medico.antecedentes && (
             <div className="text-stone-500 text-xs pt-1 border-t border-stone-100">
               {paciente.medico.antecedentes}

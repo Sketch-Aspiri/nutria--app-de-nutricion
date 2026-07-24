@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, Calculator, Check, Loader2, Save } from 'lucide-react';
+import { AlertTriangle, Calculator, Check, Loader2, Pencil, Save } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import type {
@@ -65,6 +65,23 @@ function entradaDeCalculo(paciente: Paciente, opciones: Opciones): DatosSnapshot
 }
 
 /**
+ * Qué le falta al expediente para poder calcular. Se enumera en vez de dar un
+ * mensaje genérico: el nutriólogo necesita saber qué campo abrir a corregir.
+ */
+function datosFaltantes(paciente: Paciente): string[] {
+  const faltantes: string[] = [];
+  if (!paciente.antropometria.peso) faltantes.push('peso');
+  if (!paciente.antropometria.altura) faltantes.push('altura');
+  if (!paciente.edad) faltantes.push('fecha de nacimiento');
+  return faltantes;
+}
+
+function listaEnEspanol(valores: string[]): string {
+  if (valores.length <= 1) return valores.join('');
+  return `${valores.slice(0, -1).join(', ')} y ${valores[valores.length - 1]}`;
+}
+
+/**
  * Pestaña de cálculo clínico.
  *
  * La vista previa se calcula en el navegador con las mismas funciones puras de
@@ -75,9 +92,12 @@ function entradaDeCalculo(paciente: Paciente, opciones: Opciones): DatosSnapshot
 export function TabCalculo({
   paciente,
   calculo,
+  onEditar,
 }: {
   paciente: Paciente;
   calculo: CalculoApi | null;
+  /** Abre la edición del expediente para completar lo que falte. */
+  onEditar?: () => void;
 }) {
   const [opciones, setOpciones] = useState<Opciones>(() => opcionesDesde(calculo));
   const guardar = useGuardarCalculo(paciente.id);
@@ -88,10 +108,12 @@ export function TabCalculo({
     try {
       return { ok: true, snapshot: construirSnapshotCalculo(entradaDeCalculo(paciente, opciones)) };
     } catch {
+      const faltantes = datosFaltantes(paciente);
       return {
         ok: false,
-        motivo:
-          'El expediente está incompleto: se necesitan peso, altura y fecha de nacimiento válidos.',
+        motivo: faltantes.length
+          ? `Falta capturar ${listaEnEspanol(faltantes)} en el expediente para calcular el gasto energético.`
+          : 'No pudimos calcular con los datos del expediente. Revisa que las medidas sean plausibles.',
       };
     }
   }, [paciente, opciones]);
@@ -115,6 +137,11 @@ export function TabCalculo({
             <AlertTriangle size={15} className="shrink-0 mt-0.5" />
             {vistaPrevia.motivo}
           </div>
+          {onEditar && (
+            <Btn variant="outline" size="sm" className="mt-3" onClick={onEditar}>
+              <Pencil size={14} /> Completar expediente
+            </Btn>
+          )}
         </SectionCard>
         <FormPliegues pacienteId={paciente.id} antropometria={paciente.antropometria} />
       </div>

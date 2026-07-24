@@ -1,9 +1,6 @@
-import type {
-  AlimentoFicha,
-  CalculoNutricional,
-  PlanAlimenticio,
-} from '@nutria/shared';
+import type { AlimentoFicha, CalculoNutricional } from '@nutria/shared';
 
+import type { PlanBorradorIa } from '@/services/ia';
 import type {
   AlimentoResumenPlan,
   ComidaPlanEstructura,
@@ -140,51 +137,34 @@ export function crearPlanVacio(
   };
 }
 
-export function planIaAEditable(sugerencia: PlanAlimenticio): PlanEditable {
-  const totalSugerido = sugerencia.comidas.reduce(
-    (total, comida) => total + Math.max(comida.calorias, 0),
-    0,
-  );
-  const divisor = Math.max(sugerencia.comidas.length, 1);
-
+/**
+ * Convierte el borrador que devuelve `/api/v1/ai/generate` en un plan editable.
+ *
+ * Es una traducción directa: el servidor ya resolvió los `food_id` contra el
+ * catálogo y calculó los nutrimentos de cada item, así que aquí no se reparte
+ * ni se estima nada — solo se agregan las claves locales del editor.
+ */
+export function borradorIaAEditable(borrador: PlanBorradorIa): PlanEditable {
   return {
     id: null,
     updated_at: null,
     estado: 'BORRADOR',
-    calorias_diarias: sugerencia.calorias_diarias,
-    proteina_g: sugerencia.macros.proteina_g,
-    carbos_g: sugerencia.macros.carbos_g,
-    grasa_g: sugerencia.macros.grasa_g,
-    nota: sugerencia.nota_ia ?? 'Borrador generado con IA; requiere revisión profesional.',
+    calorias_diarias: borrador.calorias_diarias,
+    proteina_g: borrador.proteina_g,
+    carbos_g: borrador.carbos_g,
+    grasa_g: borrador.grasa_g,
+    nota: borrador.nota || 'Borrador generado con IA; requiere revisión profesional.',
     origen: 'IA',
     compartido_at: null,
     pdf_url: null,
-    comidas: sugerencia.comidas.map((comida, orden) => {
-      const proporcion =
-        totalSugerido > 0 ? Math.max(comida.calorias, 0) / totalSugerido : 1 / divisor;
-      const descripcion = [comida.descripcion, comida.porcion].filter(Boolean).join(' · ');
-
-      return {
-        clave: claveLocal('comida'),
-        orden,
-        nombre: comida.nombre,
-        horario: comida.horario || null,
-        descripcion: null,
-        items: [
-          {
-            clave: claveLocal('item'),
-            food_id: null,
-            descripcion_libre: descripcion || comida.nombre,
-            cantidad_porciones: 1,
-            energia_kcal: Math.max(comida.calorias, 0),
-            proteina_g: redondear(sugerencia.macros.proteina_g * proporcion),
-            carbohidratos_g: redondear(sugerencia.macros.carbos_g * proporcion),
-            lipidos_g: redondear(sugerencia.macros.grasa_g * proporcion),
-            food: null,
-          },
-        ],
-      };
-    }),
+    comidas: borrador.comidas.map((comida) => ({
+      clave: claveLocal('comida'),
+      orden: comida.orden,
+      nombre: comida.nombre,
+      horario: comida.horario,
+      descripcion: comida.descripcion,
+      items: comida.items.map((item) => ({ ...item, clave: claveLocal('item') })),
+    })),
   };
 }
 

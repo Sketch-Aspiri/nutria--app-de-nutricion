@@ -8,6 +8,7 @@ import {
   crearPlantillaSchema,
   estructuraPlantillaSchema,
 } from '@/server/plans/schemas';
+import { generarSchema } from '@/server/ai/schemas';
 import { actualizarPerfilSchema } from '@/server/profile/schemas';
 
 const uuid = z.string().uuid();
@@ -149,6 +150,33 @@ const perfilSchema = z
   })
   .meta({ id: 'NutritionistProfile' });
 
+const cuotaIaSchema = z
+  .object({
+    plan: z.enum(['FREE', 'PRO', 'CLINICA']),
+    limite: z.number().int(),
+    usadas: z.number().int(),
+    restantes: z.number().int(),
+    agotada: z.boolean(),
+  })
+  .meta({ id: 'CuotaIA' });
+
+const cuotaIaConEstadoSchema = cuotaIaSchema
+  .extend({ configurada: z.boolean() })
+  .meta({ id: 'CuotaIAConEstado' });
+
+const generacionIaSchema = z
+  .object({
+    tipo: z.enum(['PLAN', 'NOTA_CLINICA', 'RECETA', 'RESPUESTA_MENSAJE', 'PLAN_ACTIVIDAD']),
+    formato: z.enum(['estructurado', 'texto']),
+    /** Presente solo con `formato: estructurado`; su forma depende de `tipo`. */
+    datos: z.unknown().nullable(),
+    /** Presente solo con `formato: texto`, para que el nutriólogo lo edite. */
+    texto: z.string().nullable(),
+    advertencias: z.array(z.string()),
+    cuota: cuotaIaSchema,
+  })
+  .meta({ id: 'GeneracionIA' });
+
 const json = <T extends z.ZodType>(schema: T) => ({
   'application/json': { schema },
 });
@@ -167,8 +195,9 @@ export const openApiDocument = createDocument({
   openapi: '3.1.0',
   info: {
     title: 'Nutria API',
-    version: '1.4.0',
-    description: 'Contratos de planes alimenticios, plantillas, PDF y marca blanca.',
+    version: '1.5.0',
+    description:
+      'Contratos de planes alimenticios, plantillas, PDF, marca blanca y asistencia con IA.',
   },
   servers: [{ url: '/' }],
   security: [{ sessionCookie: [] }],
@@ -176,8 +205,41 @@ export const openApiDocument = createDocument({
     { name: 'Perfil' },
     { name: 'Planes' },
     { name: 'Plantillas' },
+    { name: 'IA' },
   ],
   paths: {
+    '/api/v1/ai/generate': {
+      post: {
+        tags: ['IA'],
+        summary: 'Genera un borrador asistido por IA sobre un paciente propio',
+        description: [
+          'Discriminado por `tipo`. Con `stream: true` responde `text/event-stream`',
+          'con eventos `delta`, `progreso`, `reintento`, `final` y `error`; el evento',
+          '`final` lleva el mismo objeto que la respuesta JSON.',
+          'Los datos del paciente viajan seudonimizados y los prompts nunca se loggean.',
+        ].join(' '),
+        requestBody: { required: true, content: json(generarSchema) },
+        responses: {
+          '200': respuesta('Borrador generado y validado', generacionIaSchema),
+          '400': respuesta('JSON inválido o validación fallida', errorSchema),
+          '404': respuesta('Paciente no encontrado', errorSchema),
+          '429': respuesta('Cuota mensual de IA agotada (AI_LIMIT_REACHED)', errorSchema),
+          '502': respuesta('El proveedor de IA falló (AI_UPSTREAM_ERROR)', errorSchema),
+          '503': respuesta('Falta ANTHROPIC_API_KEY (AI_NOT_CONFIGURED)', errorSchema),
+          ...erroresComunes,
+        },
+      },
+    },
+    '/api/v1/ai/usage': {
+      get: {
+        tags: ['IA'],
+        summary: 'Consulta la cuota de IA del mes en curso',
+        responses: {
+          '200': respuesta('Cuota vigente', cuotaIaConEstadoSchema),
+          ...erroresComunes,
+        },
+      },
+    },
     '/api/v1/me': {
       get: {
         tags: ['Perfil'],

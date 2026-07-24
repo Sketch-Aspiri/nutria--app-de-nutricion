@@ -49,6 +49,7 @@ export function serializarExpedienteMedico(expediente: MedicalRecord | null) {
     medicamentos: expediente.medicamentos,
     nivel_actividad: expediente.nivelActividad,
     objetivo: expediente.objetivo,
+    objetivo_otro: expediente.objetivoOtro,
   };
 }
 
@@ -114,6 +115,7 @@ export function serializarPacienteResumen(
   return {
     ...datosBase(paciente),
     objetivo: paciente.medicalRecord?.objetivo ?? null,
+    objetivo_otro: paciente.medicalRecord?.objetivoOtro ?? null,
   };
 }
 

@@ -1,11 +1,12 @@
 'use client';
 
-import { Plus, Users } from 'lucide-react';
+import { Plus, Trash2, Users } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { objetivoDesdeDb } from '@nutria/shared';
+import { etiquetaObjetivo, objetivoDesdeDb } from '@nutria/shared';
 
+import { ConfirmarBajaPaciente } from '@/components/pacientes/ConfirmarBajaPaciente';
 import { NuevoPacienteWizard } from '@/components/pacientes/NuevoPacienteWizard';
 import { Avatar } from '@/components/ui/Avatar';
 import { Btn } from '@/components/ui/Btn';
@@ -30,6 +31,7 @@ function EstadoVacio({ onNuevo }: { onNuevo: () => void }) {
 export default function PacientesPage() {
   const { pacientes, cargando, error } = usePacientes();
   const [showWizard, setShowWizard] = useState(false);
+  const [aBorrar, setABorrar] = useState<{ id: string; nombre: string } | null>(null);
   const router = useRouter();
 
   const alCrear = (id: string) => {
@@ -68,26 +70,45 @@ export default function PacientesPage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {pacientes.map((p) => (
-          <button
-            type="button"
+          // La tarjeta no puede ser un <button>: anidaría el de eliminar dentro.
+          <div
             key={p.id}
-            onClick={() => router.push(`/pacientes/${p.id}`)}
-            className="text-left bg-white border border-stone-200 rounded-xl p-4 flex items-center gap-4 hover:border-emerald-300 hover:shadow-sm transition-all"
+            className="relative bg-white border border-stone-200 rounded-xl flex items-center hover:border-emerald-300 hover:shadow-sm transition-all"
           >
-            <Avatar foto={p.foto_url} nombre={p.nombre} />
-            <div className="min-w-0 flex-1">
-              <div className="text-emerald-950 font-medium truncate">{p.nombre}</div>
-              <div className="text-stone-500 text-xs mt-0.5">
-                {p.objetivo ? objetivoDesdeDb(p.objetivo) : 'Sin objetivo definido'}
-                {p.edad > 0 && ` · ${p.edad} años`}
+            <button
+              type="button"
+              onClick={() => router.push(`/pacientes/${p.id}`)}
+              className="text-left p-4 pr-12 flex items-center gap-4 flex-1 min-w-0"
+            >
+              <Avatar foto={p.foto_url} nombre={p.nombre} />
+              <div className="min-w-0 flex-1">
+                <div className="text-emerald-950 font-medium truncate">{p.nombre}</div>
+                <div className="text-stone-500 text-xs mt-0.5">
+                  {p.objetivo
+                    ? etiquetaObjetivo(objetivoDesdeDb(p.objetivo), p.objetivo_otro)
+                    : 'Sin objetivo definido'}
+                  {p.edad > 0 && ` · ${p.edad} años`}
+                </div>
               </div>
-            </div>
-          </button>
+            </button>
+            <button
+              type="button"
+              onClick={() => setABorrar({ id: p.id, nombre: p.nombre })}
+              aria-label={`Eliminar a ${p.nombre}`}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-stone-400 hover:text-red-700 hover:bg-red-50 transition-colors"
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
         ))}
       </div>
 
       {showWizard && (
         <NuevoPacienteWizard onClose={() => setShowWizard(false)} onCreado={alCrear} />
+      )}
+
+      {aBorrar && (
+        <ConfirmarBajaPaciente paciente={aBorrar} onClose={() => setABorrar(null)} />
       )}
     </div>
   );

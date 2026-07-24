@@ -20,6 +20,8 @@ export function crearPacienteDePrueba(overrides: Partial<Paciente> = {}): Pacien
       medicamentos: '',
       nivelActividad: 'Moderado',
       objetivo: 'Mantenimiento',
+      // Solo acompaña al objetivo OTRO; con cualquier otro va nulo.
+      objetivoOtro: null,
     },
     antropometria: {
       peso: 65,

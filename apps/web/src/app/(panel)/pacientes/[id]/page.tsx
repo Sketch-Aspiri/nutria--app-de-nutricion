@@ -1,16 +1,28 @@
 'use client';
 
-import { Calculator, ChefHat, ChevronLeft, ClipboardList, Dumbbell, Sparkles } from 'lucide-react';
+import {
+  Calculator,
+  ChefHat,
+  ChevronLeft,
+  ClipboardList,
+  Dumbbell,
+  Pencil,
+  Sparkles,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
 
+import { etiquetaObjetivo } from '@nutria/shared';
+
+import { EditarPacienteModal } from '@/components/pacientes/EditarPacienteModal';
 import { TabCalculo } from '@/components/pacientes/TabCalculo';
 import { TabExpediente } from '@/components/pacientes/TabExpediente';
 import { TabPlan } from '@/components/pacientes/TabPlan';
 import { TabRecetas } from '@/components/pacientes/TabRecetas';
 import { TabSeguimiento } from '@/components/pacientes/TabSeguimiento';
 import { Avatar } from '@/components/ui/Avatar';
+import { Btn } from '@/components/ui/Btn';
 import { usePaciente } from '@/hooks/usePacientes';
 
 const TABS = [
@@ -27,6 +39,7 @@ export default function PacienteDetallePage() {
   const params = useParams<{ id: string }>();
   const { paciente, calculo, cargando } = usePaciente(params.id);
   const [tab, setTab] = useState<TabId>('expediente');
+  const [editando, setEditando] = useState(false);
 
   if (cargando) {
     return <div className="p-8 text-stone-400 text-sm">Cargando expediente…</div>;
@@ -46,7 +59,7 @@ export default function PacienteDetallePage() {
   }
 
   return (
-    <div className="p-8 max-w-4xl">
+    <div className="p-8">
       <Link
         href="/pacientes"
         className="flex items-center gap-1 text-stone-500 text-sm mb-5 hover:text-emerald-900 w-fit"
@@ -58,9 +71,13 @@ export default function PacienteDetallePage() {
         <div>
           <h1 className="font-display text-2xl text-emerald-950 font-medium">{paciente.nombre}</h1>
           <div className="text-stone-500 text-sm">
-            {paciente.edad} años · {paciente.medico.objetivo}
+            {paciente.edad > 0 ? `${paciente.edad} años` : 'Sin fecha de nacimiento'} ·{' '}
+            {etiquetaObjetivo(paciente.medico.objetivo, paciente.medico.objetivoOtro)}
           </div>
         </div>
+        <Btn variant="outline" size="sm" className="ml-auto" onClick={() => setEditando(true)}>
+          <Pencil size={14} /> Editar paciente
+        </Btn>
       </div>
       <div className="flex gap-1 mb-5 border-b border-stone-200 overflow-x-auto">
         {TABS.map((t) => (
@@ -79,10 +96,15 @@ export default function PacienteDetallePage() {
         ))}
       </div>
       {tab === 'expediente' && <TabExpediente paciente={paciente} />}
-      {tab === 'calculo' && <TabCalculo paciente={paciente} calculo={calculo} />}
+      {tab === 'calculo' && (
+        <TabCalculo paciente={paciente} calculo={calculo} onEditar={() => setEditando(true)} />
+      )}
       {tab === 'plan' && <TabPlan paciente={paciente} />}
       {tab === 'seguimiento' && <TabSeguimiento paciente={paciente} />}
       {tab === 'recetas' && <TabRecetas paciente={paciente} />}
+      {editando && (
+        <EditarPacienteModal paciente={paciente} onClose={() => setEditando(false)} />
+      )}
     </div>
   );
 }

@@ -52,6 +52,8 @@ export const expedienteMedicoSchema = z.object({
   medicamentos: z.string().max(2000).nullish(),
   nivel_actividad: z.enum(NIVELES_ACTIVIDAD).optional(),
   objetivo: z.enum(OBJETIVOS).optional(),
+  /** Descripción libre del objetivo; solo tiene sentido cuando es `OTRO`. */
+  objetivo_otro: z.string().trim().max(120).nullish(),
 });
 
 export const preferenciasSchema = z.object({

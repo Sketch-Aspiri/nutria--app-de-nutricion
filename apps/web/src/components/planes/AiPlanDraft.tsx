@@ -3,36 +3,43 @@
 import { AlertTriangle, Loader2, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 
-import {
-  NOMBRE_ECUACION,
-  type Paciente,
-  type PlanAlimenticio,
-} from '@nutria/shared';
+import type { Paciente } from '@nutria/shared';
 
 import { Btn } from '@/components/ui/Btn';
 import { SectionCard } from '@/components/ui/SectionCard';
-import { useGenerarJSON } from '@/hooks/useIA';
+import { useCuotaIA, useGenerarIAConStream } from '@/hooks/useIA';
+import { ErrorIA, type PlanBorradorIa } from '@/services/ia';
 
 type AiPlanDraftProps = {
   paciente: Paciente;
-  onGenerated: (plan: PlanAlimenticio) => void;
+  onGenerated: (borrador: PlanBorradorIa) => void;
 };
 
-function crearPrompt(paciente: Paciente, notas: string): string {
-  const meta = paciente.calculo
-    ? `Meta profesional (${NOMBRE_ECUACION[paciente.calculo.ecuacion]}): ${paciente.calculo.objetivoCalorias} kcal; ${paciente.calculo.proteina_g} g proteína; ${paciente.calculo.carbos_g} g carbohidratos; ${paciente.calculo.grasa_g} g grasa.`
-    : 'No hay una meta calculada: propón cifras conservadoras y márcalas para revisión.';
-
-  return `Actúa como asistente de un profesional de nutrición. Genera solo un BORRADOR de un día, nunca una indicación final. No inventes diagnósticos.
-Paciente seudonimizado: ${paciente.edad} años, género ${paciente.genero}, ${paciente.antropometria.peso} kg, ${paciente.antropometria.altura} cm. Objetivo: ${paciente.medico.objetivo}. Condiciones: ${paciente.medico.condiciones.join(', ')}. Dieta: ${paciente.preferencias.tipoDieta}. Alergias: ${paciente.preferencias.alergias.join(', ')}. Evitar: ${paciente.preferencias.disgustos || 'sin datos'}. Número de comidas: ${paciente.preferencias.comidasPorDia}.
-${meta}
-Preferencias de esta propuesta: ${notas.trim() || 'ninguna adicional'}.
-Responde SOLO JSON válido: {"calorias_diarias":number,"macros":{"proteina_g":number,"carbos_g":number,"grasa_g":number},"comidas":[{"nombre":string,"horario":string,"descripcion":string,"porcion":string,"calorias":number}],"nota_ia":string}`;
-}
-
+/**
+ * Borrador de plan asistido por IA.
+ *
+ * El componente no arma prompts: manda `tipo: 'PLAN'` y el identificador del
+ * paciente, y el servidor construye el contexto ya seudonimizado. Lo que vuelve
+ * está validado contra las alergias y la meta energética del expediente.
+ */
 export function AiPlanDraft({ paciente, onGenerated }: AiPlanDraftProps) {
   const [notas, setNotas] = useState('');
-  const generar = useGenerarJSON<PlanAlimenticio>();
+  const cuota = useCuotaIA();
+  const generar = useGenerarIAConStream<PlanBorradorIa>();
+  const { estado } = generar;
+
+  const sinCuota = cuota.data?.agotada ?? false;
+  const error = generar.error instanceof ErrorIA ? generar.error : null;
+
+  const solicitar = () =>
+    generar.mutate(
+      { tipo: 'PLAN', patient_id: paciente.id, notas: notas.trim() || undefined },
+      {
+        onSuccess: (salida) => {
+          if (salida.formato === 'estructurado' && salida.datos) onGenerated(salida.datos);
+        },
+      },
+    );
 
   return (
     <SectionCard title="Borrador asistido" icon={Sparkles}>
@@ -49,13 +56,8 @@ export function AiPlanDraft({ paciente, onGenerated }: AiPlanDraftProps) {
         </label>
         <span data-testid="generate-ai-plan">
           <Btn
-            onClick={() =>
-              generar.mutate(
-                { prompt: crearPrompt(paciente, notas), maxTokens: 1600 },
-                { onSuccess: onGenerated },
-              )
-            }
-            disabled={generar.isPending}
+            onClick={solicitar}
+            disabled={generar.isPending || sinCuota}
             className="w-full justify-center md:mb-0.5 md:w-auto"
           >
             {generar.isPending ? (
@@ -67,17 +69,56 @@ export function AiPlanDraft({ paciente, onGenerated }: AiPlanDraftProps) {
           </Btn>
         </span>
       </div>
+
+      {generar.isPending && (
+        <p className="mt-2 text-xs text-stone-500" role="status">
+          {estado.reintento
+            ? 'Ajustando el borrador para que cumpla las restricciones del expediente…'
+            : `Redactando el borrador… ${estado.avance} caracteres`}
+        </p>
+      )}
+
+      {cuota.data && !cuota.data.agotada && (
+        <p className="mt-2 text-[11px] text-stone-400">
+          Te quedan {cuota.data.restantes} de {cuota.data.limite} generaciones de IA este mes.
+        </p>
+      )}
+
       <p className="mt-2 flex items-start gap-1.5 text-[11px] leading-4 text-stone-400">
         <AlertTriangle size={12} className="mt-0.5 shrink-0" />
         Se envían datos clínicos seudonimizados, sin nombre ni contacto. Revisa alimentos,
         alergias y totales antes de guardar.
       </p>
-      {generar.error && (
+
+      {(sinCuota || error?.esLimiteAlcanzado) && (
         <p role="alert" className="mt-2 text-xs text-orange-600">
-          {generar.error instanceof SyntaxError
-            ? 'La respuesta no tuvo el formato esperado. Intenta nuevamente.'
-            : generar.error.message}
+          Agotaste tus generaciones de IA de este mes.{' '}
+          <a href="/suscripcion" className="underline">
+            Mejora tu plan
+          </a>{' '}
+          para seguir generando borradores.
         </p>
+      )}
+
+      {error && !error.esLimiteAlcanzado && (
+        <p role="alert" className="mt-2 text-xs text-orange-600">
+          {error.message}
+        </p>
+      )}
+
+      {generar.data?.formato === 'texto' && (
+        <div className="mt-3 rounded-lg border border-orange-200 bg-orange-50 p-3">
+          <p className="text-xs text-orange-700">
+            El borrador no pasó la validación clínica
+            {generar.data.advertencias.length > 0
+              ? `: ${generar.data.advertencias.join(' ')}`
+              : '.'}{' '}
+            Abajo queda la propuesta en crudo para que la uses como referencia.
+          </p>
+          <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap text-[11px] text-stone-600">
+            {generar.data.texto}
+          </pre>
+        </div>
       )}
     </SectionCard>
   );

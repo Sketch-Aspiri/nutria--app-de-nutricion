@@ -1,4 +1,4 @@
-import { extraerJSON } from './ia';
+import { extraerJSON } from './json';
 
 describe('extraerJSON', () => {
   it('parsea JSON plano', () => {

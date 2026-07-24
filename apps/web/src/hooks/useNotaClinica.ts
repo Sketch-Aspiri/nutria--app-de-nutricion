@@ -4,23 +4,31 @@ import { useCallback, useState } from 'react';
 
 import type { NotaConsulta, Paciente } from '@nutria/shared';
 
-import { generarJSON } from '@/services/ia';
+import { generarIA } from '@/services/ia';
 import { useAppState } from '@/store/app-state';
 
 type NotaEstructurada = Omit<NotaConsulta, 'fecha'>;
 
 /**
- * Convierte texto libre (notas o transcripción) en una nota clínica estructurada vía IA.
- * Si la IA falla, guarda el texto como nota libre para no perder el trabajo del nutriólogo.
+ * Convierte texto libre (notas o dictado) en una nota clínica estructurada.
+ *
+ * El texto se manda tal cual al servidor, que lo seudonimiza antes de armar el
+ * prompt: una nota dictada casi siempre menciona al paciente por su nombre.
+ *
+ * Si la IA falla o su salida no valida, se guarda el texto como nota libre: el
+ * trabajo del nutriólogo no se pierde por un error del proveedor.
  */
 export function useNotaClinica(paciente: Paciente) {
   const { updatePatient } = useAppState();
   const [procesando, setProcesando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const procesar = useCallback(
     async (texto: string) => {
       if (!texto.trim()) return;
       setProcesando(true);
+      setError(null);
+
       const guardar = (nota: NotaEstructurada) =>
         updatePatient(paciente.id, (p) => ({
           notasConsulta: [
@@ -28,18 +36,39 @@ export function useNotaClinica(paciente: Paciente) {
             ...p.notasConsulta,
           ],
         }));
+
       try {
-        const prompt = `Eres un asistente clínico para nutriólogos. Convierte estas notas/transcripción de consulta en un resumen clínico estructurado. Responde solo con JSON: {"motivo": string, "hallazgos": string, "plan": string, "seguimiento": string}.
-Paciente: ${paciente.nombre}, objetivo: ${paciente.medico.objetivo}. Texto: ${texto}`;
-        guardar(await generarJSON<NotaEstructurada>(prompt, 500));
-      } catch {
+        const salida = await generarIA<NotaEstructurada>({
+          tipo: 'NOTA_CLINICA',
+          patient_id: paciente.id,
+          texto,
+        });
+        if (salida.formato === 'estructurado' && salida.datos) {
+          guardar(salida.datos);
+        } else {
+          // Degradada a texto: se conserva lo que devolvió la IA y se avisa
+          // para que el nutriólogo la acomode a mano.
+          guardar({
+            motivo: 'Nota sin estructurar',
+            hallazgos: salida.texto?.trim() || texto,
+            plan: '—',
+            seguimiento: '—',
+          });
+          setError('La IA no pudo estructurar la nota. Se guardó como nota libre para editarla.');
+        }
+      } catch (fallo: unknown) {
         guardar({ motivo: 'Nota libre', hallazgos: texto, plan: '—', seguimiento: '—' });
+        setError(
+          fallo instanceof Error
+            ? fallo.message
+            : 'No se pudo contactar al asistente. La nota se guardó sin estructurar.',
+        );
       } finally {
         setProcesando(false);
       }
     },
-    [paciente.id, paciente.nombre, paciente.medico.objetivo, updatePatient],
+    [paciente.id, updatePatient],
   );
 
-  return { procesar, procesando };
+  return { procesar, procesando, error };
 }

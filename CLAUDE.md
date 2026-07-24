@@ -38,6 +38,7 @@ packages/
 | `deploy-config.md` | Al tocar migraciones, variables de entorno, o el pipeline de CI/CD |
 | `MVP-app-movil.md` | Al trabajar en `apps/mobile`, para saber qué está y qué no está en alcance |
 | `MVP-app-web.md` | Al trabajar en `apps/web`, para saber qué está y qué no está en alcance |
+| `ai-guidelines.md` | Al tocar cualquier función de IA: prompts, seudonimización, cuotas, validación de salidas |
 
 ## Comandos habituales
 
@@ -68,6 +69,7 @@ npm run type-check --workspaces
 4. **Cambios pequeños y enfocados.** Un PR resuelve una cosa. Refactors no relacionados van aparte, aunque se detecten de paso.
 5. **Todo cambio de lógica de negocio lleva test.** Ver `testing.md` para cobertura mínima esperada por app.
 6. **Migraciones reversibles o expand-contract.** Ver `deploy-config.md`.
+7. **La IA propone, el nutriólogo aprueba.** Las funciones de IA generativa (borrador de plan, resumen clínico, recetas, sugerencia de respuesta, plan de actividad) sí están en alcance, pero siempre como asistencia: nada que produzca el modelo se guarda ni se envía al paciente sin que el profesional lo revise. Ver `ai-guidelines.md`.
 
 ## Comandos y agentes disponibles en este proyecto
 
@@ -79,5 +81,4 @@ npm run type-check --workspaces
 ## Qué evitar
 
 - No introducir un ORM o librería de estado nuevo sin justificarlo (ya hay decisiones tomadas: React Query + Zustand en mobile, Prisma/TypeORM en el backend).
-- No construir funciones de IA generativa (planes automáticos, chatbots) en el MVP — está explícitamente fuera de alcance en `MVP-app-movil.md` y `MVP-app-web.md`.
 - No commitear secretos ni valores reales de `.env`.

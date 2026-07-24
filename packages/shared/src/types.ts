@@ -16,6 +16,8 @@ export type ExpedienteMedico = {
   medicamentos: string;
   nivelActividad: NivelActividad;
   objetivo: Objetivo;
+  /** Descripción escrita por el nutriólogo; solo se llena si `objetivo` es 'Otro'. */
+  objetivoOtro: string | null;
 };
 
 export type RegistroPeso = {

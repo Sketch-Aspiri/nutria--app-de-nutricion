@@ -26,6 +26,7 @@ function pacienteConAlergias(alergias: string[]): Paciente {
       medicamentos: '',
       nivelActividad: 'Moderado',
       objetivo: 'Mantenimiento',
+      objetivoOtro: null,
     },
     antropometria: {
       peso: 60,

@@ -316,7 +316,7 @@ Además: tests unitarios/integración de handlers con la BD (≥ 80 % en `src/se
 | **2. Fórmulas + cálculo** ✅ | 3 | Módulo `nutricion/` ampliado con tests; TabCalculo con selector de ecuación y equivalentes; snapshot persistido; E2E #3 |
 | **3. Base de alimentos** ✅ | 3–4 | Seed tanda 1 (150 núcleo MX) + tanda 2 (USDA); imágenes en Blob; búsqueda pg_trgm; FoodPicker contra API; CRUD alimentos propios |
 | **4. Planes + PDF + plantillas** ✅ | 4–5 | Editor de plan sobre BD con items ligados a foods; plantillas; PDF real (react-pdf) con marca blanca; E2E #4 |
-| **5. IA Claude** | 5 | Servicio AI con streaming, salida estructurada validada, seudonimización, `ai_usage` y límites; los 5 casos de uso; E2E #10 |
+| **5. IA Claude** ✅ | 5 | Servicio AI con streaming, salida estructurada validada, seudonimización, `ai_usage` y límites; los 5 casos de uso; E2E #10 |
 | **6. Agenda, mensajes, seguimiento** | 6 | Citas + recordatorios (cron + Resend); mensajes con polling; seguimiento leyendo logs reales; E2E #5, #6, #7 |
 | **7. Stripe** | 7 | Checkout, portal, webhooks, entitlements en servidor; paywall; E2E #8 |
 | **8. Endurecimiento y lanzamiento** | 8 | Cifrado de columnas, auditoría security-auditor, Sentry, avisos de privacidad, seed tanda 3, carga de prueba, dominio productivo, **onboarding de 3–5 nutriólogos piloto** |
@@ -564,6 +564,75 @@ blanca embebido, descarga, compartir y aislamiento entre nutriólogos (404, no 4
 genera bajo demanda en cada petición, que es correcto y suficiente para la prueba. El envío del plan
 al paciente por email/app móvil llega con la fase 6 y la app móvil; `compartir` marca `compartido_at`
 y deja el plan disponible.
+
+---
+
+### Fase 5 — IA Claude (completada)
+
+- **Servicio de IA en el servidor** (`apps/web/src/server/ai/`): el proxy `api/ai/route.ts`, que
+  recibía el prompt ya armado desde el navegador, quedó eliminado. Ahora hay un solo endpoint
+  `POST /api/v1/ai/generate` con `tipo` discriminado (Zod) y `GET /api/v1/ai/usage` para la cuota.
+  La UI manda **intención** —tipo, paciente, texto libre—, nunca el prompt: si el cliente pudiera
+  mandarlo entero, cualquier pantalla nueva podría saltarse la seudonimización sin que se note en
+  review. SDK oficial `@anthropic-ai/sdk`; `claude-sonnet-5` para lo que tiene consecuencia clínica
+  (plan, receta, resumen de nota) y `claude-haiku-4-5` para las tareas cortas.
+- **Los cinco casos de uso**: borrador de plan, resumen clínico estructurado de la nota, receta,
+  sugerencia de respuesta en mensajes y plan de actividad. Los tres primeros se piden con
+  `output_config.format` (schema JSON) y se validan con Zod al recibir; los otros dos devuelven texto
+  que el nutriólogo edita.
+- **Seudonimización** (`packages/shared/src/ia/seudonimizar.ts`): hacia Anthropic viajan edad, sexo,
+  mediciones, condiciones, alergias y preferencias; nombre, correo y teléfono se sustituyen por
+  `[PACIENTE]`, `[CORREO]` y `[TELEFONO]`. El filtro corre sobre **todo** campo de texto libre —
+  antecedentes, medicamentos, disgustos, tipo de dieta, objetivo "Otro", condiciones capturadas a
+  mano— y además barre correos y teléfonos con expresión regular, porque una nota dictada suele
+  mencionar el teléfono de un familiar que no está en la ficha. `contexto.ts` es la única frontera
+  por la que salen datos del expediente, así que el filtro vive ahí y no en cada prompt.
+- **Validación clínica antes de mostrar** (`validacion.ts`): un borrador de plan se rechaza si
+  referencia un `food_id` que no existe en el catálogo, si menciona un alérgeno declarado —revisando
+  también el nombre real del alimento, no solo el texto que escribió el modelo—, si la energía se
+  desvía más de ±5 % de la meta calculada, o si el número de comidas no coincide con el del paciente.
+  Al fallar se **reintenta una vez** explicándole al modelo el motivo del rechazo, y si vuelve a
+  fallar se **degrada a texto editable** con la advertencia visible, en lugar de mostrar una salida
+  no validada como si estuviera aprobada.
+- **Los nutrimentos los calcula el servidor** (`borrador.ts`): la IA elige *qué* y *cuánto*, y la
+  aritmética sale de la fila del alimento. Un borrador aceptado no puede traer kcal inventadas, y
+  llega al editor en la misma estructura que un plan cargado de la API.
+- **Streaming SSE**: `stream: true` responde `text/event-stream` con eventos `delta` (texto de las
+  salidas libres), `progreso` (avance de las estructuradas, cuyo JSON a medio construir no tiene
+  sentido enseñar), `reintento`, `final` y `error`. El contrato de datos es idéntico en ambos modos.
+- **Cuotas y costo** (`uso.ts` + `packages/shared/src/ia/limites.ts`): Free 15 generaciones/mes, Pro
+  150, Clínica 500, leídas de `subscriptions` —nunca del cliente—. La cuota se reserva **antes** de
+  llamar al proveedor, en una sola sentencia atómica para que dos pestañas no puedan pasarse del
+  límite, y se reembolsa si la llamada falla. Al agotarse: **429 `AI_LIMIT_REACHED`** con CTA de
+  mejora de plan. `ai_usage` guarda solo contadores y tokens; los prompts y respuestas **nunca** se
+  loggean.
+- **Dictado real** (`useDictado.ts`): la transcripción simulada de `GrabadorConsulta` se reemplazó
+  por la Web Speech API del navegador. El audio no sale del equipo del nutriólogo; solo el texto —que
+  puede editar antes— viaja al servidor para estructurarse. En navegadores sin soporte queda la
+  captura manual, sin romper el flujo.
+- **De paso**: se documentaron los dos endpoints en el OpenAPI (v1.5.0), se quitó de `CLAUDE.md` la
+  restricción de "no construir funciones de IA generativa" —que era del MVP v1— y se agregó
+  `rules/ai-guidelines.md` con las reglas permanentes (la IA propone y el profesional aprueba,
+  prompts en el servidor, seudonimización, no loggear, validar antes de mostrar, cuotas).
+
+Verificado: **75 tests nuevos** en `src/server/ai` y en la ruta (seudonimización con datos ficticios
+sembrados en todos los campos libres, autorización por `nutritionistId`, validación clínica,
+reintento y degradación, reserva/reembolso de cuota, SSE), **505 tests en verde en el monorepo**,
+**type-check limpio** y **`next build` exitoso**. El E2E #10 (`e2e/limite-ia.spec.ts`) agota la cuota
+sembrando `ai_usage` y comprueba que el rechazo ocurra en el servidor, que el streaming también lo
+respete, que un plan superior amplíe el límite y que la cuota de un nutriólogo no afecte la de otro.
+
+**Desviaciones respecto al plan original**, y por qué:
+
+1. **La transcripción con Web Speech API se adelantó a esta fase** (el plan la listaba como caso 6).
+   `GrabadorConsulta` tenía una transcripción falsa hardcodeada; dejarla habría sido enseñar una
+   fachada en la prueba con nutriólogos piloto.
+2. **La sugerencia de respuesta y el plan de actividad siguen guardándose en el almacén puente**, no
+   en `messages`/`activity_plans`. La generación ya es real y va contra la BD; la persistencia de
+   esos dos módulos es de la fase 6, y mezclarla aquí rompería la regla de PR enfocado.
+3. **`ai_usage` cuenta una generación aunque haya reintento interno**, pero suma los tokens de ambos
+   intentos. El nutriólogo paga por el resultado, no por los tropiezos del modelo; el costo real
+   queda igualmente auditable en las columnas de tokens.
 
 ---
 

@@ -7,10 +7,22 @@ import type { Paciente, RecetaEnCurso, RecetaSugerida } from '@nutria/shared';
 
 import { Btn } from '@/components/ui/Btn';
 import { SectionCard } from '@/components/ui/SectionCard';
-import { useGenerarJSON, useGenerarTexto } from '@/hooks/useIA';
+import { useGenerarIA } from '@/hooks/useIA';
+import { ErrorIA, type RecetaIa } from '@/services/ia';
 import { useAppState } from '@/store/app-state';
 
 type RecetaGenerada = Omit<RecetaSugerida, 'id' | 'enviada'>;
+
+/** La API devuelve los pasos como `pasos`; el modelo local los llama `pasos_breve`. */
+function aRecetaGuardable(receta: RecetaIa): RecetaGenerada {
+  return {
+    nombre: receta.nombre,
+    ingredientes: receta.ingredientes,
+    pasos_breve: receta.pasos,
+    calorias: receta.calorias,
+    porciones: receta.porciones,
+  };
+}
 
 export function TabRecetas({ paciente }: { paciente: Paciente }) {
   const { updatePatient } = useAppState();
@@ -18,27 +30,37 @@ export function TabRecetas({ paciente }: { paciente: Paciente }) {
   const [ajusteTexto, setAjusteTexto] = useState('');
   const [ajusteResultado, setAjusteResultado] = useState<Record<number, string>>({});
   const [ideaNueva, setIdeaNueva] = useState('');
-  const ajustar = useGenerarTexto();
-  const generarReceta = useGenerarJSON<RecetaGenerada>();
+  const ajustar = useGenerarIA<RecetaIa>();
+  const generarReceta = useGenerarIA<RecetaIa>();
   const s = paciente.seguimiento;
 
+  // El servidor arma el prompt con el expediente seudonimizado; aquí solo se
+  // manda qué receta ajustar y cómo.
   const sugerirCambio = (receta: RecetaEnCurso) => {
-    const prompt = `Eres un asistente para nutriólogos. El paciente prepara: "${receta.nombre}". Ajústala así: "${ajusteTexto}". Considera alergias (${paciente.preferencias.alergias.join(', ')}) y objetivo (${paciente.medico.objetivo}). Da una versión ajustada en 3-4 líneas, lista para enviar.`;
     ajustar.mutate(
-      { prompt, maxTokens: 400 },
       {
-        onSuccess: (respuesta) =>
-          setAjusteResultado((r) => ({ ...r, [receta.id]: respuesta.trim() })),
+        tipo: 'RECETA',
+        patient_id: paciente.id,
+        idea: `Ajusta la receta "${receta.nombre}" así: ${ajusteTexto}`,
+      },
+      {
+        onSuccess: (salida) => {
+          const texto = salida.datos
+            ? `${salida.datos.nombre}: ${salida.datos.ingredientes.join(', ')}. ${salida.datos.pasos}`
+            : (salida.texto ?? '');
+          setAjusteResultado((r) => ({ ...r, [receta.id]: texto.trim() }));
+        },
       },
     );
   };
 
   const generarNueva = () => {
-    const prompt = `Eres un asistente para nutriólogos. Sugiere una receta nueva${ideaNueva ? `, idea: "${ideaNueva}"` : ''}. Paciente: dieta ${paciente.preferencias.tipoDieta}, alergias ${paciente.preferencias.alergias.join(', ')}, no le gusta ${paciente.preferencias.disgustos || 'nada'}, objetivo ${paciente.medico.objetivo}. Responde SOLO JSON: {"nombre": string, "ingredientes": [string], "pasos_breve": string, "calorias": number, "porciones": number}`;
     generarReceta.mutate(
-      { prompt, maxTokens: 500 },
+      { tipo: 'RECETA', patient_id: paciente.id, idea: ideaNueva.trim() || undefined },
       {
-        onSuccess: (receta) => {
+        onSuccess: (salida) => {
+          if (!salida.datos) return;
+          const receta = aRecetaGuardable(salida.datos);
           updatePatient(paciente.id, (p) => ({
             seguimiento: {
               ...p.seguimiento,
@@ -130,9 +152,23 @@ export function TabRecetas({ paciente }: { paciente: Paciente }) {
         </Btn>
         {generarReceta.isError && (
           <div className="text-orange-600 text-xs mt-2">
-            {generarReceta.error instanceof SyntaxError
-              ? 'La IA devolvió un formato inesperado. Intenta de nuevo.'
-              : generarReceta.error.message}
+            {generarReceta.error instanceof ErrorIA && generarReceta.error.esLimiteAlcanzado ? (
+              <>
+                Agotaste tus generaciones de IA de este mes.{' '}
+                <a href="/suscripcion" className="underline">
+                  Mejora tu plan
+                </a>
+                .
+              </>
+            ) : (
+              generarReceta.error.message
+            )}
+          </div>
+        )}
+        {generarReceta.data?.formato === 'texto' && (
+          <div className="text-orange-600 text-xs mt-2">
+            La receta no pasó la validación de alergias del expediente. Revísala antes de usarla:{' '}
+            {generarReceta.data.advertencias.join(' ')}
           </div>
         )}
         <div className="space-y-3 mt-4">

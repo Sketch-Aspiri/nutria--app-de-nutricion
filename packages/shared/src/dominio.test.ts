@@ -1,6 +1,7 @@
 import { NIVELES_ACTIVIDAD, OBJETIVOS } from './catalogos';
 import {
   edadDesdeFechaNacimiento,
+  etiquetaObjetivo,
   fechaNacimientoDesdeEdad,
   generoADb,
   generoDesdeDb,
@@ -44,6 +45,30 @@ describe('mapeo de objetivo', () => {
 
   it('recupera el acento al leer de la base', () => {
     expect(objetivoDesdeDb('PERDIDA_DE_GRASA')).toBe('Pérdida de grasa');
+  });
+});
+
+describe('etiquetaObjetivo', () => {
+  it('usa el texto escrito cuando el objetivo es "Otro"', () => {
+    expect(etiquetaObjetivo('Otro', 'Recuperación post cirugía')).toBe(
+      'Recuperación post cirugía',
+    );
+  });
+
+  it('recorta el texto escrito', () => {
+    expect(etiquetaObjetivo('Otro', '  Salud digestiva  ')).toBe('Salud digestiva');
+  });
+
+  it.each([null, undefined, '', '   '])(
+    'cae en "Otro" cuando el texto es %p',
+    (texto) => {
+      expect(etiquetaObjetivo('Otro', texto)).toBe('Otro');
+    },
+  );
+
+  it('ignora el texto libre si el objetivo es uno del catálogo', () => {
+    // Un texto huérfano no debe contradecir al enum guardado.
+    expect(etiquetaObjetivo('Mantenimiento', 'texto viejo')).toBe('Mantenimiento');
   });
 });
 

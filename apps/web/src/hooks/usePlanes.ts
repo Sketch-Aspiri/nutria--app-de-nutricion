@@ -3,16 +3,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 
-import type { AlimentoFicha, Paciente, PlanAlimenticio } from '@nutria/shared';
+import type { AlimentoFicha, Paciente } from '@nutria/shared';
 
 import {
   alimentoAItem,
+  borradorIaAEditable,
   crearPlanVacio,
   planAEditable,
   planAPayload,
-  planIaAEditable,
   type PlanEditable,
 } from '@/components/planes/editor-model';
+import type { PlanBorradorIa } from '@/services/ia';
 import {
   activarPlan,
   actualizarPlan,
@@ -331,14 +332,14 @@ export function usePlanWorkspace(paciente: Paciente) {
       ),
     }));
 
-  const usarBorradorIa = (sugerencia: PlanAlimenticio) => {
+  const usarBorradorIa = (borrador: PlanBorradorIa) => {
     if (
       modificado &&
       !window.confirm('La propuesta reemplazará los cambios sin guardar. ¿Continuar?')
     ) {
       return;
     }
-    setPlan(planIaAEditable(sugerencia));
+    setPlan(borradorIaAEditable(borrador));
     setBaseGuardada(null);
     setModificado(true);
     setErrorAccion(null);

@@ -2,11 +2,12 @@ import type { SnapshotCalculo } from '@nutria/shared';
 
 import { prisma } from '@/server/db';
 
-import { guardarCalculo } from './repository';
+import { actualizarExpedienteMedico, guardarCalculo } from './repository';
 
 jest.mock('@/server/db', () => ({
   prisma: {
     patient: { findFirst: jest.fn() },
+    medicalRecord: { upsert: jest.fn() },
     mealPlan: {
       findFirst: jest.fn(),
       update: jest.fn(),
@@ -21,6 +22,7 @@ const DRAFT_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 
 const db = prisma as unknown as {
   patient: { findFirst: jest.Mock };
+  medicalRecord: { upsert: jest.Mock };
   mealPlan: {
     findFirst: jest.Mock;
     update: jest.Mock;
@@ -78,5 +80,60 @@ describe('persistencia del cálculo en planes', () => {
       }),
     });
     expect(db.mealPlan.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('texto libre del objetivo en el expediente', () => {
+  /** Devuelve el `update` que el repositorio le pasó a Prisma. */
+  async function actualizarCon(
+    datos: Parameters<typeof actualizarExpedienteMedico>[2],
+    objetivoGuardado?: string,
+  ) {
+    db.patient.findFirst.mockResolvedValue({
+      id: PATIENT_ID,
+      medicalRecord: objetivoGuardado ? { objetivo: objetivoGuardado } : null,
+    });
+    db.medicalRecord.upsert.mockResolvedValue({ patientId: PATIENT_ID });
+
+    await actualizarExpedienteMedico(NUTRITIONIST_ID, PATIENT_ID, datos);
+    return db.medicalRecord.upsert.mock.calls[0][0].update;
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('guarda la descripción cuando el objetivo es OTRO', async () => {
+    const update = await actualizarCon({ objetivo: 'OTRO', objetivo_otro: 'Salud digestiva' });
+
+    expect(update).toMatchObject({ objetivo: 'OTRO', objetivoOtro: 'Salud digestiva' });
+  });
+
+  it('descarta la descripción si el objetivo es uno del catálogo', async () => {
+    const update = await actualizarCon({
+      objetivo: 'MANTENIMIENTO',
+      objetivo_otro: 'Salud digestiva',
+    });
+
+    expect(update).toMatchObject({ objetivo: 'MANTENIMIENTO', objetivoOtro: null });
+  });
+
+  it('limpia la descripción vieja al salir de OTRO aunque no la manden', async () => {
+    const update = await actualizarCon({ objetivo: 'GANANCIA_MUSCULAR' }, 'OTRO');
+
+    expect(update).toMatchObject({ objetivoOtro: null });
+  });
+
+  it('conserva el objetivo ya guardado al editar solo la descripción', async () => {
+    const update = await actualizarCon({ objetivo_otro: 'Salud digestiva' }, 'OTRO');
+
+    expect(update).toMatchObject({ objetivoOtro: 'Salud digestiva' });
+    expect(update).not.toHaveProperty('objetivo');
+  });
+
+  it('no toca la descripción cuando la edición no menciona el objetivo', async () => {
+    const update = await actualizarCon({ medicamentos: 'Metformina' }, 'OTRO');
+
+    expect(update).not.toHaveProperty('objetivoOtro');
   });
 });

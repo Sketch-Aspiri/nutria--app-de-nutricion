@@ -1,15 +1,17 @@
 /**
  * @jest-environment node
  */
-import type { AlimentoFicha, PlanAlimenticio } from '@nutria/shared';
+import type { AlimentoFicha } from '@nutria/shared';
+
+import type { PlanBorradorIa } from '@/services/ia';
 
 import {
   alimentoAItem,
+  borradorIaAEditable,
   calcularTotalesPlan,
   cambiarCantidadItem,
   crearPlanVacio,
   planAPayload,
-  planIaAEditable,
 } from './editor-model';
 
 const ALIMENTO_PRUEBA: AlimentoFicha = {
@@ -68,39 +70,75 @@ describe('modelo editable de planes', () => {
     });
   });
 
-  it('convierte la propuesta de IA en items libres editables y distribuye sus macros', () => {
-    const sugerencia: PlanAlimenticio = {
+  it('convierte el borrador de IA en un plan editable conservando los alimentos resueltos', () => {
+    const borrador: PlanBorradorIa = {
       calorias_diarias: 1_000,
-      macros: { proteina_g: 100, carbos_g: 120, grasa_g: 30 },
+      proteina_g: 100,
+      carbos_g: 120,
+      grasa_g: 30,
+      nota: 'Revisar porciones de la cena.',
       comidas: [
         {
+          orden: 0,
           nombre: 'Primera comida',
           horario: '08:00',
           descripcion: 'Preparación de prueba',
-          porcion: '1 plato',
-          calorias: 400,
-        },
-        {
-          nombre: 'Segunda comida',
-          horario: '14:00',
-          descripcion: 'Otra preparación',
-          porcion: '1 plato',
-          calorias: 600,
+          items: [
+            {
+              food_id: ALIMENTO_PRUEBA.id,
+              descripcion_libre: null,
+              cantidad_porciones: 2,
+              energia_kcal: 300,
+              proteina_g: 10,
+              carbohidratos_g: 50,
+              lipidos_g: 6,
+              food: {
+                id: ALIMENTO_PRUEBA.id,
+                nombre: ALIMENTO_PRUEBA.nombre,
+                grupo: ALIMENTO_PRUEBA.grupo,
+                porcion_descripcion: ALIMENTO_PRUEBA.porcion_descripcion,
+                porcion_gramos: ALIMENTO_PRUEBA.porcion_gramos,
+                imagen_url: null,
+              },
+            },
+          ],
         },
       ],
+      totales: {
+        energia_kcal: 300,
+        proteina_g: 10,
+        carbohidratos_g: 50,
+        lipidos_g: 6,
+      },
     };
 
-    const plan = planIaAEditable(sugerencia);
+    const plan = borradorIaAEditable(borrador);
 
     expect(plan.origen).toBe('IA');
+    expect(plan.estado).toBe('BORRADOR');
+    expect(plan.nota).toBe('Revisar porciones de la cena.');
+    // Los nutrimentos llegan calculados del servidor: aquí no se reparte nada.
     expect(plan.comidas[0]?.items[0]).toMatchObject({
-      food_id: null,
-      energia_kcal: 400,
-      proteina_g: 40,
-      carbohidratos_g: 48,
-      lipidos_g: 12,
+      food_id: ALIMENTO_PRUEBA.id,
+      cantidad_porciones: 2,
+      energia_kcal: 300,
     });
-    expect(calcularTotalesPlan(plan).proteina_g).toBe(100);
+    expect(plan.comidas[0]?.items[0]?.clave).toBeTruthy();
+    expect(calcularTotalesPlan(plan).energia_kcal).toBe(300);
+  });
+
+  it('pone una nota de revisión cuando el borrador de IA no trae ninguna', () => {
+    const plan = borradorIaAEditable({
+      calorias_diarias: 1_500,
+      proteina_g: 90,
+      carbos_g: 180,
+      grasa_g: 50,
+      nota: '',
+      comidas: [],
+      totales: { energia_kcal: 0, proteina_g: 0, carbohidratos_g: 0, lipidos_g: 0 },
+    });
+
+    expect(plan.nota).toContain('revisión profesional');
   });
 
   it('el payload elimina claves de UI y redondea las metas enteras del contrato', () => {

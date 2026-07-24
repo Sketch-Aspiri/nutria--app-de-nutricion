@@ -5,4 +5,4 @@ export * from './alimentos';
 export * from './nutricion';
 export * from './alergias';
 export * from './adherencia';
-export * from './ia';
+export * from './ia/index';

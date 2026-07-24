@@ -41,6 +41,7 @@ function pacienteApi(overrides: Partial<PacienteApi> = {}): PacienteApi {
       medicamentos: null,
       nivel_actividad: 'MUY_ACTIVO',
       objetivo: 'PERDIDA_DE_GRASA',
+      objetivo_otro: null,
     },
     preferencias_alimentarias: {
       tipo_dieta: 'Vegetariano',
@@ -136,6 +137,7 @@ describe('aPacienteDominio', () => {
           medicamentos: null,
           nivel_actividad: 'MODERADO',
           objetivo: 'MANTENIMIENTO',
+          objetivo_otro: null,
         },
         preferencias_alimentarias: {
           tipo_dieta: null,

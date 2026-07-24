@@ -6,12 +6,12 @@ import { esAdherenciaBaja, type Paciente } from '@nutria/shared';
 
 import { Btn } from '@/components/ui/Btn';
 import { SectionCard } from '@/components/ui/SectionCard';
-import { useGenerarTexto } from '@/hooks/useIA';
+import { useGenerarIA } from '@/hooks/useIA';
 import { useAppState } from '@/store/app-state';
 
 export function TabSeguimiento({ paciente }: { paciente: Paciente }) {
   const { updatePatient } = useAppState();
-  const generarRutina = useGenerarTexto();
+  const generarRutina = useGenerarIA();
   const s = paciente.seguimiento;
   const adherenciaBaja = esAdherenciaBaja(s.adherencia);
 
@@ -24,12 +24,13 @@ export function TabSeguimiento({ paciente }: { paciente: Paciente }) {
     }));
 
   const sugerirEjercicio = () => {
-    const prompt = `Eres un asistente para nutriólogos. Sugiere en 4-5 líneas una rutina semanal de actividad física complementaria para: ${paciente.nombre}, objetivo ${paciente.medico.objetivo}, actividad ${paciente.medico.nivelActividad}, condiciones ${paciente.medico.condiciones.join(', ')}. Solo el texto, sin encabezados.`;
     generarRutina.mutate(
-      { prompt, maxTokens: 400 },
+      { tipo: 'PLAN_ACTIVIDAD', patient_id: paciente.id },
       {
-        onSuccess: (texto) =>
-          updatePatient(paciente.id, { planEjercicio: { texto: texto.trim(), compartido: null } }),
+        onSuccess: (salida) =>
+          updatePatient(paciente.id, {
+            planEjercicio: { texto: salida.texto ?? '', compartido: null },
+          }),
       },
     );
   };

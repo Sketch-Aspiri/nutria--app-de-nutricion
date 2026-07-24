@@ -84,6 +84,15 @@ export function objetivoDesdeDb(valor: ObjetivoDb): Objetivo {
   return OBJETIVO_DESDE_DB[valor] ?? 'Otro';
 }
 
+/**
+ * Cómo se lee el objetivo en pantalla. 'Otro' por sí solo no dice nada, así que
+ * se sustituye por lo que escribió el nutriólogo cuando existe.
+ */
+export function etiquetaObjetivo(objetivo: Objetivo, objetivoOtro?: string | null): string {
+  if (objetivo !== 'Otro') return objetivo;
+  return objetivoOtro?.trim() || 'Otro';
+}
+
 /** Listas para poblar los `select` del formulario sin repetir literales. */
 export const GENEROS_DB = Object.values(GENERO_A_DB);
 export const NIVELES_ACTIVIDAD_DB = Object.values(NIVEL_ACTIVIDAD_A_DB);

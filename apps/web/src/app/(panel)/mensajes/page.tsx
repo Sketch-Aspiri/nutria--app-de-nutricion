@@ -3,10 +3,8 @@
 import { Loader2, Send, ShieldCheck, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 
-import { objetivoDesdeDb } from '@nutria/shared';
-
 import { Avatar } from '@/components/ui/Avatar';
-import { useGenerarTexto } from '@/hooks/useIA';
+import { useGenerarIA } from '@/hooks/useIA';
 import { usePacientes } from '@/hooks/usePacientes';
 import { useAppState } from '@/store/app-state';
 
@@ -15,7 +13,7 @@ export default function MensajesPage() {
   const { pacientes } = usePacientes();
   const [activo, setActivo] = useState('');
   const [texto, setTexto] = useState('');
-  const sugerirRespuesta = useGenerarTexto();
+  const sugerirRespuesta = useGenerarIA();
 
   const hilo = mensajes[activo] ?? [];
   const paciente = pacientes.find((p) => p.id === activo);
@@ -36,14 +34,19 @@ export default function MensajesPage() {
     setTexto('');
   };
 
+  // El prompt lo arma el servidor a partir del expediente; aquí solo se manda
+  // el mensaje a contestar, para que el nombre del paciente nunca salga hacia
+  // el proveedor de IA.
   const sugerir = () => {
     if (!paciente) return;
     const ultimo = [...hilo].reverse().find((m) => m.de === 'paciente');
-    const objetivo = paciente.objetivo ? objetivoDesdeDb(paciente.objetivo) : 'sin definir';
-    const prompt = `Eres asistente de un nutriólogo. Redacta una respuesta breve, cálida y profesional para este mensaje de un paciente (${paciente.nombre}, objetivo ${objetivo}): "${ultimo ? ultimo.texto : 'quiere saber cómo va su progreso'}". Solo el texto de la respuesta.`;
     sugerirRespuesta.mutate(
-      { prompt, maxTokens: 200 },
-      { onSuccess: (t) => setTexto(t.trim()) },
+      {
+        tipo: 'RESPUESTA_MENSAJE',
+        patient_id: paciente.id,
+        mensaje: ultimo?.texto ?? 'Quiere saber cómo va su progreso.',
+      },
+      { onSuccess: (salida) => setTexto(salida.texto ?? '') },
     );
   };
 

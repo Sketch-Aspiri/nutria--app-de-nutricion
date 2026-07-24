@@ -16,9 +16,11 @@
     "db:seed": "tsx prisma/seed/index.ts",
     "db:import:usda": "tsx prisma/seed/usda/importar.ts",
     "db:imagenes": "tsx prisma/seed/imagenes.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "ai:check": "tsx --env-file=.env scripts/verificar-ia.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.114.0",
     "@auth/prisma-adapter": "^2.11.3",
     "@nutria/shared": "*",
     "@nutria/ui-tokens": "*",

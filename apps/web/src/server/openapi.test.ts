@@ -27,6 +27,20 @@ describe('OpenAPI de la fase 4', () => {
     expect(pdf?.responses).toHaveProperty('503');
   });
 
+  it('documenta los endpoints de IA de la fase 5', () => {
+    expect(Object.keys(openApiDocument.paths ?? {})).toEqual(
+      expect.arrayContaining(['/api/v1/ai/generate', '/api/v1/ai/usage']),
+    );
+  });
+
+  it('declara el límite de cuota y la falta de configuración de IA', () => {
+    const generar = openApiDocument.paths?.['/api/v1/ai/generate']?.post;
+
+    expect(generar?.responses).toHaveProperty('429');
+    expect(generar?.responses).toHaveProperty('503');
+    expect(JSON.stringify(generar?.responses?.['429'])).toContain('AI_LIMIT_REACHED');
+  });
+
   it('publica la estructura reutilizable de las plantillas', () => {
     const plantilla = openApiDocument.components?.schemas?.PlanTemplate;
 

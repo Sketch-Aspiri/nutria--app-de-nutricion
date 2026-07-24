@@ -36,6 +36,14 @@ export const ErrorCode = {
   PLAN_STRUCTURE_INVALID: 'PLAN_STRUCTURE_INVALID',
   /** 409: otra sesión guardó una versión más reciente del plan. */
   PLAN_VERSION_CONFLICT: 'PLAN_VERSION_CONFLICT',
+  /** 503: falta ANTHROPIC_API_KEY en el servidor. */
+  AI_NOT_CONFIGURED: 'AI_NOT_CONFIGURED',
+  /** 502: el proveedor de IA falló o no respondió. */
+  AI_UPSTREAM_ERROR: 'AI_UPSTREAM_ERROR',
+  /** 429: se agotó la cuota mensual de generaciones del plan. */
+  AI_LIMIT_REACHED: 'AI_LIMIT_REACHED',
+  /** 422: la IA respondió, pero su salida no pasó la validación clínica. */
+  AI_INVALID_OUTPUT: 'AI_INVALID_OUTPUT',
   /** 422: el documento excede el máximo seguro de comidas o items. */
   PLAN_PDF_TOO_LARGE: 'PLAN_PDF_TOO_LARGE',
   INTERNAL_ERROR: 'INTERNAL_ERROR',

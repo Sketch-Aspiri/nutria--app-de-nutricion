@@ -6,13 +6,20 @@ import { useMemo } from 'react';
 import type { Paciente } from '@nutria/shared';
 
 import {
+  type ActualizarPacientePayload,
   type CrearPacientePayload,
+  type ExpedienteMedicoPayload,
   type MedicionPayload,
   type OpcionesCalculo,
   type PacienteApi,
   type PacienteResumenApi,
+  type PreferenciasPayload,
   aPacienteDominio,
+  actualizarExpedienteMedicoApi,
+  actualizarPacienteApi,
+  actualizarPreferenciasApi,
   agregarMedicionApi,
+  archivarPacienteApi,
   crearPacienteApi,
   guardarCalculoApi,
   listarPacientes,
@@ -72,6 +79,56 @@ export function useCrearPaciente() {
   return useMutation({
     mutationFn: (payload: CrearPacientePayload) => crearPacienteApi(payload),
     onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: CLAVE_PACIENTES });
+    },
+  });
+}
+
+/**
+ * Edición del expediente. Cada bloque vive en su propio recurso REST, así que
+ * la pantalla de edición se traduce en varias peticiones.
+ *
+ * Van en secuencia y no en paralelo para que, si una falla, las siguientes ni
+ * se intenten: es preferible un expediente a medio guardar y un error visible
+ * que cuatro escrituras compitiendo sin saber cuál quedó.
+ */
+export type EdicionPaciente = {
+  generales: ActualizarPacientePayload;
+  expediente: ExpedienteMedicoPayload;
+  preferencias: PreferenciasPayload;
+  /** Solo cuando cambió alguna medida: una toma nueva se archiva fechada. */
+  medicion: MedicionPayload | null;
+};
+
+export function useEditarPaciente(pacienteId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (edicion: EdicionPaciente) => {
+      await actualizarPacienteApi(pacienteId, edicion.generales);
+      await actualizarExpedienteMedicoApi(pacienteId, edicion.expediente);
+      await actualizarPreferenciasApi(pacienteId, edicion.preferencias);
+      if (edicion.medicion) await agregarMedicionApi(pacienteId, edicion.medicion);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: [...CLAVE_PACIENTES, pacienteId] });
+      void queryClient.invalidateQueries({ queryKey: CLAVE_PACIENTES });
+    },
+  });
+}
+
+/**
+ * Da de baja al paciente. El servidor lo archiva en vez de borrarlo, así que
+ * basta con invalidar el listado: deja de venir en `/patients` y su detalle
+ * en caché queda obsoleto.
+ */
+export function useArchivarPaciente() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => archivarPacienteApi(id),
+    onSuccess: (_data, id) => {
+      queryClient.removeQueries({ queryKey: [...CLAVE_PACIENTES, id] });
       void queryClient.invalidateQueries({ queryKey: CLAVE_PACIENTES });
     },
   });

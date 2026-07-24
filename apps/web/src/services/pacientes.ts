@@ -53,6 +53,7 @@ export type PacienteApi = {
     medicamentos: string | null;
     nivel_actividad: NivelActividadDb;
     objetivo: ObjetivoDb;
+    objetivo_otro: string | null;
   } | null;
   preferencias_alimentarias: {
     tipo_dieta: string | null;
@@ -69,7 +70,7 @@ export type PacienteApi = {
 export type PacienteResumenApi = Omit<
   PacienteApi,
   'expediente_medico' | 'preferencias_alimentarias' | 'mediciones' | 'ultima_medicion' | 'calculo'
-> & { objetivo: ObjetivoDb | null };
+> & { objetivo: ObjetivoDb | null; objetivo_otro: string | null };
 
 export type ErrorApi = {
   code: string;
@@ -175,6 +176,7 @@ export function aPacienteDominio(api: PacienteApi, extras: ExtrasPaciente): Paci
       medicamentos: medico?.medicamentos ?? '',
       nivelActividad: nivelActividadDesdeDb(medico?.nivel_actividad ?? 'MODERADO'),
       objetivo: objetivoDesdeDb(medico?.objetivo ?? 'MANTENIMIENTO'),
+      objetivoOtro: medico?.objetivo_otro ?? null,
     },
     antropometria: {
       // 0 significa "sin capturar": las fórmulas lanzan EXPEDIENTE_INCOMPLETO.
@@ -222,6 +224,7 @@ export type CrearPacientePayload = {
     medicamentos?: string | null;
     nivel_actividad?: NivelActividadDb;
     objetivo?: ObjetivoDb;
+    objetivo_otro?: string | null;
   };
   preferencias_alimentarias?: {
     tipo_dieta?: string | null;
@@ -252,6 +255,54 @@ export function crearPacienteApi(payload: CrearPacientePayload): Promise<Pacient
     method: 'POST',
     body: JSON.stringify(payload),
   });
+}
+
+/** Datos generales editables; `PATCH` parcial sobre `/patients/{id}`. */
+export type ActualizarPacientePayload = Pick<
+  CrearPacientePayload,
+  'nombre' | 'fecha_nacimiento' | 'genero' | 'email' | 'telefono' | 'foto_url'
+>;
+
+export function actualizarPacienteApi(
+  id: string,
+  payload: ActualizarPacientePayload,
+): Promise<PacienteApi> {
+  return pedir<PacienteApi>(`/api/v1/patients/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export type ExpedienteMedicoPayload = NonNullable<CrearPacientePayload['expediente_medico']>;
+
+export function actualizarExpedienteMedicoApi(
+  id: string,
+  payload: ExpedienteMedicoPayload,
+): Promise<unknown> {
+  return pedir<unknown>(`/api/v1/patients/${id}/medical_record`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export type PreferenciasPayload = NonNullable<CrearPacientePayload['preferencias_alimentarias']>;
+
+export function actualizarPreferenciasApi(
+  id: string,
+  payload: PreferenciasPayload,
+): Promise<unknown> {
+  return pedir<unknown>(`/api/v1/patients/${id}/food_preferences`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+/**
+ * Baja del paciente. El servidor archiva (borrado lógico): el expediente
+ * clínico se conserva porque la NOM-004-SSA3 exige guardarlo.
+ */
+export function archivarPacienteApi(id: string): Promise<void> {
+  return pedir<void>(`/api/v1/patients/${id}`, { method: 'DELETE' });
 }
 
 export type MedicionPayload = NonNullable<CrearPacientePayload['antropometria']> & {

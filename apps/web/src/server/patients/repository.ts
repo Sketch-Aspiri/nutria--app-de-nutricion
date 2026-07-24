@@ -45,6 +45,17 @@ function normalizarTexto(valor: string | null | undefined): string | null {
   return limpio ? limpio : null;
 }
 
+/**
+ * El texto libre solo acompaña al objetivo OTRO. Con cualquier otro objetivo se
+ * guarda nulo, para que no quede una descripción huérfana contradiciendo al enum.
+ */
+function objetivoOtroDe(
+  objetivo: ExpedienteMedicoInput['objetivo'],
+  texto: string | null | undefined,
+): string | null {
+  return objetivo === 'OTRO' ? normalizarTexto(texto) : null;
+}
+
 function fechaDeMedicion(fecha: string | undefined): Date {
   return fecha ? new Date(fecha) : new Date();
 }
@@ -118,6 +129,7 @@ export async function crearPaciente(nutritionistId: string, datos: CrearPaciente
           medicamentos: normalizarTexto(medico?.medicamentos),
           nivelActividad: medico?.nivel_actividad ?? 'MODERADO',
           objetivo: medico?.objetivo ?? 'MANTENIMIENTO',
+          objetivoOtro: objetivoOtroDe(medico?.objetivo, medico?.objetivo_otro),
         },
       },
       foodPreference: {
@@ -198,6 +210,11 @@ export async function actualizarExpedienteMedico(
   const paciente = await buscarPaciente(nutritionistId, patientId);
   if (!paciente) return null;
 
+  // Actualización parcial: el objetivo vigente puede venir en la petición o ya
+  // estar guardado, y de él depende si el texto libre sobrevive.
+  const objetivoVigente = datos.objetivo ?? paciente.medicalRecord?.objetivo;
+  const tocaObjetivo = datos.objetivo !== undefined || datos.objetivo_otro !== undefined;
+
   return prisma.medicalRecord.upsert({
     where: { patientId },
     update: {
@@ -210,6 +227,9 @@ export async function actualizarExpedienteMedico(
         : {}),
       ...(datos.nivel_actividad !== undefined ? { nivelActividad: datos.nivel_actividad } : {}),
       ...(datos.objetivo !== undefined ? { objetivo: datos.objetivo } : {}),
+      ...(tocaObjetivo
+        ? { objetivoOtro: objetivoOtroDe(objetivoVigente, datos.objetivo_otro) }
+        : {}),
     },
     create: {
       patientId,
@@ -218,6 +238,7 @@ export async function actualizarExpedienteMedico(
       medicamentos: normalizarTexto(datos.medicamentos),
       nivelActividad: datos.nivel_actividad ?? 'MODERADO',
       objetivo: datos.objetivo ?? 'MANTENIMIENTO',
+      objetivoOtro: objetivoOtroDe(datos.objetivo, datos.objetivo_otro),
     },
   });
 }
