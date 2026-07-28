@@ -3,7 +3,7 @@ import { readFile, rm } from 'node:fs/promises';
 /**
  * Buzón de correo de los E2E.
  *
- * `src/server/email.ts` anexa cada correo a `EMAIL_OUTBOX_FILE` cuando esa
+ * `packages/servidor/src/server/email.ts` anexa cada correo a `EMAIL_OUTBOX_FILE` cuando esa
  * variable existe, en lugar de mandarlo por Resend. `playwright.config.ts` es
  * quien la define, así que los tests pueden afirmar sobre lo que recibiría el
  * paciente sin escribirle a nadie de verdad.

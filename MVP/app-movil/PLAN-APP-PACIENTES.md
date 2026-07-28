@@ -170,14 +170,27 @@ packages/servidor/
     schema.prisma        # desde apps/web/nutriologos/prisma/
     migrations/
     seed/
+  scripts/               # db:encrypt, launch:check, ai:check, pilot:status, load/
   src/
-    db.ts  http.ts  logger.ts  crypto.ts  audit.ts  email.ts  cron.ts
-    rate-limit.ts  rate-limit-key.ts  load-safety.ts  openapi.ts  onboarding.ts
-    auth/  ai/  patients/  plans/  foods/  messages/  appointments/
-    tracking/  consultations/  profile/  billing/  pdf/  testing/
+    server/              # todo apps/web/nutriologos/src/server, tal cual
+      db.ts  http.ts  logger.ts  crypto.ts  audit.ts  email.ts  cron.ts
+      rate-limit.ts  rate-limit-key.ts  load-safety.ts  openapi.ts  onboarding.ts
+      auth/  ai/  patients/  plans/  foods/  messages/  appointments/
+      tracking/  consultations/  profile/  billing/  pdf/  testing/
+    config/              # privacy.ts, brandLogo.ts
+    domain/              # planLimits.ts
+    components/pdf/      # MealPlanDocument y compañía (las usa server/pdf)
+    types/               # next-auth.d.ts
 ```
 
-Es decir: **todo `src/server`** más `prisma/`. Los tests colocados (`*.test.ts`) se mueven con sus módulos.
+Es decir: **todo `src/server`** más `prisma/` y `scripts/`. Los tests colocados (`*.test.ts`) se
+mueven con sus módulos.
+
+El paquete replica el layout que esas carpetas tenían dentro de la app (`src/server/…`, no
+`src/…`) porque `src/server` no era autocontenido: importa `@/config/privacy`,
+`@/config/brandLogo`, `@/domain/planLimits` y `@/components/pdf/MealPlanDocument`. Al conservar
+el mismo layout, esos imports siguen resolviendo sin tocarse (§4.2), y `agendaFormato.ts` —el otro
+archivo de `src/domain`, que depende de `@/services`— se queda en la app, donde pertenece.
 
 `billing/` y `pdf/` se mueven aunque hoy solo los use el panel: quedan en el paquete por cohesión
 (dependen de `db.ts` y `crypto.ts`), y solo `nutriologos` monta las rutas que los usan.
@@ -185,20 +198,29 @@ Es decir: **todo `src/server`** más `prisma/`. Los tests colocados (`*.test.ts`
 ### 4.2 Cómo se resuelven los imports sin tocar 200 archivos
 
 Los módulos movidos siguen importando `@/server/db`, `@/server/http`, etc. En lugar de reescribirlos,
-cada app apunta ese alias al paquete:
+cada app resuelve el alias primero en su propio `src` y, si no encuentra, en el paquete:
 
 `apps/web/{nutriologos,pacientes}/tsconfig.json`:
 
 ```json
 "paths": {
-  "@/*": ["./src/*"],
-  "@/server/*": ["../../../packages/servidor/src/*"]
+  "@/*": ["./src/*", "../../../packages/servidor/src/*"]
 }
 ```
 
-`next.config.mjs` de ambas apps: `transpilePackages: ['@nutria/servidor', '@nutria/shared', '@nutria/ui-tokens']`.
+Una sola regla en vez de una por carpeta, porque el paquete replica el layout de la app (§4.1).
+El orden importa: lo que exista en el `src` de la app gana, así que una app puede sobreescribir un
+módulo compartido poniendo uno propio en la misma ruta.
 
-`jest.config.mjs` de ambas apps: `moduleNameMapper` con la misma correspondencia.
+`jest.config.mjs` de ambas apps: el mismo arreglo ordenado en `moduleNameMapper`.
+
+No hace falta `transpilePackages: ['@nutria/servidor']`: como el alias apunta a una **ruta
+relativa** y no a `node_modules`, Next compila esos archivos como código fuente de la app. El
+paquete sí se declara como dependencia (`"@nutria/servidor": "*"`) para que npm lo enlace y
+`--workspaces` lo incluya en type-check y tests.
+
+La ampliación de módulo de Auth.js (`types/next-auth.d.ts`) viaja con la configuración de sesión,
+pero un `.d.ts` solo surte efecto si forma parte del programa: cada app lo agrega a su `include`.
 
 Ventaja: la Fase 1 no modifica el contenido de ningún módulo de servidor, así que un `git diff`
 de la fase es puro movimiento y configuración. Costo: un alias no obvio, documentado con un comentario
@@ -208,13 +230,24 @@ con un codemod, sin prisa.
 ### 4.3 Dependencias
 
 Pasan a `packages/servidor`: `@prisma/client`, `prisma`, `bcryptjs`, `@anthropic-ai/sdk`, `zod`,
-`@auth/prisma-adapter`, `next-auth`, `resend`, `stripe`, `@upstash/*`, `@vercel/blob`, `@react-pdf/renderer`, `tsx`.
-Se quedan en cada app: `next`, `react`, `react-dom`, `@tanstack/react-query`, `lucide-react`,
-`tailwindcss`, `@sentry/nextjs`.
+`zod-openapi`, `@auth/prisma-adapter`, `next-auth`, `resend`, `stripe`, `@upstash/*`,
+`@vercel/blob`, `@react-pdf/renderer`, `tsx`. También `next`, `react` y `@sentry/nextjs`, que el
+paquete usa de verdad (`next/server`, JSX de `@react-pdf`, `logger.ts`).
 
-Los scripts `db:*`, `db:import:*`, `db:encrypt`, `launch:check`, `ai:check` se mueven a
-`packages/servidor/package.json`. El `postinstall: prisma generate` vive ahí; ambas apps consumen
-el cliente generado.
+Se quedan en cada app: `next`, `react`, `react-dom`, `@tanstack/react-query`, `lucide-react`,
+`tailwindcss`, `@sentry/nextjs`. Salen de la app solo las que dejó de importar del todo:
+`@anthropic-ai/sdk`, `@auth/prisma-adapter`, `@react-pdf/renderer`, `@upstash/*`, `@vercel/blob`,
+`resend`, `zod-openapi`. `@prisma/client`, `bcryptjs`, `next-auth`, `stripe` y `zod` se declaran en
+los dos, porque los dos los importan; npm los resuelve a una sola copia izada.
+
+Los archivos de `scripts/` y de `prisma/` se mueven al paquete, pero **los scripts de npm que los
+invocan se quedan en `apps/web/nutriologos/package.json`**, apuntando al paquete con `--schema` y
+rutas relativas (`prisma migrate dev --schema ../../../packages/servidor/prisma/schema.prisma`).
+Razón: el CLI de Prisma solo lee un `.env` del directorio desde el que corre, y el `.env` local
+—con `DATABASE_URL`— vive en la app porque Next también lo necesita en tiempo de ejecución.
+Anclarlos ahí evita duplicar la cadena de conexión en dos archivos, y coincide con §11: solo
+`nutriologos` corre migraciones. El `package.json` raíz expone `db:migrate`, `db:deploy`,
+`db:status` y `db:seed` como atajos a ese workspace.
 
 ### 4.4 Verificación
 
@@ -319,7 +352,7 @@ Reinvitación: si ya hay `user_id`, el endpoint responde 409 y ofrece "recuperar
 
 ### 6.2 Guarda de autorización
 
-Nueva `requierePaciente()` en `packages/servidor/src/auth/guards.ts`, hermana de `requiereNutriologo()`:
+Nueva `requierePaciente()` en `packages/servidor/src/server/auth/guards.ts`, hermana de `requiereNutriologo()`:
 
 ```ts
 export type SesionPaciente = { ok: true; sesion: Session; userId: string; patientId: string };
@@ -375,7 +408,7 @@ Límites de tasa (`rate-limit.ts`) por `user_id`: escritura 60/min, IA según §
 
 ## 8. Fase 5 — IA del paciente
 
-Tres casos de uso nuevos en `packages/servidor/src/ai/config.ts`:
+Tres casos de uso nuevos en `packages/servidor/src/server/ai/config.ts`:
 
 | Tipo | Modelo | Estructurado | Presupuesto |
 |---|---|---|---|
@@ -553,7 +586,7 @@ Se dejan fuera a propósito, y se anotan aquí para que no se cuelen a mitad de 
 | # | Fase | Entregable | Depende de |
 |---|---|---|---|
 | 0 | **Reorganización** ✅ | `apps/web/nutriologos` funcionando idéntico | — |
-| 1 | `packages/servidor` | Capa de servidor compartida, panel intacto | 0 |
+| 1 | **`packages/servidor`** ✅ ⚠️ | Capa de servidor compartida, panel intacto. **Gate de E2E (§4.4) sin cumplir — ver §15** | 0 |
 | 2 | Modelo de datos | Migraciones de `meal_logs`, `water_logs`, `patient_invites` | 1 |
 | 3 | Identidad del paciente | Invitación, activación, `requierePaciente` | 2 |
 | 4 | API `/api/v1/me/*` | Endpoints con tests de integración | 3 |
@@ -571,6 +604,163 @@ Las fases 0 a 5 son secuenciales. De la 7 a la 11 son independientes entre sí u
 ---
 
 ## 15. Bitácora
+
+### Fase 1 — `packages/servidor` ✅ (2026-07-28)
+
+Segundo movimiento sin cambio funcional: la capa de servidor salió de la app del nutriólogo y ahora
+vive en un paquete que las dos apps web podrán consumir. **Ni una línea de lógica de servidor se
+editó**; el diff de la fase es mudanza y configuración.
+
+**Qué se movió.** 155 archivos, todos registrados por Git como renombrados (`R`), así que
+`git log --follow` sigue funcionando:
+
+| Origen | Destino |
+|---|---|
+| `apps/web/nutriologos/src/server/` | `packages/servidor/src/server/` |
+| `apps/web/nutriologos/src/config/` | `packages/servidor/src/config/` |
+| `apps/web/nutriologos/src/domain/planLimits.ts` | `packages/servidor/src/domain/planLimits.ts` |
+| `apps/web/nutriologos/src/components/pdf/` | `packages/servidor/src/components/pdf/` |
+| `apps/web/nutriologos/src/types/next-auth.d.ts` | `packages/servidor/src/types/next-auth.d.ts` |
+| `apps/web/nutriologos/prisma/` | `packages/servidor/prisma/` |
+| `apps/web/nutriologos/scripts/` | `packages/servidor/scripts/` |
+
+**El hallazgo que definió el layout.** §4.1 daba por hecho que `src/server` era autocontenido y
+podía aplanarse en `packages/servidor/src/`. No lo era: 13 archivos de servidor importan cuatro
+cosas de fuera —`@/config/privacy`, `@/config/brandLogo`, `@/domain/planLimits` y
+`@/components/pdf/MealPlanDocument`—. Aplanar habría obligado a reescribir esos imports (y a
+duplicar las constantes en la app del paciente).
+
+La salida fue **replicar dentro del paquete el layout que las carpetas tenían en la app**
+(`src/server/…`, `src/config/…`, `src/domain/…`, `src/components/pdf/…`). Con eso:
+
+- ningún import cambia;
+- el paquete se type-checkea aislado, con un solo `paths` propio (`"@/*": ["./src/*"]`);
+- cada app necesita una sola regla, con respaldo ordenado, en vez de una por carpeta:
+
+```json
+"paths": { "@/*": ["./src/*", "../../../packages/servidor/src/*"] }
+```
+
+El orden da además una escotilla útil: si una app necesita su propia versión de un módulo
+compartido, la pone en su `src` y gana. `agendaFormato.ts` —el otro archivo de `src/domain`, que
+depende de `@/services`— se quedó en la app, que es donde pertenece.
+
+`transpilePackages: ['@nutria/servidor']` resultó innecesario: el alias apunta a una ruta relativa,
+no a `node_modules`, así que Next compila esos archivos como código fuente de la app. El paquete sí
+se declara como dependencia para que npm lo enlace y `--workspaces` lo recorra.
+
+**Ampliación de módulo de Auth.js.** `next-auth.d.ts` viajó con la configuración de sesión, pero un
+`.d.ts` solo surte efecto si forma parte del programa, y los alias no lo arrastran: sin él,
+`tsc` reventaba con siete errores en `auth/config.ts`. Cada app lo agrega explícitamente a su
+`include`.
+
+**Jest.** `packages/servidor` no puede usar `next/jest`: ese preset aborta con *"Couldn't find any
+`pages` or `app` directory"* porque el paquete no es una app de Next. Se transpila con **ts-jest**,
+igual que `packages/shared`, apuntando el `dir` a sí mismo. Se evaluó `nextJest({ dir: '../../apps/
+web/nutriologos' })`, pero invertía la dependencia —el paquete compartido dependiendo de una app—,
+justo lo que la fase busca romper. `ts-jest` ya estaba en el árbol, así que no se agregó ninguna
+dependencia nueva.
+
+**Cobertura: se reatribuye, no se pierde.** Al salir el servidor, `apps/web/nutriologos` cayó de
+~60 % a **49.05 %** de líneas y su umbral de 60 dejaba de pasar. No se dejó de probar nada: el
+código y sus tests se contabilizan ahora donde viven. Se ajustaron los umbrales y se documentó el
+cambio en `rules/testing.md`:
+
+| Workspace | Cobertura de líneas | Umbral |
+|---|---|---|
+| `apps/web/nutriologos` (solo UI) | 49.05 % | 45 |
+| `packages/servidor` | 64.28 % | 60 |
+| `packages/shared` | 99.3 % | 80 |
+
+`packages/servidor` debe llegar a 80 —lo que `rules/testing.md` exige al backend— conforme entren
+los tests de las fases 2 a 5. Subirlo ahora sería trabajo distinto al de esta fase.
+
+**Scripts de base de datos: se movieron los archivos, no los comandos.** §4.3 los mandaba a
+`packages/servidor/package.json`, pero el CLI de Prisma solo lee un `.env` del directorio desde el
+que corre, y el `.env` local vive en la app porque Next también lo necesita en tiempo de ejecución.
+Ponerlos en el paquete habría obligado a duplicar `DATABASE_URL` en dos archivos. Se quedaron en
+`apps/web/nutriologos/package.json` apuntando al paquete con `--schema
+../../../packages/servidor/prisma/schema.prisma`, que además coincide con §11: solo `nutriologos`
+corre migraciones. El `package.json` raíz expone `db:migrate`, `db:deploy`, `db:status` y `db:seed`
+como atajos.
+
+**Dependencias.** Salieron de la app las que dejó de importar del todo (`@anthropic-ai/sdk`,
+`@auth/prisma-adapter`, `@react-pdf/renderer`, `@upstash/*`, `@vercel/blob`, `resend`,
+`zod-openapi`). `@prisma/client`, `bcryptjs`, `next-auth`, `stripe` y `zod` quedan declaradas en
+ambos porque ambos las importan; npm las resuelve a una sola copia izada.
+
+**Otros ajustes de configuración**
+
+| Archivo | Cambio |
+|---|---|
+| `apps/web/nutriologos/playwright.config.ts` | La guarda `validarBaseE2E` se importa por ruta relativa explícita; Playwright carga su config sin pasar por los alias de tsconfig |
+| `.github/workflows/ci.yml` | Los 4 pasos de Prisma (`validate`, `migrate deploy` ×2, `migrate diff`) cambian a `working-directory: packages/servidor`; los de Playwright y `db:seed` se quedan en la app |
+| `rules/ai-guidelines.md`, `.env.example`, `README.md`, `CLAUDE.md`, `AGENTS.md`, `skills/deploy/deploy-config.md`, `e2e/utils/correo.ts` | Rutas y estructura del monorepo |
+
+**Verificación**
+
+| Comprobación | Resultado |
+|---|---|
+| `npm install` | Enlace `node_modules/@nutria/servidor` creado; `postinstall` genera el cliente de Prisma con el esquema compartido |
+| `npm run type-check --workspaces` | Limpio en los **4** workspaces |
+| `npm run test --workspaces -- --coverage` | **689/689** — 87 en `nutriologos` (13 suites) + 300 en `servidor` (41 suites) + 302 en `shared` (18 suites). Mismo total que la fase 0: los 300 que salieron de la app son exactamente los que entraron al paquete |
+| `npm run build:nutriologos` | Build de producción exitoso, con todas las rutas de `/api/v1` y del panel |
+| `npm run db:status` | `.env` de la app leído, esquema compartido resuelto, 7 migraciones, *Database schema is up to date* |
+| Playwright: carga de config | La config resuelve y ejecuta la guarda importada del paquete |
+| Suite E2E completa | ❌ **No pasa** — ver abajo |
+
+**El gate de E2E de §4.4 NO se cumplió.** Queda pendiente y es lo primero que hay que resolver
+antes de la fase 2.
+
+Tres corridas contra Postgres desechable en Docker:
+
+| Corrida | Modo | Base | Resultado |
+|---|---|---|---|
+| 1 | `next dev` | sembrada | 23 pasan / 15 fallan (17.1 min) |
+| 2 | `next start` (build de producción, igual que CI) | recreada desde cero | ~16 pasan / 22 fallan |
+| 3 | `next start`, solo `calculo-clinico.spec.ts` | recreada desde cero | los 7 agotan el timeout |
+
+**Todos los fallos tienen la misma firma**: `page.waitForURL('**/pacientes')` agota 60 s después
+del clic en "Iniciar sesión", con `[auth][error] CredentialsSignin` en el servidor. Es decir, el
+login devuelve credenciales inválidas.
+
+Lo que **sí** se descartó:
+
+- *No es resolución de módulos.* Si el alias `@/server/*` estuviera mal, no arrancaría el servidor
+  ni pasaría un solo test; en la corrida 1 pasaron 23, varios de los cuales inician sesión.
+- *No es compilación lenta de `next dev`.* Falla igual contra el build de producción.
+- *No es estado acumulado ni límite de tasa.* `calculo-clinico` falla completo aun corriendo solo,
+  con servidor nuevo y base recién creada.
+- *No es base sucia.* Se recreó (`DROP DATABASE … WITH (FORCE)`) y resembró antes de las corridas
+  2 y 3.
+
+Lo que **no** se pudo descartar, y por qué:
+
+- **No hay línea base verde con la cual comparar.** La fase 0 no llegó a correr los E2E (Docker
+  apagado) y el CI viene fallando en el paso `npm audit`, que corre **antes** del paso de E2E: la
+  suite no se ejecuta en CI desde hace días. No se puede afirmar si estos fallos son anteriores a
+  la fase 1 o los introdujo.
+- Los specs que fallan **cambian entre corridas** (`agenda` y `aislamiento-datos` pasan en la 1 y
+  fallan en la 2), lo que apunta a sensibilidad de tiempo o de recursos de la máquina, no a un
+  defecto determinista. Pero `calculo-clinico` falla completo en las tres.
+
+Siguiente paso sugerido: reproducir contra el commit anterior a esta fase (`cd6dfbc`) para
+determinar si es regresión o deuda preexistente, y en cualquier caso instrumentar `authorize()`
+para ver por qué rechaza las credenciales, en lugar de seguir infiriendo desde el timeout.
+
+**Notas y deuda**
+
+- Se corrigieron en el propio plan §4.1, §4.2, §4.3, §6.2 y §8: describían rutas
+  (`packages/servidor/src/auth/guards.ts`, `packages/servidor/src/ai/config.ts`) que el layout
+  replicado invalida. Ahora dicen `src/server/…`.
+- `npm audit --audit-level=high` sigue reportando 21 vulnerabilidades altas, todas transitivas de
+  `jest`. Vienen de antes de la fase 0 y hacen fallar el paso "Auditar dependencias" del CI. Se
+  atiende aparte.
+- En una corrida de `npm run test --workspaces -- --coverage` se vio **un** test de `servidor`
+  fallar y no se reprodujo en las cuatro corridas siguientes (con y sin cobertura). Queda anotado
+  como sospecha de test sensible al tiempo; si reaparece, hay que aislarlo.
+- El catálogo de alimentos de USDA y Open Food Facts no está en el árbol local, así que el seed
+  siembra solo los 157 alimentos del núcleo mexicano. Es igual que antes de la fase.
 
 ### Fase 0 — Reorganización del monorepo ✅ (2026-07-28)
 

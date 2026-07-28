@@ -1,6 +1,6 @@
 # Reglas de las funciones de IA
 
-Aplican a todo lo que viva bajo `apps/web/*/src/server/ai/` y a cualquier pantalla que
+Aplican a todo lo que viva bajo `packages/servidor/src/server/ai/` y a cualquier pantalla que
 consuma `/api/v1/ai`.
 
 ## 1. La IA propone, el profesional aprueba
@@ -17,7 +17,7 @@ La UI manda **intención** (`tipo`, identificador del paciente, texto libre del 
 nunca el prompt. Si el cliente pudiera mandar el prompt completo, cualquier pantalla nueva
 podría saltarse la seudonimización sin que nadie lo note en review.
 
-Todo prompt nuevo va en `src/server/ai/prompts.ts` y recibe el contexto ya limpio de
+Todo prompt nuevo va en `packages/servidor/src/server/ai/prompts.ts` y recibe el contexto ya limpio de
 `contexto.ts`.
 
 ## 3. Seudonimización obligatoria

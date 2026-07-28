@@ -21,7 +21,15 @@
 - **Integración**: endpoints del backend contra una base de datos de test real (Postgres en Docker, no mocks de la capa de datos), y componentes de frontend que orquestan varios subcomponentes.
 - **E2E** (pocos, cubren solo flujos críticos): login, registro de una comida, asignación de un plan, agendar una cita, checkout de pago.
 
-Cobertura mínima exigida en CI: **80% líneas en `apps/api` y `packages/shared`**, **60% en `apps/web/*` y `apps/mobile`** (la UI se apoya más en E2E que en cobertura de líneas). El build falla si baja de estos umbrales.
+Cobertura mínima exigida en CI: **80% líneas en `apps/api` y `packages/shared`**, **60% en
+`packages/servidor`**, **45% en `apps/web/*` y 60% en `apps/mobile`** (la UI se apoya más en E2E que
+en cobertura de líneas). El build falla si baja de estos umbrales.
+
+Los dos últimos números cambiaron en la fase 1 del plan de la app del paciente, cuando la capa de
+servidor salió de `apps/web/nutriologos` hacia `packages/servidor`. No se dejó de probar nada: la
+cobertura simplemente se contabiliza donde vive el código. Lo que queda en `apps/web/*` es UI, que
+antes iba promediada con un backend muy cubierto. `packages/servidor` arranca en 60 y debe subir a
+80 —el nivel que esta misma tabla exige al backend— conforme se agreguen los tests de las fases 2 a 5.
 
 ## Convenciones
 

@@ -8,6 +8,8 @@ apps/
     nutriologos/  # Next.js (App Router) — panel del nutriólogo + API /api/v1
     pacientes/    # Next.js — app del paciente (pendiente; ver plan)
 packages/
+  servidor/   # capa de servidor compartida por las apps web: prisma (esquema,
+              # migraciones, seed), auth, IA, cifrado, bitácora, repositorios
   shared/     # lógica de negocio pura (TDEE, macros, alergias, adherencia) + tests
   ui-tokens/  # design tokens compartidos (colores, tipografía, espaciado)
 MVP/          # prototipos JSX de referencia y el plan de la V2
@@ -31,7 +33,7 @@ y `DIRECT_URL` respectivamente. También funciona un Postgres local.
 
 ```bash
 cd apps/web/nutriologos
-npx prisma migrate deploy    # aplica el esquema (28 tablas)
+npm run db:deploy            # aplica el esquema (28 tablas)
 npm run db:studio            # opcional: explorar los datos
 ```
 

@@ -14,7 +14,7 @@ Una plataforma de nutrición con tres frentes: app móvil para el usuario final 
 - **Mobile**: React Native + Expo, TypeScript, React Navigation, React Query + Zustand.
 - **Web**: Next.js (App Router), TypeScript, Tailwind CSS.
 - **Backend**: Node.js con NestJS, PostgreSQL, API REST versionada (`/v1`).
-- **Compartido**: `packages/shared` (lógica de negocio pura: cálculo de macros, reglas de adherencia) y `packages/ui-tokens` (design system compartido entre mobile y web).
+- **Compartido**: `packages/servidor` (capa de servidor de las apps web: Prisma, auth, IA, cifrado, repositorios), `packages/shared` (lógica de negocio pura: cálculo de macros, reglas de adherencia) y `packages/ui-tokens` (design system compartido entre mobile y web).
 
 ## Estructura del monorepo
 
@@ -26,6 +26,8 @@ apps/
     pacientes/    # Next.js — app del paciente (pendiente; ver MVP/app-movil/PLAN-APP-PACIENTES.md)
   api/        # NestJS
 packages/
+  servidor/   # capa de servidor compartida: prisma (esquema, migraciones, seed),
+              # auth, IA, cifrado, bitácora y repositorios. La consumen ambas apps web
   shared/     # lógica de negocio compartida, sin dependencias de UI
   ui-tokens/  # colores, tipografía, espaciado
 ```

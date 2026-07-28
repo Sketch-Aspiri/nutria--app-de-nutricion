@@ -11,10 +11,24 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "plugins": [{ "name": "next" }],
+    // El alias `@/…` busca primero en el `src` de esta app y, si no encuentra,
+    // en `packages/servidor/src`, que replica el mismo layout (`server/`,
+    // `config/`, `domain/`, `components/pdf/`). Así la capa de servidor
+    // compartida se importa con las mismas rutas que cuando vivía aquí dentro,
+    // y una app puede sobreescribir un módulo poniéndolo en su propio `src`.
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*", "../../../packages/servidor/src/*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    // La ampliación de módulo de Auth.js vive con la configuración de sesión,
+    // en la capa compartida. Se incluye explícitamente porque un `.d.ts` solo
+    // surte efecto si forma parte del programa, y los alias no lo arrastran.
+    "../../../packages/servidor/src/types/*.d.ts"
+  ],
   "exclude": ["node_modules"]
 }

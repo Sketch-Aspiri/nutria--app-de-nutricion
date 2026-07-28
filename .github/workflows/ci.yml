@@ -66,11 +66,11 @@ jobs:
 
       - name: Validar el esquema de Prisma
         run: npx prisma validate
-        working-directory: apps/web/nutriologos
+        working-directory: packages/servidor
 
       - name: Aplicar migraciones
         run: npx prisma migrate deploy
-        working-directory: apps/web/nutriologos
+        working-directory: packages/servidor
 
       - name: Verificar que no haya deriva entre migraciones y esquema
         # Falla si alguien editó schema.prisma sin generar su migración.
@@ -81,7 +81,7 @@ jobs:
             --shadow-database-url "$SHADOW_DATABASE_URL" \
             --exit-code \
           || (echo "::error::schema.prisma cambió sin migración. Corre 'npm run db:migrate'." && exit 1)
-        working-directory: apps/web/nutriologos
+        working-directory: packages/servidor
 
       - name: Type-check
         run: npm run type-check --workspaces --if-present
@@ -98,7 +98,7 @@ jobs:
 
       - name: Aplicar migraciones a la base E2E
         run: npx prisma migrate deploy
-        working-directory: apps/web/nutriologos
+        working-directory: packages/servidor
         env:
           DATABASE_URL: ${{ env.E2E_DATABASE_URL }}
           DIRECT_URL: ${{ env.E2E_DATABASE_URL }}

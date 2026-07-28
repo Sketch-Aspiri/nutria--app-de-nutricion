@@ -3,7 +3,9 @@ import path from 'node:path';
 
 import { defineConfig, devices } from '@playwright/test';
 
-import { validarBaseE2E } from './src/server/testing/e2eDatabaseSafety';
+// Ruta relativa explícita: la guarda vive en la capa de servidor compartida y
+// Playwright carga este archivo sin pasar por los alias de tsconfig.
+import { validarBaseE2E } from '../../../packages/servidor/src/server/testing/e2eDatabaseSafety';
 
 // Los tests hablan con Prisma directamente para preparar cuentas, así que
 // necesitan las mismas variables que la app.

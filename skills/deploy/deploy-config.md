@@ -23,6 +23,7 @@
 - **Preview deploys**: automático en cada PR, con su propia URL para QA manual y para correr Playwright.
 - **Producción**: deploy automático al mergear a `main`, con rollback de un click desde Vercel si algo falla.
 - **Variables de entorno**: configuradas en Vercel por ambiente (`Development`/`Preview`/`Production`); nunca se commitean claves reales.
+- **Esquema y migraciones**: viven en `packages/servidor/prisma`, compartidos por las dos apps web. Los scripts `db:*` de `apps/web/nutriologos` apuntan ahí con `--schema`, así que se siguen corriendo desde esa app y leen su `.env`. Solo el proyecto de `nutriologos` ejecuta `prisma migrate deploy`; `pacientes` se limita a generar el cliente, para que dos despliegues simultáneos no compitan por el bloqueo de migración.
 
 ## Mobile (`apps/mobile`)
 
