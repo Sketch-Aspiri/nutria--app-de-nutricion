@@ -10,6 +10,7 @@ import {
   DesviacionEnergeticaPlanError,
   duplicarPlan,
   EstructuraPlanInvalidaError,
+  OPCIONES_TRANSACCION_PLAN,
   PlanNoEditableError,
   PlanIncompletoError,
   VersionPlanObsoletaError,
@@ -205,6 +206,33 @@ describe('repositorio de planes', () => {
         imagen_url: null,
       },
     });
+  });
+
+  it('escribe el plan con el presupuesto de tiempo ampliado, no con el de 5 s de Prisma', async () => {
+    db.patient.findFirst.mockResolvedValue({ id: PATIENT_ID });
+    db.food.findMany.mockResolvedValue([alimento()]);
+    db.mealPlan.create.mockResolvedValue(planDetalle());
+
+    await crearPlan(
+      NUTRITIONIST_ID,
+      PATIENT_ID,
+      crearPlanSchema.parse({
+        calorias_diarias: 1_800,
+        proteina_g: 120,
+        carbos_g: 200,
+        grasa_g: 60,
+        comidas: [{ nombre: 'Desayuno', items: [{ food_id: FOOD_ID }] }],
+      }),
+    );
+
+    // Un plan es un `create` anidado: un INSERT por comida y otro por item. Con
+    // el timeout por omisión, un borrador grande contra una base gestionada
+    // muere con P2028 y el nutriólogo pierde el trabajo.
+    expect(db.$transaction).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.objectContaining({ timeout: OPCIONES_TRANSACCION_PLAN.timeout }),
+    );
+    expect(OPCIONES_TRANSACCION_PLAN.timeout).toBeGreaterThan(5_000);
   });
 
   it('rechaza un food privado de otro nutriólogo', async () => {
@@ -702,7 +730,11 @@ describe('repositorio de planes', () => {
         data: { estado: 'ACTIVO', activadoAt: expect.any(Date) },
       }),
     );
+    // SERIALIZABLE por la garantía de un solo plan activo, y con el presupuesto
+    // de tiempo ampliado: el de 5 s por omisión no alcanza para escribir un plan
+    // completo contra una base gestionada.
     expect(db.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      ...OPCIONES_TRANSACCION_PLAN,
       isolationLevel: 'Serializable',
     });
   });

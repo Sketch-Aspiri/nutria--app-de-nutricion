@@ -178,6 +178,27 @@ export async function buscarPlanParaPdf(
   });
 }
 
+/**
+ * Presupuesto de tiempo de las transacciones de planes.
+ *
+ * Prisma corta las transacciones interactivas a los 5 s por omisión, y un plan
+ * se escribe con un `create` anidado que emite un INSERT por comida y otro por
+ * item. Contra una base gestionada (Neon), con ~80 ms de ida y vuelta, un
+ * borrador de la IA con cinco tiempos y seis alimentos cada uno se lleva esos
+ * 5 s solo en latencia y muere con P2028, que el usuario ve como "Ocurrió un
+ * error inesperado".
+ *
+ * Reintentar no sirve —el trabajo es el mismo— así que se sube el techo. El
+ * tamaño está acotado por `MAX_COMIDAS_PLAN`/`MAX_ITEMS_PLAN`, de modo que el
+ * peor caso es finito y no una transacción que se queda abierta indefinidamente.
+ */
+export const OPCIONES_TRANSACCION_PLAN = {
+  /** Espera por una conexión libre del pool antes de rendirse. */
+  maxWait: 10_000,
+  /** Tiempo máximo de la transacción ya iniciada. */
+  timeout: 30_000,
+} as const;
+
 export function crearPlan(
   nutritionistId: string,
   patientId: string,
@@ -426,7 +447,7 @@ export function duplicarPlan(
       },
       include: planDetalleInclude,
     });
-  });
+  }, OPCIONES_TRANSACCION_PLAN);
 }
 
 export async function listarPlantillas(
@@ -474,7 +495,7 @@ export function crearPlantilla(
         estructura: comoJsonPrisma(estructura),
       },
     });
-  });
+  }, OPCIONES_TRANSACCION_PLAN);
 }
 
 export async function actualizarPlantilla(
@@ -510,7 +531,7 @@ export async function actualizarPlantilla(
     if (actualizada.count === 0) return null;
 
     return tx.planTemplate.findUnique({ where: { id } });
-  });
+  }, OPCIONES_TRANSACCION_PLAN);
 }
 
 export async function borrarPlantilla(
@@ -541,6 +562,7 @@ async function transaccionSerializable<T>(
   for (let intento = 1; ; intento += 1) {
     try {
       return await prisma.$transaction(operacion, {
+        ...OPCIONES_TRANSACCION_PLAN,
         isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
       });
     } catch (error: unknown) {
