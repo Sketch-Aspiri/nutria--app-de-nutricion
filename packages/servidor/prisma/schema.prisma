@@ -349,9 +349,11 @@ model Patient {
   mealPlans         MealPlan[]
   recipes           Recipe[]
   mealLogs          MealLog[]
+  waterLogs         WaterLog[]
   weightLogs        WeightLog[]
   exerciseLogs      ExerciseLog[]
   activityPlans     ActivityPlan[]
+  invites           PatientInvite[]
   appointments      Appointment[]
   messages          Message[]
   invoices          Invoice[]
@@ -405,6 +407,7 @@ model FoodPreference {
   alergias          Json     @default("[]")
   disgustos         String?
   comidasPorDia     Int      @default(3) @map("comidas_por_dia")
+  metaAguaVasos     Int      @default(8) @map("meta_agua_vasos")
   presupuestoTiempo String   @default("Medio") @map("presupuesto_tiempo")
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
@@ -601,21 +604,40 @@ model Recipe {
 // ---------------------------------------------------------------------------
 
 model MealLog {
-  id                   String   @id @default(uuid()) @db.Uuid
-  patientId            String   @map("patient_id") @db.Uuid
-  mealPlanMealId       String?  @map("meal_plan_meal_id") @db.Uuid
+  id                   String        @id @default(uuid()) @db.Uuid
+  patientId            String        @map("patient_id") @db.Uuid
+  mealPlanMealId       String?       @map("meal_plan_meal_id") @db.Uuid
   fecha                DateTime
+  hora                 DateTime?
   nombre               String
-  fotoUrl              String?  @map("foto_url")
-  comentarioPaciente   String?  @map("comentario_paciente")
-  comentarioNutriologo String?  @map("comentario_nutriologo")
-  createdAt            DateTime @default(now()) @map("created_at")
+  calorias             Int?
+  proteinaG            Float?        @map("proteina_g")
+  carbosG              Float?        @map("carbos_g")
+  grasaG               Float?        @map("grasa_g")
+  origen               ContentOrigin @default(MANUAL)
+  fotoUrl              String?       @map("foto_url")
+  comentarioPaciente   String?       @map("comentario_paciente")
+  comentarioNutriologo String?       @map("comentario_nutriologo")
+  createdAt            DateTime      @default(now()) @map("created_at")
 
   patient      Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
   mealPlanMeal MealPlanMeal? @relation(fields: [mealPlanMealId], references: [id], onDelete: SetNull)
 
   @@index([patientId, fecha])
   @@map("meal_logs")
+}
+
+model WaterLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  patientId String   @map("patient_id") @db.Uuid
+  fecha     DateTime @db.Date
+  vasos     Int      @default(0)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@unique([patientId, fecha])
+  @@map("water_logs")
 }
 
 model WeightLog {
@@ -659,6 +681,21 @@ model ActivityPlan {
 
   @@index([patientId])
   @@map("activity_plans")
+}
+
+model PatientInvite {
+  id        String    @id @default(uuid()) @db.Uuid
+  patientId String    @map("patient_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  email     String
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@map("patient_invites")
 }
 
 // ---------------------------------------------------------------------------

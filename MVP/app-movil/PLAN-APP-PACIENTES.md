@@ -256,7 +256,7 @@ suite completa de E2E del panel en verde (`npm run test:e2e --workspace apps/web
 
 ---
 
-## 5. Fase 2 — Modelo de datos que falta
+## 5. Fase 2 — Modelo de datos que falta ✅
 
 Una migración por tema, todas expand-only (columnas nullables, tablas nuevas): reversibles y sin
 downtime, conforme a `deploy-config.md`.
@@ -587,7 +587,7 @@ Se dejan fuera a propósito, y se anotan aquí para que no se cuelen a mitad de 
 |---|---|---|---|
 | 0 | **Reorganización** ✅ | `apps/web/nutriologos` funcionando idéntico | — |
 | 1 | **`packages/servidor`** ✅ ⚠️ | Capa de servidor compartida, panel intacto. **Gate de E2E (§4.4) sin cumplir — ver §15** | 0 |
-| 2 | Modelo de datos | Migraciones de `meal_logs`, `water_logs`, `patient_invites` | 1 |
+| 2 | **Modelo de datos** ✅ | Migraciones de `meal_logs`, `water_logs`, `patient_invites` | 1 |
 | 3 | Identidad del paciente | Invitación, activación, `requierePaciente` | 2 |
 | 4 | API `/api/v1/me/*` | Endpoints con tests de integración | 3 |
 | 5 | IA del paciente | Coach, estimación, sustitución, con cuotas y guardas | 4 |
@@ -604,6 +604,48 @@ Las fases 0 a 5 son secuenciales. De la 7 a la 11 son independientes entre sí u
 ---
 
 ## 15. Bitácora
+
+### Fase 2 — Modelo de datos ✅ (2026-07-28)
+
+Se completó la capa de persistencia que necesita la futura app del paciente, sin adelantar
+endpoints ni pantallas de las fases posteriores. Los tres cambios se dividieron por tema en
+migraciones expand-only, compatibles con la versión anterior del panel.
+
+**Registros de comida.** `meal_logs` ahora admite `calorias`, `proteina_g`, `carbos_g` y
+`grasa_g` nullables para no reinterpretar registros históricos. También incorpora `hora`
+nullable y `origen` con default `manual`, reutilizando el enum `content_origin`.
+
+**Agua.** Se creó `water_logs` con un renglón único por paciente y día, contador con default 0 y
+eliminación en cascada con el paciente. `food_preferences.meta_agua_vasos` tiene default 8 para
+que las preferencias existentes sigan siendo válidas y el nutriólogo pueda personalizar la meta
+en una fase posterior.
+
+**Invitaciones.** Se creó `patient_invites` con hash único del token, correo, caducidad, marca de
+uso y relación en cascada con el paciente. El token en claro no tiene columna y nunca se persiste.
+La generación, validación y consumo transaccional del token pertenecen a la Fase 3.
+
+**Migraciones.**
+
+| Migración | Cambio |
+|---|---|
+| `20260728_phase2_01_meal_logs_macros` | Macros, calorías, origen y hora del registro libre |
+| `20260728_phase2_02_water_logs` | Meta de agua y tabla de consumo diario |
+| `20260728_phase2_03_patient_invites` | Invitaciones de activación con token hasheado |
+
+**Verificación.**
+
+| Comprobación | Resultado |
+|---|---|
+| `prisma validate` + generación del cliente | Esquema válido; cliente Prisma generado |
+| `prisma migrate deploy` en PostgreSQL 16 desechable | **10/10 migraciones** aplicadas desde cero |
+| `prisma migrate status` | *Database schema is up to date* |
+| `prisma migrate diff` (base migrada vs. `schema.prisma`) | *No difference detected* |
+| Repositorio de seguimiento | **14/14 tests** |
+| Suite completa de `packages/servidor` | **300/300 tests**, 41 suites |
+| `type-check` de workspaces | Limpio en `nutriologos`, `servidor`, `shared` y `ui-tokens` |
+
+La base desechable se eliminó después de verificarla. Por instrucción explícita para esta fase no
+se ejecutaron la suite E2E ni el pipeline de CI.
 
 ### Fase 1 — `packages/servidor` ✅ (2026-07-28)
 
