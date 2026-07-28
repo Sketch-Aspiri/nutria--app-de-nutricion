@@ -734,19 +734,39 @@ Lo que **sí** se descartó:
 - *No es base sucia.* Se recreó (`DROP DATABASE … WITH (FORCE)`) y resembró antes de las corridas
   2 y 3.
 
-Lo que **no** se pudo descartar, y por qué:
+**Causa raíz, encontrada después del commit.** No es regresión de esta fase: es el propio arnés de
+E2E chocando contra un control de seguridad de producción.
 
-- **No hay línea base verde con la cual comparar.** La fase 0 no llegó a correr los E2E (Docker
-  apagado) y el CI viene fallando en el paso `npm audit`, que corre **antes** del paso de E2E: la
-  suite no se ejecuta en CI desde hace días. No se puede afirmar si estos fallos son anteriores a
-  la fase 1 o los introdujo.
-- Los specs que fallan **cambian entre corridas** (`agenda` y `aislamiento-datos` pasan en la 1 y
-  fallan en la 2), lo que apunta a sensibilidad de tiempo o de recursos de la máquina, no a un
-  defecto determinista. Pero `calculo-clinico` falla completo en las tres.
+`authorize()` (`packages/servidor/src/server/auth/index.ts`) limita el login a **15 intentos por IP
+cada 15 minutos**:
 
-Siguiente paso sugerido: reproducir contra el commit anterior a esta fase (`cd6dfbc`) para
-determinar si es regresión o deuda preexistente, y en cualquier caso instrumentar `authorize()`
-para ver por qué rechaza las credenciales, en lugar de seguir infiriendo desde el timeout.
+```ts
+rateLimit(`login:source:${ipDe(request)}`, 15, 15 * 60 * 1000)
+```
+
+La suite hace **34 llamadas a `iniciarSesion`** —más los reintentos— todas desde `127.0.0.1` y
+contra un solo proceso de servidor. Sin `UPSTASH_*` configurado el limitador es en memoria, así que
+el contador se acumula durante toda la corrida. A partir del login 16, `authorize()` devuelve
+`null`; el cliente recibe `CredentialsSignin`, la página nunca navega y `waitForURL` agota sus 60 s.
+
+Encaja con todo lo observado: en `next dev` (lento) la ventana de 15 minutos alcanzaba a renovarse
+a media corrida y pasaban 23 tests; en modo CI, más rápido, cabían más logins dentro de la misma
+ventana y fallaban más. Y explica que los specs afectados cambien entre corridas: depende de
+cuántos logins se hayan gastado antes de llegar a cada uno.
+
+**Descartada la regresión, con prueba.** Se comparó byte a byte cada uno de los **155 archivos
+movidos** contra `cd6dfbc` (el commit anterior a esta fase):
+
+```
+comparados: 155 | con diferencias: 0
+```
+
+Incluye toda la ruta de login (`auth/index.ts`, `auth/config.ts`, `auth/password.ts`,
+`rate-limit.ts`, `db.ts`). La fase 1 no pudo introducir este fallo. Es deuda preexistente,
+probablemente desde que la fase 8 del plan V2 agregó los límites de tasa: el CI dejó de llegar al
+paso de E2E —falla antes en `npm audit`— así que la suite se rompió sin que nadie lo viera.
+
+**Pendiente de decidir cómo arreglarlo** (toca un control de seguridad, no se cambia a la ligera).
 
 **Notas y deuda**
 
