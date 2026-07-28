@@ -11,7 +11,7 @@
 | App | Unitario/integración | E2E |
 |---|---|---|
 | `apps/api` (Node) | Jest + Supertest (requests HTTP contra la app en memoria) | Postman/Newman contra ambiente de staging para los flujos críticos |
-| `apps/web` (Next.js) | Jest + React Testing Library | Playwright |
+| `apps/web/*` (Next.js) | Jest + React Testing Library | Playwright |
 | `apps/mobile` (React Native) | Jest + React Native Testing Library | Detox (iOS/Android, corre en CI solo en `main` por costo/tiempo) |
 | `packages/shared` | Jest (funciones puras: cálculo de calorías, macros, adherencia) | — |
 
@@ -21,7 +21,7 @@
 - **Integración**: endpoints del backend contra una base de datos de test real (Postgres en Docker, no mocks de la capa de datos), y componentes de frontend que orquestan varios subcomponentes.
 - **E2E** (pocos, cubren solo flujos críticos): login, registro de una comida, asignación de un plan, agendar una cita, checkout de pago.
 
-Cobertura mínima exigida en CI: **80% líneas en `apps/api` y `packages/shared`**, **60% en `apps/web` y `apps/mobile`** (la UI se apoya más en E2E que en cobertura de líneas). El build falla si baja de estos umbrales.
+Cobertura mínima exigida en CI: **80% líneas en `apps/api` y `packages/shared`**, **60% en `apps/web/*` y `apps/mobile`** (la UI se apoya más en E2E que en cobertura de líneas). El build falla si baja de estos umbrales.
 
 ## Convenciones
 

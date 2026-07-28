@@ -62,7 +62,7 @@ y en las variables de entorno de Vercel.
 
 ## Paso 5 — Llenar el `.env` local
 
-En `apps/web/.env` (créalo copiando `apps/web/.env.example` si aún no existe):
+En `apps/web/nutriologos/.env` (créalo copiando `apps/web/nutriologos/.env.example` si aún no existe):
 
 ```bash
 BILLING_MODE=beta
@@ -100,7 +100,7 @@ Necesitas la CLI de Stripe para que los webhooks lleguen a tu máquina.
    ```
 
    Imprime una línea como `Your webhook signing secret is whsec_...`. **Copia ese
-   `whsec_...` a `STRIPE_WEBHOOK_SECRET` en `apps/web/.env`.** Es distinto del
+   `whsec_...` a `STRIPE_WEBHOOK_SECRET` en `apps/web/nutriologos/.env`.** Es distinto del
    secreto de producción; cada endpoint tiene el suyo.
 
 4. **Pon el cobro en marcha temporalmente** para poder probarlo. En `.env`:
@@ -112,7 +112,7 @@ Necesitas la CLI de Stripe para que los webhooks lleguen a tu máquina.
 5. **Levanta la app** en otra terminal:
 
    ```bash
-   cd apps/web && npm run dev
+   cd apps/web/nutriologos && npm run dev
    ```
 
 6. **Prueba**: entra al panel → **Suscripción** en la barra lateral → *Probar 14

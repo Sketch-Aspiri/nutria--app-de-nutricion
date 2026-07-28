@@ -66,11 +66,11 @@ jobs:
 
       - name: Validar el esquema de Prisma
         run: npx prisma validate
-        working-directory: apps/web
+        working-directory: apps/web/nutriologos
 
       - name: Aplicar migraciones
         run: npx prisma migrate deploy
-        working-directory: apps/web
+        working-directory: apps/web/nutriologos
 
       - name: Verificar que no haya deriva entre migraciones y esquema
         # Falla si alguien editó schema.prisma sin generar su migración.
@@ -81,7 +81,7 @@ jobs:
             --shadow-database-url "$SHADOW_DATABASE_URL" \
             --exit-code \
           || (echo "::error::schema.prisma cambió sin migración. Corre 'npm run db:migrate'." && exit 1)
-        working-directory: apps/web
+        working-directory: apps/web/nutriologos
 
       - name: Type-check
         run: npm run type-check --workspaces --if-present
@@ -90,33 +90,33 @@ jobs:
         run: npm run test --workspaces --if-present -- --coverage
 
       - name: Build de la app web
-        run: npm run build --workspace apps/web
+        run: npm run build --workspace apps/web/nutriologos
 
       - name: Instalar Chromium para Playwright
         run: npx playwright install --with-deps chromium
-        working-directory: apps/web
+        working-directory: apps/web/nutriologos
 
       - name: Aplicar migraciones a la base E2E
         run: npx prisma migrate deploy
-        working-directory: apps/web
+        working-directory: apps/web/nutriologos
         env:
           DATABASE_URL: ${{ env.E2E_DATABASE_URL }}
           DIRECT_URL: ${{ env.E2E_DATABASE_URL }}
 
       - name: Sembrar catálogo de prueba en la base E2E
         run: npm run db:seed
-        working-directory: apps/web
+        working-directory: apps/web/nutriologos
         env:
           DATABASE_URL: ${{ env.E2E_DATABASE_URL }}
           DIRECT_URL: ${{ env.E2E_DATABASE_URL }}
 
       - name: Tests E2E
-        run: npm run test:e2e --workspace apps/web
+        run: npm run test:e2e --workspace apps/web/nutriologos
 
       - name: Guardar reporte de E2E si algo falla
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: playwright-report
-          path: apps/web/test-results/
+          path: apps/web/nutriologos/test-results/
           retention-days: 7

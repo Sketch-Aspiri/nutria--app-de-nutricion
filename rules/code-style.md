@@ -1,6 +1,6 @@
 # Guía de estilo de código
 
-Aplica a los tres paquetes del monorepo: `apps/mobile` (React Native/Expo), `apps/web` (Next.js) y `apps/api` (Node.js). Todo el código se escribe en **TypeScript estricto** (`strict: true` en `tsconfig.json`); no se aceptan nuevos archivos `.js` salvo scripts de configuración puntuales.
+Aplica a los tres paquetes del monorepo: `apps/mobile` (React Native/Expo), `apps/web/nutriologos` y `apps/web/pacientes` (Next.js) y `apps/api` (Node.js). Todo el código se escribe en **TypeScript estricto** (`strict: true` en `tsconfig.json`); no se aceptan nuevos archivos `.js` salvo scripts de configuración puntuales.
 
 ## Formato y linting
 
@@ -28,7 +28,7 @@ apps/mobile/src/
   store/                     # Zustand
   navigation/
 
-apps/web/src/
+apps/web/nutriologos/src/
   app/<route>/               # App Router de Next.js
   components/
   hooks/

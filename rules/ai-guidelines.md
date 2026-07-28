@@ -1,6 +1,6 @@
 # Reglas de las funciones de IA
 
-Aplican a todo lo que viva bajo `apps/web/src/server/ai/` y a cualquier pantalla que
+Aplican a todo lo que viva bajo `apps/web/*/src/server/ai/` y a cualquier pantalla que
 consuma `/api/v1/ai`.
 
 ## 1. La IA propone, el profesional aprueba

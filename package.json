@@ -2,7 +2,7 @@
   "name": "nutria-monorepo",
   "private": true,
   "workspaces": [
-    "apps/*",
+    "apps/web/*",
     "packages/*"
   ],
   "overrides": {
@@ -10,8 +10,10 @@
     "sharp": "0.35.3"
   },
   "scripts": {
-    "dev:web": "npm run dev --workspace apps/web",
-    "build:web": "npm run build --workspace apps/web",
+    "dev:nutriologos": "npm run dev --workspace apps/web/nutriologos",
+    "build:nutriologos": "npm run build --workspace apps/web/nutriologos",
+    "dev:web": "npm run dev --workspace apps/web/nutriologos",
+    "build:web": "npm run build --workspace apps/web/nutriologos",
     "test": "npm run test --workspaces --if-present",
     "type-check": "npm run type-check --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present"

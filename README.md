@@ -4,7 +4,9 @@ Monorepo (npm workspaces) de la plataforma de nutrición. Ver `CLAUDE.md` para c
 
 ```
 apps/
-  web/        # Next.js (App Router) — panel del nutriólogo + API /api/v1
+  web/
+    nutriologos/  # Next.js (App Router) — panel del nutriólogo + API /api/v1
+    pacientes/    # Next.js — app del paciente (pendiente; ver plan)
 packages/
   shared/     # lógica de negocio pura (TDEE, macros, alergias, adherencia) + tests
   ui-tokens/  # design tokens compartidos (colores, tipografía, espaciado)
@@ -12,12 +14,13 @@ MVP/          # prototipos JSX de referencia y el plan de la V2
 ```
 
 El plan de la versión desplegable vive en `MVP/app-web/PLAN-V2-PRODUCCION.md`.
+El plan de la app del paciente, en `MVP/app-movil/PLAN-APP-PACIENTES.md`.
 
 ## Puesta en marcha
 
 ```bash
 npm install
-cp apps/web/.env.example apps/web/.env    # y completa los valores
+cp apps/web/nutriologos/.env.example apps/web/nutriologos/.env    # y completa los valores
 ```
 
 ### 1. Base de datos
@@ -27,7 +30,7 @@ en [Neon](https://neon.tech): copia las cadenas *Pooled* y *Direct* a `DATABASE_
 y `DIRECT_URL` respectivamente. También funciona un Postgres local.
 
 ```bash
-cd apps/web
+cd apps/web/nutriologos
 npx prisma migrate deploy    # aplica el esquema (28 tablas)
 npm run db:studio            # opcional: explorar los datos
 ```
@@ -35,13 +38,13 @@ npm run db:studio            # opcional: explorar los datos
 ### 2. Secreto de sesión
 
 ```bash
-cd apps/web && npx auth secret     # escribe AUTH_SECRET en .env
+cd apps/web/nutriologos && npx auth secret     # escribe AUTH_SECRET en .env
 ```
 
 ### 3. Levantar la app
 
 ```bash
-npm run dev:web          # http://localhost:3000
+npm run dev:nutriologos  # http://localhost:3000
 ```
 
 Crea tu cuenta en `/registro`. Sin `RESEND_API_KEY` no se envían correos: el
@@ -60,7 +63,7 @@ enlace de verificación aparece en la pantalla de alta y en la consola del servi
 ```bash
 npm run test             # Jest en todos los workspaces (shared: 80% líneas mínimo)
 npm run type-check       # tsc --noEmit en todos los workspaces
-npm run build:web        # build de producción
+npm run build:nutriologos  # build de producción
 ```
 
 CI (`.github/workflows/ci.yml`) levanta un Postgres efímero, aplica las migraciones,

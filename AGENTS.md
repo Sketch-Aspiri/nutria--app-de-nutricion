@@ -21,7 +21,9 @@ Una plataforma de nutrición con tres frentes: app móvil para el usuario final 
 ```
 apps/
   mobile/     # React Native / Expo
-  web/        # Next.js
+  web/
+    nutriologos/  # Next.js — panel del nutriólogo + API /api/v1
+    pacientes/    # Next.js — app del paciente (pendiente; ver MVP/app-movil/PLAN-APP-PACIENTES.md)
   api/        # NestJS
 packages/
   shared/     # lógica de negocio compartida, sin dependencias de UI
@@ -37,7 +39,7 @@ packages/
 | `api-conventions.md` | Al crear o modificar cualquier endpoint del backend |
 | `deploy-config.md` | Al tocar migraciones, variables de entorno, o el pipeline de CI/CD |
 | `MVP-app-movil.md` | Al trabajar en `apps/mobile`, para saber qué está y qué no está en alcance |
-| `MVP-app-web.md` | Al trabajar en `apps/web`, para saber qué está y qué no está en alcance |
+| `MVP-app-web.md` | Al trabajar en `apps/web/nutriologos`, para saber qué está y qué no está en alcance |
 
 ## Comandos habituales
 
@@ -48,8 +50,8 @@ cd apps/api && npm run test            # tests unitarios/integración
 cd apps/api && npm run migration:run   # migraciones pendientes
 
 # Web
-cd apps/web && npm run dev
-cd apps/web && npm run test
+cd apps/web/nutriologos && npm run dev
+cd apps/web/nutriologos && npm run test
 
 # Mobile
 cd apps/mobile && npx expo start

@@ -12,7 +12,7 @@ Corrige el issue `$ARGUMENTS`. Sigue este proceso en orden; no saltes directo a 
 
 - Si `$ARGUMENTS` es un número, obtén el detalle con `gh issue view $ARGUMENTS` (título, descripción, pasos para reproducir, comentarios recientes).
 - Si es una descripción libre, trátala como el reporte del bug/feature a resolver.
-- Identifica: ¿es un bug (comportamiento actual incorrecto) o una feature (comportamiento nuevo)? ¿en qué app vive (`apps/mobile`, `apps/web`, `apps/api`, o `packages/shared`)?
+- Identifica: ¿es un bug (comportamiento actual incorrecto) o una feature (comportamiento nuevo)? ¿en qué app vive (`apps/mobile`, `apps/web/nutriologos`, `apps/web/pacientes`, `apps/api`, o `packages/shared`)?
 
 ## 2. Reproducir / localizar
 

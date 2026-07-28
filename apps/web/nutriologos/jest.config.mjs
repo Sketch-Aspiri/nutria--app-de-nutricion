@@ -14,8 +14,8 @@ const config = {
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
     // Se resuelve al código fuente para que SWC lo transpile en tests.
-    '^@nutria/shared$': '<rootDir>/../../packages/shared/src/index.ts',
-    '^@nutria/ui-tokens$': '<rootDir>/../../packages/ui-tokens/src/index.ts',
+    '^@nutria/shared$': '<rootDir>/../../../packages/shared/src/index.ts',
+    '^@nutria/ui-tokens$': '<rootDir>/../../../packages/ui-tokens/src/index.ts',
   },
 };
 

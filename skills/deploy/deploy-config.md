@@ -17,7 +17,7 @@
 - **Variables de entorno**: gestionadas por ambiente en el proveedor de hosting (no en el repo). `.env.example` en el repo documenta qué variables existen, sin valores reales. Secretos de terceros (Stripe, proveedor de push, JWT secret) rotables sin downtime (se soporta más de una clave activa durante la rotación).
 - **Health check**: endpoint `/v1/health` verificado por el orquestador antes de enrutar tráfico a una nueva instancia.
 
-## Web (`apps/web`)
+## Web (`apps/web/nutriologos`, `apps/web/pacientes`)
 
 - **Hosting**: Vercel.
 - **Preview deploys**: automático en cada PR, con su propia URL para QA manual y para correr Playwright.
