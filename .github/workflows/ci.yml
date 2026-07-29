@@ -17,7 +17,7 @@ env:
   DATABASE_URL: postgresql://postgres:postgres@localhost:5432/nutria_ci
   DIRECT_URL: postgresql://postgres:postgres@localhost:5432/nutria_ci
   E2E_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/nutria_e2e_test
-  E2E_ALLOW_DB_MUTATION: "true"
+  E2E_ALLOW_DB_MUTATION: 'true'
   SHADOW_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/nutria_shadow
   AUTH_SECRET: secreto-solo-para-ci-no-usar-en-produccion
   AUTH_URL: http://localhost:3000
@@ -56,8 +56,16 @@ jobs:
       - name: Instalar dependencias
         run: npm ci
 
-      - name: Auditar dependencias
-        run: npm audit --audit-level=high
+      - name: Auditar dependencias de producción
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Probar el gate de auditoría
+        run: node --test .github/scripts/auditoria-npm-core.test.mjs
+
+      - name: Auditar herramientas de desarrollo
+        # La única excepción vigente es brace-expansion dentro de Jest 29. El
+        # script falla ante cualquier advisory nuevo o cuando vence la excepción.
+        run: node .github/scripts/verificar-auditoria-npm.mjs
 
       - name: Preparar base de sombra
         run: |

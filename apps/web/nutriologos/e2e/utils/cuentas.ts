@@ -2,6 +2,8 @@ import { PrismaClient } from '@prisma/client';
 import type { Page } from '@playwright/test';
 import { hash } from 'bcryptjs';
 
+import { sembrarSesion } from './sesion';
+
 /**
  * Utilidades de preparación para los tests E2E.
  *
@@ -53,12 +55,36 @@ export async function borrarCuentas(...cuentas: CuentaPrueba[]): Promise<void> {
   });
 }
 
+/**
+ * Deja la sesión lista y aterriza en `/pacientes`, igual que antes, pero
+ * sembrando la cookie en vez de llenar el formulario: el límite de 15 logins
+ * por IP cada 15 minutos no da para las más de treinta sesiones de la suite.
+ * Ver `sesion.ts` para el detalle y `sesion.spec.ts` para el formulario real.
+ */
 export async function iniciarSesion(page: Page, cuenta: CuentaPrueba): Promise<void> {
-  await page.goto('/login');
-  await page.getByLabel('Correo').fill(cuenta.email);
-  await page.getByLabel('Contraseña').fill(PASSWORD_PRUEBA);
-  await page.getByRole('button', { name: 'Iniciar sesión' }).click();
+  // Detener primero la app evita que una respuesta de `/api/auth/session` de
+  // la cuenta anterior vuelva a escribir su cookie después de limpiarla.
+  await page.goto('about:blank');
+  await page.context().clearCookies();
+  await sembrarSesion(page.context(), cuenta);
+  await page.goto('/pacientes');
   await page.waitForURL('**/pacientes');
+}
+
+/**
+ * Inicio de sesión por el formulario, tal como lo hace una persona. Consume
+ * cupo del límite de tasa, así que se usa solo donde el login **es** lo que se
+ * está probando.
+ */
+export async function iniciarSesionConFormulario(
+  page: Page,
+  email: string,
+  password: string,
+): Promise<void> {
+  await page.goto('/login');
+  await page.getByLabel('Correo').fill(email);
+  await page.getByLabel('Contraseña').fill(password);
+  await page.getByRole('button', { name: 'Iniciar sesión' }).click();
 }
 
 /** Alta de paciente por API, para tests que no ejercitan el asistente. */

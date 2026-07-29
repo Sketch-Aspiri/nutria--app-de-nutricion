@@ -1,6 +1,12 @@
 import { expect, test } from '@playwright/test';
 
 import {
+  decryptText,
+  ENCRYPTION_CONTEXT,
+  isEncrypted,
+} from '../../../../packages/servidor/src/server/crypto';
+
+import {
   borrarCuentas,
   crearNutriologo,
   type CuentaPrueba,
@@ -70,8 +76,8 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   try {
-    const cuentas = [nutriologa, otroNutriologo].filter(
-      (cuenta): cuenta is CuentaPrueba => Boolean(cuenta),
+    const cuentas = [nutriologa, otroNutriologo].filter((cuenta): cuenta is CuentaPrueba =>
+      Boolean(cuenta),
     );
     if (cuentas.length > 0) await borrarCuentas(...cuentas);
   } finally {
@@ -113,8 +119,7 @@ test('lee el hilo pendiente, responde con ayuda de IA y recibe lo nuevo por sond
     .toBe(0);
 
   // --- Sugerencia de IA ------------------------------------------------------
-  const SUGERENCIA =
-    'Podemos cambiar la colación por fruta con yogur mientras consigues la avena.';
+  const SUGERENCIA = 'Podemos cambiar la colación por fruta con yogur mientras consigues la avena.';
   await page.route('**/api/v1/ai/generate', async (route) => {
     const cuerpo = route.request().postDataJSON() as { tipo: string; patient_id: string };
     // La UI manda intención, no el prompt: el nombre y el contacto del paciente
@@ -160,8 +165,9 @@ test('lee el hilo pendiente, responde con ayuda de IA y recibe lo nuevo por sond
   });
   expect(enviado).toMatchObject({
     nutritionistId: nutriologa.id,
-    texto: RESPUESTA,
   });
+  expect(isEncrypted(enviado.texto)).toBe(true);
+  expect(decryptText(enviado.texto, ENCRYPTION_CONTEXT.messageText)).toBe(RESPUESTA);
   // Lo que uno mismo escribe nace leído.
   expect(enviado.leidoAt).not.toBeNull();
 

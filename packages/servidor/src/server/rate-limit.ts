@@ -13,12 +13,48 @@ type LimitResult = {
 
 const localWindows = new Map<string, WindowState>();
 const distributedLimiters = new Map<string, Ratelimit>();
+const TEST_DATABASE_MARKER = /(^|[-_.])(test|preview|branch)([-_.]|$)/i;
+const LOCAL_DATABASE_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
 
-function localRateLimit(
-  key: string,
-  maxRequests: number,
-  windowMs: number,
-): LimitResult {
+function databaseIdentity(raw: string | undefined): string | null {
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== 'postgres:' && url.protocol !== 'postgresql:') return null;
+
+    const database = decodeURIComponent(url.pathname.replace(/^\/+/, '')).toLowerCase();
+    const host = url.hostname.toLowerCase();
+    if (!host || !database) return null;
+    return `${host}:${url.port || '5432'}/${database}`;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * El runner E2E puede usar el limitador en memoria aun sirviendo un build de
+ * producción, pero solo contra una base local, aislada y habilitada de forma
+ * explícita. Cualquier configuración incompleta conserva el cierre seguro.
+ */
+function allowsLocalRateLimitInE2E(): boolean {
+  if (
+    process.env.CI !== 'true' ||
+    process.env.E2E_RATE_LIMIT_MODE !== 'local' ||
+    process.env.E2E_ALLOW_DB_MUTATION !== 'true'
+  ) {
+    return false;
+  }
+
+  const e2eIdentity = databaseIdentity(process.env.E2E_DATABASE_URL);
+  const appIdentity = databaseIdentity(process.env.DATABASE_URL);
+  if (!e2eIdentity || e2eIdentity !== appIdentity) return false;
+
+  const [host, database] = e2eIdentity.split('/', 2);
+  const hostname = (host?.replace(/:\d+$/, '') ?? '').replace(/^\[|\]$/g, '');
+  return LOCAL_DATABASE_HOSTS.has(hostname) && TEST_DATABASE_MARKER.test(database ?? '');
+}
+
+function localRateLimit(key: string, maxRequests: number, windowMs: number): LimitResult {
   const now = Date.now();
   const current = localWindows.get(key);
 
@@ -60,10 +96,7 @@ function localRateLimit(
 }
 
 function hasUpstashConfig(): boolean {
-  return Boolean(
-    process.env.UPSTASH_REDIS_REST_URL &&
-      process.env.UPSTASH_REDIS_REST_TOKEN,
-  );
+  return Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
 }
 
 function distributedLimiter(maxRequests: number, windowMs: number): Ratelimit {
@@ -98,7 +131,7 @@ export async function rateLimit(
 ): Promise<LimitResult> {
   const pseudonymousKey = pseudonymizeRateLimitKey(key);
   if (!hasUpstashConfig()) {
-    if (process.env.NODE_ENV === 'production') {
+    if (process.env.NODE_ENV === 'production' && !allowsLocalRateLimitInE2E()) {
       logger.error('Rate limit distribuido no configurado');
       return {
         permitido: false,
@@ -110,9 +143,7 @@ export async function rateLimit(
   }
 
   try {
-    const result = await distributedLimiter(maxRequests, windowMs).limit(
-      pseudonymousKey,
-    );
+    const result = await distributedLimiter(maxRequests, windowMs).limit(pseudonymousKey);
     return {
       permitido: result.success,
       reintentarEnSegundos: result.success
@@ -137,8 +168,6 @@ export async function rateLimit(
 export function ipDe(request: Request): string {
   const forwarded = request.headers.get('x-forwarded-for');
   return (
-    forwarded?.split(',')[0]?.trim() ||
-    request.headers.get('x-real-ip')?.trim() ||
-    'desconocida'
+    forwarded?.split(',')[0]?.trim() || request.headers.get('x-real-ip')?.trim() || 'desconocida'
   );
 }

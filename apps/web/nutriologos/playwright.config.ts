@@ -57,11 +57,13 @@ const BASE_URL = `http://localhost:${PUERTO}`;
  */
 const BUZON_CORREO = path.join(__dirname, 'test-results', 'buzon-correo.jsonl');
 const CRON_SECRET_E2E = process.env.CRON_SECRET ?? 'cron-secreto-e2e';
+const AUTH_SECRET_E2E =
+  process.env.E2E_AUTH_SECRET?.trim() || 'auth-secret-e2e-de-32-caracteres-no-produccion';
 const ENCRYPTION_KEY_E2E =
-  process.env.ENCRYPTION_KEY ??
-  'MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=';
+  process.env.ENCRYPTION_KEY ?? 'MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=';
 process.env.EMAIL_OUTBOX_FILE = BUZON_CORREO;
 process.env.CRON_SECRET = CRON_SECRET_E2E;
+process.env.AUTH_SECRET = AUTH_SECRET_E2E;
 process.env.ENCRYPTION_KEY = ENCRYPTION_KEY_E2E;
 process.env.ENCRYPTION_KEY_ID = 'e2e';
 
@@ -90,8 +92,12 @@ export default defineConfig({
     timeout: 120_000,
     env: {
       AUTH_URL: BASE_URL,
+      AUTH_SECRET: AUTH_SECRET_E2E,
       DATABASE_URL: E2E_DATABASE_URL,
       DIRECT_URL: E2E_DATABASE_URL,
+      E2E_DATABASE_URL,
+      E2E_ALLOW_DB_MUTATION: 'true',
+      E2E_RATE_LIMIT_MODE: 'local',
       EMAIL_OUTBOX_FILE: BUZON_CORREO,
       CRON_SECRET: CRON_SECRET_E2E,
       ENCRYPTION_KEY: ENCRYPTION_KEY_E2E,
