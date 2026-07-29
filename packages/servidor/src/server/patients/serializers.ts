@@ -84,12 +84,33 @@ export function serializarCalculo(plan: MealPlan): CalculoSerializado | null {
   };
 }
 
+/** Invitación vigente tal como la trae el repositorio: sin hash del token. */
+export type InvitacionVigente = { createdAt: Date; expiresAt: Date };
+
 type PacienteConRelaciones = Patient & {
   medicalRecord: MedicalRecord | null;
   foodPreference: FoodPreference | null;
   measurements: AnthropometryMeasurement[];
   mealPlans: MealPlan[];
+  invites: InvitacionVigente[];
 };
+
+/**
+ * Estado del acceso del paciente a su app, para que el panel sepa si toca
+ * invitar, reinvitar o no ofrecer nada. Nunca expone el `user_id` ni el token.
+ */
+export function serializarAccesoApp(paciente: Patient, invites: InvitacionVigente[]) {
+  const vigente = invites.find((invite) => invite.expiresAt.getTime() > Date.now()) ?? null;
+  return {
+    cuenta_activa: paciente.userId !== null,
+    invitacion_pendiente: vigente
+      ? {
+          enviada_en: vigente.createdAt.toISOString(),
+          expira_en: vigente.expiresAt.toISOString(),
+        }
+      : null,
+  };
+}
 
 function datosBase(paciente: Patient) {
   return {
@@ -132,6 +153,7 @@ export function serializarPacienteDetalle(paciente: PacienteConRelaciones) {
     ...datosBase(paciente),
     expediente_medico: serializarExpedienteMedico(paciente.medicalRecord),
     preferencias_alimentarias: serializarPreferencias(paciente.foodPreference),
+    acceso_app: serializarAccesoApp(paciente, paciente.invites),
     // Vienen ordenadas de la más reciente a la más antigua.
     mediciones: mediciones.map(serializarMedicion),
     ultima_medicion: mediciones[0] ? serializarMedicion(mediciones[0]) : null,

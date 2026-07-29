@@ -334,7 +334,7 @@ Migraciones aplicadas en una BD desechable (ver memoria `correr-e2e-local-con-po
 
 ---
 
-## 6. Fase 3 — Identidad del paciente
+## 6. Fase 3 — Identidad del paciente ✅
 
 ### 6.1 Flujo
 
@@ -343,7 +343,8 @@ Migraciones aplicadas en una BD desechable (ver memoria `correr-e2e-local-con-po
 2. `POST /api/v1/patients/{id}/invite` (app nutriólogos) crea el `PatientInvite` y envía correo con
    `https://mi.nutria.mx/activar?token=…`.
 3. El paciente abre el enlace, ve el aviso de privacidad (`src/config/privacy.ts`) y define contraseña.
-4. `POST /api/v1/auth/activate` (app pacientes): valida token → crea `User` con `role = END_USER`,
+4. `POST /api/v1/auth/activate` (app pacientes; la ruta se monta en la Fase 6, la lógica ya existe
+   como `activarCuentaPaciente` — ver §15): valida token → crea `User` con `role = END_USER`,
    `email_verified = now()`, `privacy_notice_accepted_at` → enlaza `patients.user_id` → marca
    `used_at` → registra en `audit_logs`. Todo en una transacción.
 5. Sesión iniciada, entra a "Hoy".
@@ -588,7 +589,7 @@ Se dejan fuera a propósito, y se anotan aquí para que no se cuelen a mitad de 
 | 0 | **Reorganización** ✅ | `apps/web/nutriologos` funcionando idéntico | — |
 | 1 | **`packages/servidor`** ✅ ⚠️ | Capa de servidor compartida, panel intacto. **Gate de E2E (§4.4) sin cumplir — ver §15** | 0 |
 | 2 | **Modelo de datos** ✅ | Migraciones de `meal_logs`, `water_logs`, `patient_invites` | 1 |
-| 3 | Identidad del paciente | Invitación, activación, `requierePaciente` | 2 |
+| 3 | **Identidad del paciente** ✅ | Invitación, activación, `requierePaciente` | 2 |
 | 4 | API `/api/v1/me/*` | Endpoints con tests de integración | 3 |
 | 5 | IA del paciente | Coach, estimación, sustitución, con cuotas y guardas | 4 |
 | 6 | Cascarón y PWA | App navegable e instalable | 3 |
@@ -604,6 +605,115 @@ Las fases 0 a 5 son secuenciales. De la 7 a la 11 son independientes entre sí u
 ---
 
 ## 15. Bitácora
+
+### Fase 3 — Identidad del paciente ✅ (2026-07-28)
+
+El paciente ya puede tener cuenta propia: el nutriólogo lo invita desde su ficha, el token viaja
+por correo y su consumo crea la cuenta y la enlaza al expediente. Con la guarda `requierePaciente`
+lista, la Fase 4 puede escribir endpoints `/api/v1/me/*` sin volver a resolver identidad.
+
+**Las dos mitades del flujo viven juntas.** `packages/servidor/src/server/auth/invitaciones.ts`
+concentra emisión y consumo del token porque comparten un mismo invariante: se guarda solo el
+hash, caduca a 7 días, se usa una vez y su consumo enlaza `patients.user_id`. Separarlas en dos
+módulos —uno por app— habría duplicado ese contrato en dos lugares que no se leen juntos.
+
+| Función | Qué hace |
+|---|---|
+| `invitarPaciente(nutritionistId, patientId)` | Valida pertenencia y precondiciones, invalida invitaciones previas y emite token |
+| `activarCuentaPaciente(token, password)` | Consume el token, crea el `User` y lo enlaza, todo en una transacción |
+| `requierePaciente()` | Guarda de `/api/v1/me/*`: resuelve el `patientId` en el servidor |
+
+**Reinvitar es el camino normal, no un error.** El correo se pierde y el enlace vence, así que
+cada emisión invalida las anteriores (`updateMany` sobre las `usedAt: null`) en lugar de
+rechazarse. Lo que sí se rechaza con 409 es invitar a quien ya tiene cuenta: eso se resuelve
+recuperando contraseña, no emitiendo un segundo acceso al mismo expediente.
+
+**Precondiciones que bloquean la invitación**, cada una con su mensaje —el nutriólogo necesita
+saber qué le falta hacer, no un "no se pudo" genérico:
+
+| Motivo | Estado | Código |
+|---|---|---|
+| Paciente inexistente o de otro nutriólogo | 404 | `NOT_FOUND` |
+| Ya tiene cuenta | 409 | `PATIENT_ALREADY_LINKED` |
+| Expediente archivado | 422 | `PATIENT_NOT_INVITABLE` |
+| Sin correo en el expediente | 422 | `PATIENT_NOT_INVITABLE` |
+| Sin consentimiento de datos sensibles | 422 | `PATIENT_NOT_INVITABLE` |
+
+El consentimiento es requisito duro: sin él no hay base legal para abrir una segunda superficie
+de acceso al expediente.
+
+**La activación es atómica, y la carrera no se resuelve leyendo primero.** Crear el usuario,
+enlazarlo y quemar el token ocurren en una transacción interactiva. Los dos `updateMany` llevan
+la condición en el `where` (`userId: null`, `usedAt: null`) y se comprueba el `count`: si otra
+petición se adelantó —doble clic en el enlace, dos pestañas— el update no afecta filas y la
+transacción se revierte entera. Comprobar antes y escribir después habría dejado una ventana
+para dos cuentas sobre el mismo expediente. El `P2002` del correo se traduce a un motivo propio
+(`correo_ocupado`) en vez de propagarse como 500.
+
+**`requierePaciente` no acepta un `patient_id` del cliente, ni puede.** Devuelve el `patientId`
+resuelto desde `session.user.id` a través de la relación `patientAccount`, en cada petición.
+Verifica rol `END_USER`, usuario no borrado, expediente no borrado y `estado = ACTIVO`: un
+paciente archivado pierde el acceso, no los datos. Los cuatro rechazos devuelven **el mismo
+cuerpo** —403 `FORBIDDEN` con un solo mensaje—, y hay un test que lo afirma comparando las
+respuestas: distinguirlos revelaría el estado del expediente a quien no debe conocerlo.
+
+No se verifica `emailVerified` porque la activación lo marca en el acto: llegar ahí exige haber
+abierto un enlace que solo existió en el buzón del paciente.
+
+**El correo no lleva un solo dato clínico.** `enviarInvitacionPaciente` usa la misma plantilla y
+el mismo escapado de HTML que el resto del correo al paciente, y solo menciona nombre de pila y
+consultorio. El enlace apunta a la app del paciente (`PACIENTES_URL`, variable nueva,
+`http://localhost:3001` en local), no al panel.
+
+**El panel muestra el estado, no lo deduce.** El detalle del paciente incorpora `acceso_app`
+(`cuenta_activa` + `invitacion_pendiente` con fechas), calculado en el servidor a partir de la
+invitación vigente. No expone el `user_id` ni el hash del token. El botón "Invitar a la app" vive
+en el encabezado de la ficha y cambia a "Reenviar invitación" cuando hay una pendiente; los
+motivos de rechazo se muestran tal cual llegan del servidor, sin duplicar la regla en el cliente.
+
+**La respuesta nunca incluye el token.** Si el correo no sale, se reinvita; no se copia el enlace
+desde el panel. La única excepción es `enlace_activacion_dev`, que solo aparece en desarrollo sin
+proveedor de correo configurado, igual que en el alta de nutriólogo.
+
+**Lo que esta fase deja explícitamente pendiente**
+
+- **La ruta `POST /api/v1/auth/activate` no existe todavía**, porque `apps/web/pacientes` tampoco:
+  crear la app es el entregable de la Fase 6, y montarla en `nutriologos` violaría §2 (cada app
+  expone solo sus endpoints). La lógica completa —`activarCuentaPaciente`— está escrita y probada;
+  la Fase 6 solo tiene que envolverla en un handler con validación Zod y límite de tasa.
+- **Los E2E de §6.3** (`aislamiento-pacientes.spec.ts`) y el CI quedaron fuera por instrucción
+  explícita para esta fase. Ese spec necesita además la app del paciente para tener endpoints que
+  probar.
+
+**Un test intermitente, arreglado de paso.** `crypto.test.ts` › "rechaza un sobre alterado"
+fallaba una de cada cuatro corridas. No era sensible al tiempo, como se sospechó en la Fase 1: el
+test alteraba el **último** carácter base64 del ciphertext, y ese carácter lleva bits de relleno
+que se descartan al decodificar. Cuando el último byte cifrado terminaba en `00` binario, cambiar
+`A` por `B` devolvía exactamente los mismos bytes, el tag GCM seguía siendo válido y `decryptText`
+no lanzaba. Ahora se altera el primer carácter del ciphertext, que siempre lleva 6 bits
+significativos; 8 corridas seguidas en verde. El cifrado no se tocó: el fallo era del test.
+
+**Verificación**
+
+| Comprobación | Resultado |
+|---|---|
+| `npm run type-check --workspaces` | Limpio en los **4** workspaces |
+| `npm run test --workspaces` | **733/733** — 93 en `nutriologos` (14 suites) + 338 en `servidor` (44 suites) + 302 en `shared` (18 suites) |
+| Tests nuevos de la fase | **44** — 24 de invitación y activación, 10 de `requierePaciente`, 4 del serializador de acceso, 6 del botón del panel |
+| Cobertura de líneas | `servidor` 65.65 % (umbral 60), `nutriologos` 49.94 % (umbral 45), `shared` 99.3 % (umbral 80) |
+| `npm run build:nutriologos` | Build de producción exitoso; `/api/v1/patients/[id]/invite` registrada |
+| `crypto.test.ts` en aislamiento | 8/8 corridas en verde tras el arreglo |
+| Suite E2E y CI | No ejecutados (fuera de alcance de esta fase por instrucción) |
+
+**Notas y deuda**
+
+- `PACIENTES_URL` es variable nueva: hay que darla de alta en el proyecto de Vercel de
+  `nutriologos` antes de invitar a nadie en producción. Sin ella, el enlace apunta a
+  `http://localhost:3001` y la invitación llega inservible. Queda anotada para §11.
+- El tope de invitaciones es por nutriólogo (30/hora), no por IP: la acción ya exige sesión y lo
+  que hay que acotar es la cuenta que dispara correo hacia terceros.
+- `packages/servidor` sube de 63.39 % a 65.65 % de cobertura. Sigue por debajo del 80 % que
+  `rules/testing.md` pide al backend; el hueco son módulos de fases anteriores, no los de esta.
 
 ### Fase 2 — Modelo de datos ✅ (2026-07-28)
 

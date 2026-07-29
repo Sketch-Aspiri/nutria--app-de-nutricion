@@ -44,6 +44,14 @@ const RELACIONES_DETALLE = {
     orderBy: { updatedAt: 'desc' },
     take: 1,
   },
+  // Solo la invitación vigente: el panel muestra si hay una pendiente, no el
+  // historial. El hash del token no sale del servidor.
+  invites: {
+    where: { usedAt: null },
+    orderBy: { createdAt: 'desc' },
+    take: 1,
+    select: { createdAt: true, expiresAt: true },
+  },
 } satisfies Prisma.PatientInclude;
 
 type WithMedicalRecord = {

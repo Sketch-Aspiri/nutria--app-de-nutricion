@@ -45,7 +45,13 @@ describe('cifrado de columnas clínicas', () => {
 
   it('rechaza un sobre alterado o movido a otra columna', () => {
     const encrypted = encryptText('Dato clínico sensible', CONTEXT) as string;
-    const changed = `${encrypted.slice(0, -1)}${encrypted.endsWith('A') ? 'B' : 'A'}`;
+    // Se altera el PRIMER carácter del ciphertext, no el último: en base64 el
+    // último puede llevar bits de relleno que se descartan al decodificar, así
+    // que cambiarlo devolvía los mismos bytes —y el sobre seguía siendo válido—
+    // una de cada cuatro corridas, según el último byte del cifrado.
+    const inicio = encrypted.lastIndexOf(':') + 1;
+    const alterado = encrypted[inicio] === 'A' ? 'B' : 'A';
+    const changed = `${encrypted.slice(0, inicio)}${alterado}${encrypted.slice(inicio + 1)}`;
 
     expect(() => decryptText(changed, CONTEXT)).toThrow(EncryptionIntegrityError);
     expect(() => decryptText(encrypted, 'messages.texto')).toThrow(EncryptionIntegrityError);

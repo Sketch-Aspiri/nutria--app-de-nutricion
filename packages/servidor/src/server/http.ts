@@ -32,6 +32,10 @@ export const ErrorCode = {
   BILLING_NOT_CONFIGURED: 'BILLING_NOT_CONFIGURED',
   /** 422: la petición es correcta, pero el expediente no tiene los datos clínicos. */
   EXPEDIENTE_INCOMPLETO: 'EXPEDIENTE_INCOMPLETO',
+  /** 409: el paciente ya tiene cuenta en la app; corresponde recuperar contraseña. */
+  PATIENT_ALREADY_LINKED: 'PATIENT_ALREADY_LINKED',
+  /** 422: falta correo, consentimiento o el expediente está archivado. */
+  PATIENT_NOT_INVITABLE: 'PATIENT_NOT_INVITABLE',
   /** 422: el plan menciona un alérgeno declarado por el paciente. */
   PLAN_ALLERGEN_CONFLICT: 'PLAN_ALLERGEN_CONFLICT',
   /** 422: el plan no tiene energía o contenido suficiente para activarse. */

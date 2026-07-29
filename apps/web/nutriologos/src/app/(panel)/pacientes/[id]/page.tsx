@@ -16,6 +16,7 @@ import { useState } from 'react';
 import { etiquetaObjetivo } from '@nutria/shared';
 
 import { EditarPacienteModal } from '@/components/pacientes/EditarPacienteModal';
+import { InvitarApp } from '@/components/pacientes/InvitarApp';
 import { TabCalculo } from '@/components/pacientes/TabCalculo';
 import { TabExpediente } from '@/components/pacientes/TabExpediente';
 import { TabPlan } from '@/components/pacientes/TabPlan';
@@ -37,7 +38,7 @@ type TabId = (typeof TABS)[number]['id'];
 
 export default function PacienteDetallePage() {
   const params = useParams<{ id: string }>();
-  const { paciente, calculo, cargando } = usePaciente(params.id);
+  const { paciente, calculo, accesoApp, cargando } = usePaciente(params.id);
   const [tab, setTab] = useState<TabId>('expediente');
   const [editando, setEditando] = useState(false);
 
@@ -75,9 +76,12 @@ export default function PacienteDetallePage() {
             {etiquetaObjetivo(paciente.medico.objetivo, paciente.medico.objetivoOtro)}
           </div>
         </div>
-        <Btn variant="outline" size="sm" className="ml-auto" onClick={() => setEditando(true)}>
-          <Pencil size={14} /> Editar paciente
-        </Btn>
+        <div className="ml-auto flex items-center gap-3">
+          <InvitarApp pacienteId={params.id} acceso={accesoApp} />
+          <Btn variant="outline" size="sm" onClick={() => setEditando(true)}>
+            <Pencil size={14} /> Editar paciente
+          </Btn>
+        </div>
       </div>
       <div className="flex gap-1 mb-5 border-b border-stone-200 overflow-x-auto">
         {TABS.map((t) => (

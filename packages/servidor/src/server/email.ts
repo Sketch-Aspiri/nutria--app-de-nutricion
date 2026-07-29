@@ -3,12 +3,21 @@ import path from 'node:path';
 
 import { Resend } from 'resend';
 
+import { INVITACION_VALIDA_DIAS } from './auth/tokens';
 import { esDesarrollo, logger } from './logger';
 
 const FROM_DEFAULT = 'nutria <no-reply@resend.dev>';
 
 function baseUrl(): string {
   return process.env.AUTH_URL ?? process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
+}
+
+/**
+ * Dominio de la app del paciente (`mi.nutria.mx`), distinto del panel.
+ * En local corre en el puerto 3001, según §3.3 del plan de la app del paciente.
+ */
+function basePacientes(): string {
+  return process.env.PACIENTES_URL ?? 'http://localhost:3001';
 }
 
 export type ResultadoEnvio =
@@ -124,6 +133,46 @@ export async function enviarVerificacionEmail(
 
   if (!resultado.enviado && esDesarrollo()) {
     logger.warn('Correo no enviado (RESEND_API_KEY sin configurar). Enlace de verificación:', {
+      url,
+    });
+    return { ...resultado, enlaceDev: url };
+  }
+  return resultado;
+}
+
+export type InvitacionPaciente = {
+  para: string;
+  pacienteNombre: string;
+  /** Nombre del consultorio o del profesional que invita. */
+  consultorio: string;
+  token: string;
+};
+
+/**
+ * Invitación a la app del paciente.
+ *
+ * Como el resto del correo dirigido al paciente, no lleva un solo dato clínico:
+ * un buzón compartido o reenviado no debe revelar peso, objetivo ni plan. El
+ * enlace apunta a la app del paciente, no al panel.
+ */
+export async function enviarInvitacionPaciente(
+  invitacion: InvitacionPaciente,
+): Promise<ResultadoEnvio> {
+  const url = `${basePacientes()}/activar?token=${encodeURIComponent(invitacion.token)}`;
+  const consultorio = escaparHtml(invitacion.consultorio);
+  const resultado = await enviar(
+    invitacion.para,
+    'Tu acceso a la app de nutria',
+    plantilla(
+      `Hola, ${escaparHtml(invitacion.pacienteNombre)}`,
+      `<strong>${consultorio}</strong> te invita a usar la app de nutria para seguir tu plan, registrar tus comidas y escribirle desde tu teléfono. Crea tu contraseña para entrar; el enlace vence en ${INVITACION_VALIDA_DIAS} días.`,
+      { texto: 'Crear mi contraseña', url },
+      'Si no reconoces esta invitación, ignora este correo: la cuenta no se crea hasta que abras el enlace.',
+    ),
+  );
+
+  if (!resultado.enviado && esDesarrollo()) {
+    logger.warn('Correo no enviado (RESEND_API_KEY sin configurar). Enlace de activación:', {
       url,
     });
     return { ...resultado, enlaceDev: url };

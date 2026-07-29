@@ -22,6 +22,7 @@ import {
   archivarPacienteApi,
   crearPacienteApi,
   guardarCalculoApi,
+  invitarPacienteApi,
   listarPacientes,
   obtenerPaciente,
 } from '@/services/pacientes';
@@ -68,9 +69,25 @@ export function usePaciente(id: string) {
   return {
     paciente,
     calculo: (consulta.data as PacienteApi | undefined)?.calculo ?? null,
+    accesoApp: (consulta.data as PacienteApi | undefined)?.acceso_app ?? null,
     cargando: consulta.isPending,
     error: consulta.error,
   };
+}
+
+/**
+ * Invita al paciente a su app. Al terminar se refresca el detalle: el estado de
+ * la invitación lo calcula el servidor, no el cliente.
+ */
+export function useInvitarPaciente(pacienteId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => invitarPacienteApi(pacienteId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: [...CLAVE_PACIENTES, pacienteId] });
+    },
+  });
 }
 
 export function useCrearPaciente() {

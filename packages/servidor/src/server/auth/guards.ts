@@ -11,6 +11,14 @@ export type SesionValida = { ok: true; sesion: Session; userId: string };
 export type SesionInvalida = { ok: false; respuesta: NextResponse };
 export type ResultadoSesion = SesionValida | SesionInvalida;
 
+export type SesionPaciente = {
+  ok: true;
+  sesion: Session;
+  userId: string;
+  patientId: string;
+};
+export type ResultadoSesionPaciente = SesionPaciente | SesionInvalida;
+
 /**
  * Guarda de autorización para los handlers de `/api/v1`.
  *
@@ -61,4 +69,60 @@ export async function requiereNutriologo(): Promise<ResultadoSesion> {
   }
 
   return { ok: true, sesion, userId: sesion.user.id };
+}
+
+/** Un solo mensaje para todos los rechazos: distinguirlos revelaría el estado del expediente. */
+const SIN_ACCESO_PACIENTE = 'Tu cuenta no tiene acceso a la app del paciente.';
+
+/**
+ * Guarda de autorización para los handlers de `/api/v1/me/*` (app del paciente).
+ *
+ * Devuelve el `patientId` **resuelto en el servidor** a partir de la sesión.
+ * Regla innegociable del plan (§6.2): ningún endpoint de la app del paciente
+ * acepta un `patient_id` del cliente; si una ruta lo recibiera, se compara
+ * contra este y se responde 403 ante discrepancia.
+ *
+ * Un expediente archivado o borrado pierde el acceso, no los datos: el
+ * nutriólogo sigue viéndolo en su panel.
+ */
+export async function requierePaciente(): Promise<ResultadoSesionPaciente> {
+  const sesion = await auth();
+
+  if (!sesion?.user?.id) {
+    return { ok: false, respuesta: unauthenticated() };
+  }
+
+  let usuario;
+  try {
+    usuario = await prisma.user.findFirst({
+      where: { id: sesion.user.id, deletedAt: null },
+      select: {
+        role: true,
+        patientAccount: { select: { id: true, estado: true, deletedAt: true } },
+      },
+    });
+  } catch (error: unknown) {
+    logger.error('Falló la validación de la sesión del paciente', error);
+    return { ok: false, respuesta: internalError() };
+  }
+  if (!usuario) {
+    return { ok: false, respuesta: unauthenticated() };
+  }
+
+  if (usuario.role !== 'END_USER') {
+    return {
+      ok: false,
+      respuesta: jsonError(403, ErrorCode.FORBIDDEN, SIN_ACCESO_PACIENTE),
+    };
+  }
+
+  const paciente = usuario.patientAccount;
+  if (!paciente || paciente.deletedAt || paciente.estado !== 'ACTIVO') {
+    return {
+      ok: false,
+      respuesta: jsonError(403, ErrorCode.FORBIDDEN, SIN_ACCESO_PACIENTE),
+    };
+  }
+
+  return { ok: true, sesion, userId: sesion.user.id, patientId: paciente.id };
 }

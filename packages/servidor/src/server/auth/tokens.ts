@@ -5,6 +5,8 @@ import { prisma } from '@/server/db';
 const TOKEN_BYTES = 32;
 export const VERIFICACION_VALIDA_HORAS = 24;
 export const RESET_VALIDO_HORAS = 1;
+/** Invitación del paciente a su app: vive aquí con el resto de vigencias. */
+export const INVITACION_VALIDA_DIAS = 7;
 
 /**
  * En la base solo se guarda el SHA-256 del token: quien lea la tabla no puede

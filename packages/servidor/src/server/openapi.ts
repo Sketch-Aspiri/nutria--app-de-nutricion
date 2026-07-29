@@ -257,6 +257,14 @@ const listaNotasSchema = z.object({
   meta: metaPaginacionSchema,
 });
 
+/** El token de activación nunca sale en la respuesta: solo viaja por correo. */
+const invitacionSchema = z
+  .object({
+    invitacion_enviada: z.boolean(),
+    expira_en: fechaHora,
+  })
+  .meta({ id: 'InvitacionPaciente' });
+
 const json = <T extends z.ZodType>(schema: T) => ({
   'application/json': { schema },
 });
@@ -438,6 +446,24 @@ export const openApiDocument = createDocument({
         responses: {
           '200': respuesta('Nota firmada', notaConsultaSchema),
           '404': respuesta('Nota no encontrada', errorSchema),
+          ...erroresComunes,
+        },
+      },
+    },
+    '/api/v1/patients/{id}/invite': {
+      post: {
+        tags: ['Expediente'],
+        summary: 'Invita al paciente a su app; el token viaja solo por correo',
+        requestParams: { path: pacienteIdPath },
+        responses: {
+          '201': respuesta('Invitación emitida y enviada', invitacionSchema),
+          '404': respuesta('Paciente no encontrado', errorSchema),
+          '409': respuesta('El paciente ya tiene cuenta (PATIENT_ALREADY_LINKED)', errorSchema),
+          '422': respuesta(
+            'Sin correo, sin consentimiento o archivado (PATIENT_NOT_INVITABLE)',
+            errorSchema,
+          ),
+          '429': respuesta('Demasiadas invitaciones (RATE_LIMITED)', errorSchema),
           ...erroresComunes,
         },
       },

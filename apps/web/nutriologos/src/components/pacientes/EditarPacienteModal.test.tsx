@@ -49,6 +49,7 @@ function pacienteApi(overrides: Partial<PacienteApi> = {}): PacienteApi {
     mediciones: [ultima],
     ultima_medicion: ultima,
     calculo: null,
+    acceso_app: { cuenta_activa: false, invitacion_pendiente: null },
     ...overrides,
   };
 }

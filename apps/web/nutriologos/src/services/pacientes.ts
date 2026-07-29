@@ -37,6 +37,12 @@ export type CalculoApi = {
   snapshot: SnapshotCalculo;
 };
 
+/** Estado del acceso del paciente a su app (fase 3 del plan de `pacientes`). */
+export type AccesoAppApi = {
+  cuenta_activa: boolean;
+  invitacion_pendiente: { enviada_en: string; expira_en: string } | null;
+};
+
 export type PacienteApi = {
   id: string;
   nombre: string;
@@ -65,11 +71,17 @@ export type PacienteApi = {
   mediciones: MedicionApi[];
   ultima_medicion: MedicionApi | null;
   calculo: CalculoApi | null;
+  acceso_app: AccesoAppApi;
 };
 
 export type PacienteResumenApi = Omit<
   PacienteApi,
-  'expediente_medico' | 'preferencias_alimentarias' | 'mediciones' | 'ultima_medicion' | 'calculo'
+  | 'expediente_medico'
+  | 'preferencias_alimentarias'
+  | 'mediciones'
+  | 'ultima_medicion'
+  | 'calculo'
+  | 'acceso_app'
 > & { objetivo: ObjetivoDb | null; objetivo_otro: string | null };
 
 export type ErrorApi = {
@@ -306,6 +318,21 @@ export function actualizarPreferenciasApi(
  */
 export function archivarPacienteApi(id: string): Promise<void> {
   return pedir<void>(`/api/v1/patients/${id}`, { method: 'DELETE' });
+}
+
+export type InvitacionApi = {
+  invitacion_enviada: boolean;
+  expira_en: string;
+  /** Solo en desarrollo sin proveedor de correo configurado. */
+  enlace_activacion_dev?: string;
+};
+
+/**
+ * Invita al paciente a su app. El token viaja únicamente por correo: la
+ * respuesta no lo incluye, así que reinvitar es la única forma de reenviarlo.
+ */
+export function invitarPacienteApi(id: string): Promise<InvitacionApi> {
+  return pedir<InvitacionApi>(`/api/v1/patients/${id}/invite`, { method: 'POST' });
 }
 
 export type MedicionPayload = NonNullable<CrearPacientePayload['antropometria']> & {
