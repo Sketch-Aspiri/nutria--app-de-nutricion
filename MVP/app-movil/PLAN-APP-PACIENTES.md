@@ -407,7 +407,7 @@ Límites de tasa (`rate-limit.ts`) por `user_id`: escritura 60/min, IA según §
 
 ---
 
-## 8. Fase 5 — IA del paciente
+## 8. Fase 5 — IA del paciente ✅
 
 Tres casos de uso nuevos en `packages/servidor/src/server/ai/config.ts`:
 
@@ -591,7 +591,7 @@ Se dejan fuera a propósito, y se anotan aquí para que no se cuelen a mitad de 
 | 2 | **Modelo de datos** ✅ | Migraciones de `meal_logs`, `water_logs`, `patient_invites` | 1 |
 | 3 | **Identidad del paciente** ✅ | Invitación, activación, `requierePaciente` | 2 |
 | 4 | **API `/api/v1/me/*`** ✅ | Endpoints con tests de integración | 3 |
-| 5 | IA del paciente | Coach, estimación, sustitución, con cuotas y guardas | 4 |
+| 5 | **IA del paciente** ✅ | Coach, estimación, sustitución, con cuotas y guardas | 4 |
 | 6 | Cascarón y PWA | App navegable e instalable | 3 |
 | 7 | Hoy y registro | Pantalla principal completa | 4, 5, 6 |
 | 8 | Plan y recetas | Plan y recetas compartidas | 4, 6 |
@@ -609,6 +609,131 @@ Las fases 0 a 5 son secuenciales. De la 7 a la 11 son independientes entre sí u
 ---
 
 ## 15. Bitácora
+
+### Fase 5 — IA del paciente ✅ (2026-07-29)
+
+Los tres casos de uso de §8 están montados en `apps/web/pacientes`: `POST /me/ai/coach`,
+`/me/ai/meal_estimate` y `/me/ai/substitution`. Con ellos la superficie de la API del paciente
+queda cerrada en **21 endpoints**, y la fase salda además la deuda que la 4 dejó anotada: el
+contrato OpenAPI propio de la app.
+
+**Ningún endpoint de IA del paciente escribe. Ninguno.** No es una promesa del prompt, es la
+forma del código: `servicioPaciente.ts` no importa nada que mute, y la estimación de comida se
+**devuelve** en lugar de guardarse. Registrarla es una segunda llamada, a
+`POST /me/meal_logs` con `origen = IA`, que el paciente dispara al confirmar. Si el modelo
+alucina 900 kcal en una manzana, eso muere en la pantalla; no entra a su diario ni al
+expediente que lee su nutrióloga.
+
+**El contexto del paciente es un módulo aparte, y más pobre a propósito.**
+`contextoPaciente.ts` es hermano de `contexto.ts`, no una variante suya. La diferencia es
+quién lee la salida:
+
+| Dato | Panel (`contexto.ts`) | Paciente (`contextoPaciente.ts`) |
+|---|---|---|
+| Objetivo, alergias, tipo de dieta, disgustos | sí | sí |
+| Metas del plan | del último plan con snapshot | **solo del plan activo y compartido** |
+| Edad, peso, altura, nivel de actividad | sí | no |
+| Condiciones, antecedentes, medicamentos | sí | **no** |
+
+Los últimos dos renglones son el punto. Un nutriólogo necesita la ficha clínica para juzgar un
+borrador; una orientación general sobre qué desayunar no mejora porque el modelo sepa que el
+paciente toma metformina, y sí empeora el riesgo si esa respuesta se muestra sin revisión. Un
+test enumera las claves del contexto y falla si alguien agrega una: el módulo no puede crecer
+por descuido.
+
+**Las metas salen del plan compartido, no del último calculado.** El panel puede orientarse
+con un cálculo que aún no aprueba; el coach no. Si no hay plan activo y compartido, el prompt
+dice literalmente que el paciente *no tiene metas asignadas y que no se inventen cifras* — la
+misma regla de §5.4 que impide mostrar ceros.
+
+**El nombre de pila no viaja, aunque §8.3 lo permitía.** Es la única desviación deliberada del
+plan en esta fase. El argumento en contra pesó más: `seudonimizarTexto` borra el nombre del
+texto libre del propio paciente, así que mandarlo como campo estructurado lo reintroduciría por
+la puerta de al lado, y un nombre junto a datos de salud sí es identificador. El coach habla de
+tú, que era el efecto que se buscaba. Queda anotado por si se quiere revertir con criterio de
+producto.
+
+**Dos cuotas, y la del paciente no se suelta en beta.** El consumo se cobra a la cuota mensual
+del nutriólogo dueño del expediente —§8.5: es quien paga la suscripción— y encima corre un tope
+propio de 30 interacciones al mes por paciente. Los dos contadores viven en `ai_usage`, cada
+uno bajo su `user_id`; el paciente tiene fila en `users` desde que activa su cuenta en la fase
+3, así que no hizo falta tabla nueva ni migración.
+
+Lo que sí difiere es qué se guarda en cada fila: en la del nutriólogo, generaciones **y**
+tokens; en la del paciente, solo generaciones. Anotar los tokens en las dos haría que el gasto
+del mes se contara doble al sumarlas.
+
+`calcularCuotaPaciente` no tiene modo beta, y eso es intencional. La cuota de la clínica se
+suelta durante la beta comercial (`limite: null`), y precisamente por eso el tope del paciente
+tiene que seguir vigente: si los dos se soltaran, no quedaría nada acotando el gasto.
+
+**Quién rechaza cambia lo que se le dice.** La reserva devuelve el motivo como valor, no como
+excepción, porque "ya usaste tus 30 consultas del mes" y "la cuota de tu nutrióloga se agotó"
+no son el mismo mensaje. El segundo, además, se le dice **sin cifras**: el plan del consultorio
+y cuánto le queda son información comercial de otra persona. Hay un test que compara la
+respuesta contra `/PRO|150|plan/` para que no se cuele.
+
+**La guarda de alergias está en la salida, no solo en el prompt.** El sustituto propuesto se
+revisa contra las alergias declaradas con `tieneConflictoAlergia` —la misma función que usa el
+panel— y si menciona una, se rechaza con 422 y se deriva a la nutrióloga. No se reintenta: un
+segundo intento sobre el mismo ingrediente suele reincidir, y la respuesta segura ante una
+sugerencia peligrosa es no dar ninguna.
+
+**Nada se degrada a texto.** El panel entrega un borrador malo para que el nutriólogo lo edite;
+aquí no hay a quién entregárselo. Si la salida no parsea o no valida, se responde
+`422 AI_INVALID_OUTPUT` con un motivo redactado para el paciente. Entregarle una salida cruda a
+quien no puede juzgarla sería peor que no entregar nada.
+
+**El coach no guarda conversación.** El historial lo conserva el cliente y viaja en el cuerpo,
+acotado a 6 turnos y con los dos roles cerrados por enum —un `rol: "sistema"` sería una vía de
+inyección—. Lo que un paciente le pregunta a un asistente no es expediente clínico y no tiene
+por qué persistirse; y sin tabla, no hay nada que exportar ni que borrar en los derechos ARCO
+de la fase 11.
+
+**Dos límites de tasa, que resuelven cosas distintas.** El tope mensual protege el bolsillo;
+`limiteDeIa` (6/min por `user_id`) protege el minuto: sin él, un cliente en bucle quema las 30
+interacciones del mes en diez segundos y el paciente se queda sin asistente por un error de
+programación.
+
+**El aviso viaja en la respuesta, no en la UI.** `AVISO_IA_PACIENTE` —"Orientación general. No
+sustituye a tu nutrióloga.", textual del prototipo— sale en el JSON de los tres endpoints. Si
+lo pusiera cada pantalla, la primera pantalla nueva que se agregue lo va a olvidar.
+
+**La deuda de OpenAPI de la fase 4, saldada.** `packages/servidor/src/server/me/openapi.ts`
+describe los 21 endpoints y se sirve en `/api/v1/docs` de la app del paciente, apagado en
+producción igual que el del panel. Es un documento **propio**, no un capítulo del otro: son dos
+superficies con audiencias y sesiones distintas, y mezclarlas describiría rutas que ninguna de
+las dos apps monta. Tres tests lo vigilan: que toda ruta empiece con `/api/v1/me`, que el
+documento completo no contenga la cadena `patient_id` ni `nutritionist_id`, y que la cuota
+publicada sea la del paciente y no la de la clínica.
+
+**Verificación**
+
+| Comprobación | Resultado |
+|---|---|
+| `npm run type-check --workspaces` | Limpio en los **5** |
+| `npm run test --workspaces` | **917/917** — 93 `nutriologos` + 43 `pacientes` + 452 `servidor` + 329 `shared` |
+| Tests nuevos de la fase | **90** — 21 del servicio, 14 del contexto, 12 de la doble cuota, 9 de esquemas, 7 del mapeo HTTP, 7 del OpenAPI, 7 del tope compartido, 13 de los handlers |
+| Cobertura de líneas | `pacientes` 78.15 % (umbral 70), `servidor` 68.83 % (60), `nutriologos` 49.94 % (45), `shared` 99.33 % (80) |
+| `npm run build:pacientes` | Build exitoso; **21 rutas** de `/api/v1/me/*` más `/api/v1/docs` y el handler de Auth.js |
+| `npm run build:nutriologos` | Sin regresión |
+| Suite E2E y CI | No ejecutados (fuera de alcance por instrucción) |
+
+**Notas y deuda**
+
+- **Ningún test llama a la API real de Anthropic**, conforme a §8 de `rules/ai-guidelines.md`:
+  `generar` está mockeado en todos. Falta una prueba de humo contra el proveedor real, que
+  corresponde a la fase 12 junto con los E2E.
+- `rules/ai-guidelines.md` gana una sección 9 con las cuatro reglas que la IA del paciente
+  endurece respecto de la del panel. El documento decía aplicar a todo
+  `packages/servidor/src/server/ai/`, y esta fase agregó tres casos de uso con reglas propias.
+- La app del paciente no declara `@anthropic-ai/sdk` en su `package.json`, igual que
+  `nutriologos`: llega izada desde `packages/servidor`, que sí la declara y ambas apps
+  consumen. Es la convención que fijó la fase 1, no un olvido.
+- `packages/servidor` sube de 65.48 % a **68.83 %**. Sigue por debajo del 80 % que
+  `rules/testing.md` pide al backend; el hueco son módulos de fases anteriores.
+- El coach todavía no tiene pantalla: la fase 7 conecta el registro por texto y la 8 la
+  sustitución de ingrediente en la vista de recetas.
 
 ### Fase 4 — API `/api/v1/me/*` ✅ (2026-07-28)
 

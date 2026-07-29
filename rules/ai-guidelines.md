@@ -73,3 +73,27 @@ nutriólogo; solo el texto, y solo cuando pide estructurarlo.
 
 Toda función nueva de IA lleva test de la validación clínica y del camino de degradación.
 El proveedor se mockea: los tests nunca llaman a la API real.
+
+## 9. IA que lee el paciente
+
+Los tres casos de uso de `apps/web/pacientes` (`COACH_PACIENTE`, `ESTIMACION_COMIDA`,
+`SUSTITUCION_INGREDIENTE`) heredan todo lo anterior, y encima cambian cuatro cosas — porque
+del otro lado no hay un profesional revisando:
+
+1. **Contexto más pobre.** `contextoPaciente.ts` manda objetivo, metas del plan compartido,
+   alergias, tipo de dieta y disgustos. **No** manda antecedentes, medicamentos, condiciones
+   ni mediciones: esos son para el criterio del nutriólogo, y la salida aquí la lee el
+   paciente. Tampoco el nombre de pila.
+2. **Nada se degrada a texto.** Si la salida no valida, se responde `422 AI_INVALID_OUTPUT`
+   y se le pide reintentar. Entregarle una salida cruda a quien no puede juzgarla es peor
+   que no entregar nada.
+3. **Dos topes, no uno.** El consumo se cobra a la cuota del nutriólogo dueño del expediente
+   —es quien paga— y encima corre un tope propio por paciente
+   (`LIMITE_INTERACCIONES_IA_PACIENTE`, 30/mes) para que uno solo no agote la del consultorio.
+   El tope del paciente sigue vigente aunque la cuota de la clínica esté en modo beta.
+4. **Aviso obligatorio en la respuesta.** `AVISO_IA_PACIENTE` viaja en el JSON, no lo escribe
+   la UI: así ninguna pantalla nueva puede mostrar una salida del modelo sin él.
+
+Y una garantía estructural, no de prompt: **ningún endpoint de IA del paciente escribe**. La
+estimación de comida se devuelve y es la app la que registra el resultado en `meal_logs` con
+`origen = IA` si el paciente lo confirma.

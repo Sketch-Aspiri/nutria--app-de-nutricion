@@ -41,6 +41,14 @@ const repositorio = {
   proximasCitas: jest.fn(),
 };
 
+// La IA cuenta como capa de datos para esta prueba: llamarla pese al rechazo de
+// la guarda sacaría datos del expediente hacia el proveedor.
+const ia = {
+  responderCoach: jest.fn(),
+  estimarComida: jest.fn(),
+  sustituirIngrediente: jest.fn(),
+};
+
 jest.mock('@/server/me/repository', () => repositorio);
 jest.mock('@/server/me/fotos', () => ({
   MAX_FOTO_BYTES: 5 * 1024 * 1024,
@@ -49,6 +57,20 @@ jest.mock('@/server/me/fotos', () => ({
 jest.mock('@/server/me/limites', () => ({
   limiteDeEscritura: jest.fn().mockResolvedValue({ permitido: true }),
   limiteDeFotos: jest.fn().mockResolvedValue({ permitido: true }),
+  limiteDeIa: jest.fn().mockResolvedValue({ permitido: true }),
+}));
+jest.mock('@/server/ai/cliente', () => ({
+  iaConfigurada: () => true,
+  IaNoConfiguradaError: class extends Error {},
+  IaUpstreamError: class extends Error {},
+}));
+jest.mock('@/server/ai/servicioPaciente', () => ({
+  ...ia,
+  CuotaClinicaAgotadaError: class extends Error {},
+  CuotaPacienteAgotadaError: class extends Error {},
+  PacienteSinExpedienteError: class extends Error {},
+  RecetaNoEncontradaError: class extends Error {},
+  SalidaIaInvalidaError: class extends Error {},
 }));
 
 type Invocacion = () => Promise<Response>;
@@ -78,6 +100,9 @@ async function endpoints(): Promise<Array<[string, Invocacion]>> {
   const leidos = await import('@/app/api/v1/me/messages/read/route');
   const citas = await import('@/app/api/v1/me/appointments/route');
   const fotos = await import('@/app/api/v1/me/photos/route');
+  const coach = await import('@/app/api/v1/me/ai/coach/route');
+  const estimacion = await import('@/app/api/v1/me/ai/meal_estimate/route');
+  const sustitucion = await import('@/app/api/v1/me/ai/substitution/route');
 
   const params = { params: Promise.resolve({ id: 'cualquiera' }) };
   const url = new Request('http://localhost:3001/api/v1/me');
@@ -104,6 +129,9 @@ async function endpoints(): Promise<Array<[string, Invocacion]>> {
     ['POST /me/messages/read', () => leidos.POST()],
     ['GET /me/appointments', () => citas.GET()],
     ['POST /me/photos', () => fotos.POST(peticion())],
+    ['POST /me/ai/coach', () => coach.POST(peticion({ mensaje: 'Hola' }))],
+    ['POST /me/ai/meal_estimate', () => estimacion.POST(peticion({ texto: '2 tacos' }))],
+    ['POST /me/ai/substitution', () => sustitucion.POST(peticion({ ingrediente: 'pollo' }))],
   ];
 }
 
@@ -112,9 +140,9 @@ beforeEach(() => {
 });
 
 describe('guarda de sesión en /api/v1/me/*', () => {
-  it('cubre los endpoints publicados de la fase 4', async () => {
+  it('cubre los endpoints publicados de las fases 4 y 5', async () => {
     // Si se agrega un endpoint y no se agrega aquí, este conteo lo delata.
-    expect(await endpoints()).toHaveLength(18);
+    expect(await endpoints()).toHaveLength(21);
   });
 
   it('responde 401 en todos los endpoints cuando no hay sesión', async () => {
@@ -143,7 +171,7 @@ describe('guarda de sesión en /api/v1/me/*', () => {
 
     for (const [, invocar] of await endpoints()) await invocar();
 
-    for (const [nombre, fn] of Object.entries(repositorio)) {
+    for (const [nombre, fn] of Object.entries({ ...repositorio, ...ia })) {
       expect(`${nombre}: ${fn.mock.calls.length}`).toBe(`${nombre}: 0`);
     }
   });

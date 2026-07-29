@@ -1,4 +1,10 @@
-import { LIMITE_GENERACIONES_IA, calcularCuota, mesDeUso } from './limites';
+import {
+  LIMITE_GENERACIONES_IA,
+  LIMITE_INTERACCIONES_IA_PACIENTE,
+  calcularCuota,
+  calcularCuotaPaciente,
+  mesDeUso,
+} from './limites';
 
 describe('mesDeUso', () => {
   it('devuelve el mes en formato YYYY-MM con dos dígitos', () => {
@@ -52,5 +58,49 @@ describe('calcularCuota', () => {
       agotada: true,
       ilimitada: false,
     });
+  });
+});
+
+describe('calcularCuotaPaciente', () => {
+  it('arranca con el tope completo disponible', () => {
+    expect(calcularCuotaPaciente(0)).toEqual({
+      limite: LIMITE_INTERACCIONES_IA_PACIENTE,
+      usadas: 0,
+      restantes: LIMITE_INTERACCIONES_IA_PACIENTE,
+      agotada: false,
+    });
+  });
+
+  it('descuenta cada interacción del tope', () => {
+    expect(calcularCuotaPaciente(4)).toMatchObject({ usadas: 4, restantes: 26, agotada: false });
+  });
+
+  it('marca la cuota agotada al llegar al tope', () => {
+    expect(calcularCuotaPaciente(LIMITE_INTERACCIONES_IA_PACIENTE)).toMatchObject({
+      restantes: 0,
+      agotada: true,
+    });
+  });
+
+  it('nunca devuelve restantes negativas si el contador se pasó', () => {
+    expect(calcularCuotaPaciente(120)).toMatchObject({ restantes: 0, agotada: true });
+  });
+
+  it('trata contadores inválidos como cero consumido', () => {
+    expect(calcularCuotaPaciente(-5).usadas).toBe(0);
+    expect(calcularCuotaPaciente(Number.NaN).usadas).toBe(0);
+    expect(calcularCuotaPaciente(2.7).usadas).toBe(2);
+  });
+
+  it('admite un tope distinto sin tocar el default', () => {
+    expect(calcularCuotaPaciente(3, 5)).toMatchObject({ limite: 5, restantes: 2 });
+    expect(calcularCuotaPaciente(0).limite).toBe(LIMITE_INTERACCIONES_IA_PACIENTE);
+  });
+
+  it('no tiene modo beta: el tope sigue vigente aunque el de la clínica se suelte', () => {
+    // La cuota de la clínica en beta es ilimitada; la del paciente, no. Es la
+    // única defensa contra que un paciente dispare el gasto de la cuenta.
+    expect(calcularCuota('FREE', 400, 'beta').ilimitada).toBe(true);
+    expect(calcularCuotaPaciente(400).agotada).toBe(true);
   });
 });

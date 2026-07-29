@@ -66,3 +66,38 @@ export function calcularCuota(
     ilimitada: false,
   };
 }
+
+/* -------------------------------------------------------------------------- */
+/* Tope por paciente (sección 8 del plan de la app del paciente)               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Interacciones de IA que un paciente puede tener al mes.
+ *
+ * Existe además de la cuota del nutriólogo, no en su lugar: el consumo se cobra
+ * contra la suscripción de la clínica —es quien paga— y sin un tope propio un
+ * solo paciente podría agotarla para todos los demás.
+ */
+export const LIMITE_INTERACCIONES_IA_PACIENTE = 30;
+
+export type CuotaPaciente = {
+  limite: number;
+  usadas: number;
+  restantes: number;
+  agotada: boolean;
+};
+
+/**
+ * A diferencia de `calcularCuota`, no tiene modo beta: la cuota de la clínica se
+ * suelta durante la beta comercial, y precisamente por eso el tope del paciente
+ * sigue vigente. Si los dos se soltaran, no quedaría nada acotando el gasto.
+ */
+export function calcularCuotaPaciente(
+  usadas: number,
+  limite: number = LIMITE_INTERACCIONES_IA_PACIENTE,
+): CuotaPaciente {
+  // Mismo criterio que `calcularCuota`: un contador corrupto no regala cuota.
+  const consumidas = Number.isFinite(usadas) && usadas > 0 ? Math.floor(usadas) : 0;
+  const restantes = Math.max(limite - consumidas, 0);
+  return { limite, usadas: consumidas, restantes, agotada: restantes === 0 };
+}

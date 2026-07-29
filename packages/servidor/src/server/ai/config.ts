@@ -46,6 +46,54 @@ export const CONFIGURACION: Record<TipoGeneracion, ConfiguracionTipo> = {
   PLAN_ACTIVIDAD: { modelo: HAIKU, maxTokens: 900, estructurado: false },
 };
 
+/* -------------------------------------------------------------------------- */
+/* IA de la app del paciente (sección 8 del plan de pacientes)                 */
+/* -------------------------------------------------------------------------- */
+
+export const TIPOS_GENERACION_PACIENTE = [
+  'COACH_PACIENTE',
+  'ESTIMACION_COMIDA',
+  'SUSTITUCION_INGREDIENTE',
+] as const;
+
+export type TipoGeneracionPaciente = (typeof TIPOS_GENERACION_PACIENTE)[number];
+
+/**
+ * Los tres son Haiku y con presupuesto corto a propósito: son respuestas de
+ * pantalla de teléfono, las paga la suscripción del nutriólogo y ninguna tiene
+ * consecuencia clínica —la IA del paciente orienta, no decide—.
+ */
+export const CONFIGURACION_PACIENTE: Record<TipoGeneracionPaciente, ConfiguracionTipo> = {
+  COACH_PACIENTE: { modelo: HAIKU, maxTokens: 400, estructurado: false },
+  ESTIMACION_COMIDA: { modelo: HAIKU, maxTokens: 300, estructurado: true },
+  SUSTITUCION_INGREDIENTE: { modelo: HAIKU, maxTokens: 300, estructurado: true },
+};
+
+/**
+ * Aviso que acompaña a toda salida de IA que ve el paciente. Viaja en la
+ * respuesta —no lo escribe la UI— para que ninguna pantalla nueva pueda
+ * mostrar una respuesta del modelo sin él. Texto tomado del prototipo.
+ */
+export const AVISO_IA_PACIENTE = 'Orientación general. No sustituye a tu nutrióloga.';
+
+/**
+ * Instrucción común de la IA del paciente.
+ *
+ * `SISTEMA_BASE` habla con un profesional que revisa borradores; aquí el lector
+ * es el paciente y no hay revisión de por medio, así que las prohibiciones son
+ * más duras: nada de diagnósticos, nada de cambiar el plan y derivación
+ * explícita a la nutrióloga en cuanto la pregunta pida criterio clínico.
+ */
+export const SISTEMA_BASE_PACIENTE = [
+  'Eres el asistente de una app de nutrición y le escribes directamente al paciente.',
+  'NO eres su nutrióloga y no la sustituyes: orientas sobre lo que ya le indicó y le ayudas a registrar lo que come.',
+  'Nunca emitas diagnósticos, nunca interpretes síntomas, nunca hables de medicamentos ni de suplementos, y nunca afirmes que algo es seguro para su salud.',
+  'NUNCA cambies su plan alimenticio, sus metas ni sus horarios, ni le sugieras hacerlo por su cuenta: si necesita un ajuste, dile que se lo pida a su nutrióloga desde el chat de la app.',
+  'Ante cualquier pregunta médica, síntoma, malestar, embarazo, medicación o duda que requiera criterio clínico, no respondas el fondo: deriva a su nutrióloga en una frase.',
+  'Los datos que recibes están seudonimizados: no conoces su nombre ni su contacto. No los pidas ni los inventes.',
+  'Escribe en español de México, de tú, cálido y breve.',
+].join(' ');
+
 /** Tolerancia respecto a la meta energética antes de rechazar un borrador. */
 export const TOLERANCIA_ENERGIA = 0.05;
 
