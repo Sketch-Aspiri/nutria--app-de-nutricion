@@ -1,4 +1,5 @@
 import { BottomNav } from '@/components/nav/BottomNav';
+import { RegistroProvider } from '@/features/hoy/registro/RegistroProvider';
 
 /**
  * Layout de las pantallas con sesión. La navegación inferior vive aquí y no en
@@ -7,9 +8,9 @@ import { BottomNav } from '@/components/nav/BottomNav';
  */
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <>
+    <RegistroProvider>
       {children}
       <BottomNav />
-    </>
+    </RegistroProvider>
   );
 }

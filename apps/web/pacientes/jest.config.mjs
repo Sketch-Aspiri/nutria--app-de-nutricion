@@ -4,12 +4,10 @@ const createJestConfig = nextJest({ dir: './' });
 
 /** @type {import('jest').Config} */
 const config = {
-  // Node, no jsdom. La fase 6 trajo componentes, pero son cascarón: enlaces,
-  // estados vacíos y clases de Tailwind. Su única lógica —qué pestaña se
-  // enciende— está extraída como función pura (`esRutaActiva`) y se prueba
-  // aquí mismo. El jsdom entra en la fase 7, con los formularios de registro,
-  // que sí tienen interacción que probar.
-  testEnvironment: 'node',
+  // La fase 7 incorpora formularios, hojas y actualizaciones optimistas que sí
+  // requieren un DOM. Los handlers de API conservan `@jest-environment node`
+  // en cada suite para probar Request/Response nativos.
+  testEnvironment: 'jsdom',
   testPathIgnorePatterns: ['<rootDir>/e2e/', '<rootDir>/.next/'],
   coverageThreshold: {
     global: { lines: 70 },

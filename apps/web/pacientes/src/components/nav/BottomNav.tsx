@@ -4,6 +4,8 @@ import { CalendarDays, Home, MessageCircle, Plus, TrendingUp } from 'lucide-reac
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
+import { useAbrirRegistro } from '@/features/hoy/registro/RegistroProvider';
+
 /**
  * Navegación inferior: Hoy · Plan · **+** · Progreso · Mensajes.
  *
@@ -28,6 +30,7 @@ export function esRutaActiva(pathname: string, href: string): boolean {
 
 export function BottomNav() {
   const pathname = usePathname();
+  const abrirRegistro = useAbrirRegistro();
   const [hoy, plan, progreso, mensajes] = DESTINOS;
 
   return (
@@ -39,18 +42,14 @@ export function BottomNav() {
         <Destino key={destino.href} {...destino} pathname={pathname} />
       ))}
 
-      {/*
-        El botón de registrar no es una pestaña: es la acción principal de la
-        app. La hoja de registro llega en la fase 7; hasta entonces el enlace
-        apunta a Hoy, que es donde va a abrirse.
-      */}
-      <Link
-        href="/"
+      <button
+        type="button"
         aria-label="Registrar"
+        onClick={abrirRegistro}
         className="-mt-6 rounded-full bg-emerald-900 p-3.5 text-white shadow-lg shadow-emerald-900/30 transition-colors hover:bg-emerald-800"
       >
         <Plus size={24} aria-hidden />
-      </Link>
+      </button>
 
       {[progreso, mensajes].map((destino) => (
         <Destino key={destino.href} {...destino} pathname={pathname} />
@@ -76,9 +75,7 @@ function Destino({
       className="flex flex-1 flex-col items-center gap-0.5 pb-3"
     >
       <Icono size={22} aria-hidden className={activo ? 'text-emerald-900' : 'text-stone-400'} />
-      <span
-        className={`text-[10px] ${activo ? 'font-medium text-emerald-900' : 'text-stone-400'}`}
-      >
+      <span className={`text-[10px] ${activo ? 'font-medium text-emerald-900' : 'text-stone-400'}`}>
         {etiqueta}
       </span>
     </Link>

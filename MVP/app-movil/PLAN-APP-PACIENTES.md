@@ -460,7 +460,7 @@ y un commit propio.
 **Aceptación:** el paciente demo entra, ve el cascarón navegable con estados vacíos, y la app se
 instala desde Chrome Android e iOS Safari.
 
-### Fase 7 — Hoy y registro
+### Fase 7 — Hoy y registro ✅
 
 - Anillo de calorías, `MacroBar`, tarjeta de agua, tarjeta de adherencia, lista del plan con check
   optimista (React Query `onMutate` + rollback).
@@ -593,7 +593,7 @@ Se dejan fuera a propósito, y se anotan aquí para que no se cuelen a mitad de 
 | 4 | **API `/api/v1/me/*`** ✅ | Endpoints con tests de integración | 3 |
 | 5 | **IA del paciente** ✅ | Coach, estimación, sustitución, con cuotas y guardas | 4 |
 | 6 | **Cascarón y PWA** ✅ | App navegable e instalable | 3 |
-| 7 | Hoy y registro | Pantalla principal completa | 4, 5, 6 |
+| 7 | Hoy y registro ✅ | Pantalla principal completa | 4, 5, 6 |
 | 8 | Plan y recetas | Plan y recetas compartidas | 4, 6 |
 | 9 | Progreso y logros | Gráfica y logros calculados | 4, 6 |
 | 10 | Mensajes | Chat real bidireccional | 4, 6 |
@@ -609,6 +609,87 @@ Las fases 0 a 5 son secuenciales. De la 7 a la 11 son independientes entre sí u
 ---
 
 ## 15. Bitácora
+
+### Fase 7 — Hoy y registro ✅ (2026-07-29)
+
+La portada dejó de ser un estado vacío: ahora consume `GET /api/v1/me/today` y muestra el día real
+del paciente con anillo de calorías, barras de macros, agua, adherencia, racha, comidas del plan y
+registros libres. Sin plan compartido no inventa metas: conserva el registro del día y explica qué
+falta para poder calcular el resto.
+
+**Los nutrientes salen de los snapshots del plan, no de una regla aproximada en la UI.** Una comida
+marcada suma sus items; una comida libre suma los macros que confirmó el paciente. Los marcadores
+antiguos que no guardan macros usan el snapshot como respaldo y los duplicados heredados cuentan
+una sola vez. Las kcal de un plan pueden ser fraccionarias por las medias porciones, pero
+`meal_logs.calorias` acepta enteros: `nutrientesParaRegistroPlan` aplica el único redondeo justo
+antes del POST y lo comparte con el estado optimista.
+
+**Adherencia y racha siguen teniendo una sola fuente.** `/today` las calcula en el servidor con
+`packages/shared/src/adherencia.ts`; el cliente no replica la fórmula ni intenta adivinar el tope
+diario durante una mutación. El check cambia de inmediato y la adherencia se actualiza al recibir
+el resumen canónico.
+
+#### Checks y agua: optimismo con vuelta atrás real
+
+Las dos interacciones usan React Query con el mismo ciclo:
+
+1. cancelar el refetch de `/today`;
+2. guardar la caché completa;
+3. aplicar el check o el total de agua de inmediato;
+4. restaurar exactamente la caché anterior ante error;
+5. invalidar y reconciliar con el servidor al terminar.
+
+La prueba de `useToggleComida` detiene el POST después de `onMutate`, comprueba el check inmediato,
+fuerza el rechazo y verifica el rollback sobre el `QueryClient`, no solo sobre una función auxiliar.
+Si existen dos marcadores antiguos para la misma comida, desmarcar elimina ambos para que el check,
+el anillo y la base no se contradigan al refetch.
+
+#### La hoja de registro ya tiene cuatro flujos
+
+El botón central de la navegación abre una hoja global, disponible desde cualquier pestaña:
+
+| Opción | Flujo real |
+|---|---|
+| Comida | descripción → estimación estructurada de IA → revisión de kcal/macros → confirmación explícita → `meal_logs` con `origen = IA` |
+| Foto | `<input capture="environment">` → vista previa → subida `multipart/form-data` → URL adjunta a un registro manual |
+| Peso | kg con límites del servidor → upsert del día clínico |
+| Ejercicio | actividad + minutos → registro del día clínico |
+
+La foto **no** estima nutrientes: eso sigue fuera de alcance en §12. Se guarda con una descripción
+del paciente y se adjunta al diario. Una falla de red deja foto, texto o cifra en el formulario para
+reintentar; la capa HTTP normaliza incluso un `fetch` rechazado a un mensaje seguro y no filtra la
+URL o el error nativo.
+
+Peso y ejercicio no usan la fecha del teléfono. Al abrir la hoja se fuerza una revalidación de
+`/today` con `staleTime: 0`; ambas opciones quedan deshabilitadas hasta obtener el día en la zona
+horaria del consultorio. Si la red falla, React Query puede conservar la respuesta de ayer en caché,
+pero `RegistroProvider` la rechaza mientras haya `isError`. Hay una prueba específica con caché vieja
+y refetch fallido.
+
+**El coach de la portada también dejó de ser decorativo.** Usa `/api/v1/me/ai/coach`, conserva solo
+el hilo de la hoja en memoria y envía como contexto los últimos seis turnos, que es el límite del
+servidor. No crea otra tabla ni convierte orientación general en expediente clínico.
+
+#### Accesibilidad y estados
+
+`HojaModal` bloquea el scroll, vuelve inerte la rama de la app que queda detrás, atrapa `Tab` y
+`Shift+Tab`, cierra con Escape y restaura el foco al botón que la abrió. Los errores se anuncian con
+`role="alert"` y las confirmaciones con `role="status"`. Anillo, macros, agua y adherencia exponen
+valores accesibles además del color.
+
+#### Verificación
+
+| Comprobación | Resultado |
+|---|---|
+| Suite de `apps/web/pacientes` con cobertura | **97/97**, 12 suites |
+| Cobertura de líneas | **78.18 %**, supera el gate de 70 % |
+| `type-check` de workspaces | Limpio en `nutriologos`, `pacientes`, `servidor`, `shared` y `ui-tokens` |
+| `next build` de pacientes | Build de producción exitoso, 30 rutas |
+| Revisión `code-reviewer` | 7 hallazgos corregidos; segunda revisión sin bloqueantes |
+
+La instalación/cámara en dispositivo real y el E2E que cruza paciente → pestaña de seguimiento del
+nutriólogo quedan para la fase 12, donde el plan agrupa los ocho specs de Playwright. La escritura ya
+usa el mismo `meal_logs` que consume el panel, sin sincronización ni estado paralelo.
 
 ### Fase 6 — Cascarón, PWA e identidad visual ✅ (2026-07-29)
 
