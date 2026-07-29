@@ -29,7 +29,7 @@ const contentSecurityPolicy = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  transpilePackages: ['@nutria/shared'],
+  transpilePackages: ['@nutria/shared', '@nutria/ui-tokens'],
   // Raíz del monorepo: apps/web/pacientes → tres niveles arriba.
   outputFileTracingRoot: path.join(dirname, '../../../'),
   async headers() {

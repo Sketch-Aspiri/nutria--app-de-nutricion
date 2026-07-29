@@ -4,7 +4,7 @@ import {
   safeBeforeSend,
   sentryEnvironment,
   tracesSampleRate,
-} from './src/sentry/privacy';
+} from '../../../packages/servidor/src/sentry/privacy';
 
 Sentry.init({
   dsn: process.env.SENTRY_DSN,

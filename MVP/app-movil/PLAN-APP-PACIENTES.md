@@ -444,7 +444,7 @@ Guardas, todas heredadas de `ai-guidelines.md` y del principio 7 de `CLAUDE.md`:
 Cada fase termina con: tests en verde, `type-check` limpio, revisión con el agente `code-reviewer`,
 y un commit propio.
 
-### Fase 6 — Cascarón, PWA e identidad visual
+### Fase 6 — Cascarón, PWA e identidad visual ✅
 
 - `apps/web/pacientes` con App Router, Tailwind y `@nutria/ui-tokens` (mismas fuentes Fraunces/Inter/
   IBM Plex Mono, misma paleta esmeralda del prototipo — pero con `next/font`, no un `<link>` inyectado
@@ -592,7 +592,7 @@ Se dejan fuera a propósito, y se anotan aquí para que no se cuelen a mitad de 
 | 3 | **Identidad del paciente** ✅ | Invitación, activación, `requierePaciente` | 2 |
 | 4 | **API `/api/v1/me/*`** ✅ | Endpoints con tests de integración | 3 |
 | 5 | **IA del paciente** ✅ | Coach, estimación, sustitución, con cuotas y guardas | 4 |
-| 6 | Cascarón y PWA | App navegable e instalable | 3 |
+| 6 | **Cascarón y PWA** ✅ | App navegable e instalable | 3 |
 | 7 | Hoy y registro | Pantalla principal completa | 4, 5, 6 |
 | 8 | Plan y recetas | Plan y recetas compartidas | 4, 6 |
 | 9 | Progreso y logros | Gráfica y logros calculados | 4, 6 |
@@ -609,6 +609,145 @@ Las fases 0 a 5 son secuenciales. De la 7 a la 11 son independientes entre sí u
 ---
 
 ## 15. Bitácora
+
+### Fase 6 — Cascarón, PWA e identidad visual ✅ (2026-07-29)
+
+La app del paciente ya es una app: siete rutas navegables, instalable desde Chrome Android e iOS
+Safari, con la misma tipografía y la misma paleta esmeralda del prototipo. Lo que se entrega es
+deliberadamente un **cascarón** — las pantallas muestran estados vacíos, no datos. Los 21 endpoints
+de las fases 4 y 5 siguen sin consumirse desde la UI; eso es la fase 7 en adelante.
+
+**Los estados vacíos están escritos para el paciente, no para el equipo.** Plan dice "Tu nutrióloga
+aún no comparte tu plan"; ninguna pantalla muestra un *spinner* eterno, un "próximamente" ni datos
+de ejemplo. La razón de fondo: un plan de mentira en una app de salud es exactamente el tipo de cosa
+que después nadie recuerda que era de mentira. En qué fase llega cada contenido queda en los
+comentarios del código, que es donde le sirve a quien lo va a construir.
+
+**La navegación es de rutas, no de `useState`.** El prototipo cambiaba de pestaña con estado local.
+Aquí cada destino es una ruta con `next/link`, así que el botón de atrás del teléfono funciona, una
+pantalla se puede compartir por enlace y la app instalada reabre donde el paciente la dejó. La
+única lógica de `BottomNav` —qué pestaña se enciende— salió a `esRutaActiva`, función pura con
+tests: con `/` en la lista, un `startsWith` ingenuo dejaría "Hoy" encendido en todas las pantallas.
+
+**La barra inferior vive en el layout de `(app)`, no en el raíz.** `/entrar`, `/activar` y
+`/privacidad` no la muestran. Ofrecer pestañas a quien no tiene sesión solo produce redirecciones.
+
+**Las fuentes se autoalojan.** El prototipo inyectaba un `<link>` a Google dentro de un `useEffect`:
+parpadeo en cada carga, una petición del navegador del paciente a un tercero y un `font-src` que
+había que abrir en la CSP. Con `next/font` las tres familias (Fraunces, Inter, IBM Plex Mono) entran
+al build y la CSP se queda en `font-src 'self' data:`.
+
+**La CSP de esta app es más estrecha que la del panel.** Sin Stripe y sin llamadas directas a
+Anthropic —toda la IA pasa por el servidor, §1—, ni `frame-src` de terceros ni `api.anthropic.com`
+tienen por qué aparecer. Lo único que se abre de más es `camera=(self)` en `Permissions-Policy`,
+que la fase 7 necesita para el registro de comida por foto.
+
+#### El service worker está deliberadamente lisiado
+
+Es la decisión de la fase que más fácil sería equivocar. Un caché mal puesto en una app de salud es
+peor que no tener caché: una versión vieja del plan o del peso servida desde el disco es un dato
+clínico equivocado presentado como actual. Las reglas son cuatro y son restrictivas a propósito:
+
+1. Solo se cachea `/offline.html`. **Ninguna pantalla.**
+2. Nunca se toca `/api/`: todo lo que responde la API va anclado a la sesión, y guardarlo dejaría
+   datos de una cuenta en el disco para la siguiente persona que abra ese navegador.
+3. Solo `GET` del propio origen, y solo navegaciones.
+4. Red primero, siempre. El caché aparece únicamente cuando la navegación falla.
+
+El resultado es que estar sin señal muestra una pantalla que lo dice, y nada más. La redacción de
+esa pantalla se corrigió durante la fase: la primera versión daba a entender que lo registrado sin
+conexión se guardaría y se enviaría después. No es cierto —no hay cola de escritura— y prometerlo
+haría que alguien registrara su comida en el metro y la perdiera. Ahora dice que hace falta conexión.
+
+`sw.js` y `offline.html` están excluidos del `matcher` del middleware. Sin esa exclusión, un service
+worker redirigido a `/entrar` se instalaría con HTML en lugar de JavaScript.
+
+#### `authConfigPacientes`: dos productos, dos configuraciones
+
+El middleware del paciente hereda de `authConfig` lo que de verdad es común —estrategia JWT,
+duración, callbacks de token y sesión— y sustituye lo que no puede serlo: a dónde se manda a quien
+no tiene sesión y qué rutas son públicas. Meter las reglas del paciente dentro de `authConfig`
+habría dejado un archivo decidiendo el acceso a las dos apps, que es el acoplamiento que la
+arquitectura de §2 busca evitar. El proveedor de credenciales y el adaptador siguen viviendo una
+sola vez en `auth/index.ts`.
+
+Dos casos merecen su test porque son bugs esperando:
+
+- **Un nutriólogo con sesión del panel abriendo la app del paciente.** Sin un corte explícito,
+  `authorized` lo rechaza, Auth.js lo devuelve a `/entrar`, y desde ahí vuelve a rechazarlo: bucle
+  infinito de redirecciones. Se le deja quedarse en `/entrar` y se le explica con `?error=sin_acceso`.
+- **`/activar` con sesión ya iniciada.** Es la excepción a "quien tiene sesión no ve las pantallas
+  de entrada": el enlace de invitación puede abrirse en un navegador donde ya hay otra cuenta, y
+  redirigirlo dejaría la invitación sin poder consumirse nunca.
+
+Nada de esto es control de acceso a los datos. El middleware solo evita pantallas vacías y bucles;
+la autorización de verdad sigue siendo `requierePaciente` en cada handler, en cada petición.
+
+#### `POST /api/v1/auth/activate` — la deuda de la fase 3, saldada
+
+La lógica de activación (transacción, enlace con el expediente, quema del token) la escribió y probó
+la fase 3 en `activarCuentaPaciente`; le faltaba la ruta, porque esta app no existía. Aquí se monta
+con tres cosas encima:
+
+**El consentimiento de privacidad es un `z.literal(true)`, no un `boolean` con default.**
+`activarCuentaPaciente` sella `privacy_notice_accepted_at` con lo que llegue, y esa marca tiene que
+corresponder a un acto real del paciente. Un default en el servidor firmaría el aviso en su nombre.
+
+**Los cinco motivos de rechazo responden idéntico:** mismo 400, mismo `INVALID_TOKEN`, mismo texto.
+Distinguir "expirado" de "ya usado" o de "el expediente está archivado" le contaría a quien pruebe
+tokens al azar en qué estado está una cuenta ajena. Para el paciente legítimo la salida es la misma
+en los cinco casos —pedir que le reenvíen la invitación—, así que no se pierde nada. Hay un test que
+compara las cuatro respuestas entre sí y otro que verifica que el mensaje no mencione el motivo.
+
+**El límite va por IP** (10 intentos / 15 min) y se aplica **antes** de leer el cuerpo: es de las
+poquísimas rutas sin sesión, no hay cuenta contra la cual contar, y validar primero dejaría sondear
+el esquema sin gastar cuota.
+
+#### Pruebas
+
+67 en `apps/web/pacientes` (5 suites) y 492 en `packages/servidor` (55 suites), todas en verde;
+`type-check` y `next build` limpios en las dos apps web. Lo que agregó esta fase:
+
+| Archivo | Cubre |
+|---|---|
+| `pacientes/src/tests/activacion.test.ts` | Caso feliz, validación, rechazo uniforme, límite por IP, 500 sin fugas |
+| `pacientes/src/tests/navegacion.test.ts` | `esRutaActiva`: la raíz, las subrutas y los prefijos comunes |
+| `servidor/auth/configPacientes.test.ts` | Rutas públicas, rol equivocado, el bucle de `/entrar`, `/activar` con sesión |
+| `servidor/auth/schemasPaciente.test.ts` | Consentimiento obligatorio, token, herencia de la política de contraseñas |
+
+**Sin jsdom todavía, y es una decisión, no un olvido.** La fase 4 anotó en `jest.config.mjs` que la
+6 lo añadiría. No se hizo: los componentes de esta fase son enlaces, estados vacíos y clases de
+Tailwind, y su única lógica está extraída como función pura y probada. Renderizarlos probaría a
+React. El comentario se corrigió para que apunte a la fase 7, donde entran los formularios de
+registro, que sí tienen interacción que valga un DOM.
+
+**Dos correcciones de rumbo menores.** El test de activación se escribió esperando `422` para el
+payload inválido, siguiendo §10 de este plan; manda `api-conventions.md`, que reserva el `422` para
+reglas de negocio violadas y usa `400` para validación de esquema —que es lo que el `validationError`
+compartido ya hacía—. Y `next-auth/providers/google` se publica solo como ESM: `packages/servidor` se
+transpila a CommonJS para Jest, así que el test del middleware lo sustituye por un doble. No se
+ejecuta nunca en tests, porque la configuración compartida solo lo mete en `providers` cuando hay
+credenciales de Google en el entorno.
+
+#### Lo que esta fase no hizo
+
+- **Sin push notifications**, según §12. La PWA no las pide ni las menciona.
+- **Sin `shortcuts` ni `share_target`** en el manifiesto: cada atajo apuntaría a una pantalla sin
+  contenido propio, y prometer desde el icono del sistema algo que no está es peor que no ofrecerlo.
+- **Sin `AppStateProvider`.** Ese store es del panel (filtros de listados, barra lateral) y aquí no
+  hay nada equivalente todavía. React Query sí, con `retry: 1` y `staleTime` de 30 s, calibrado para
+  un teléfono en red móvil.
+- **La pantalla de perfil no trae los derechos ARCO** —descargar mis datos, solicitar la baja—: son
+  de la fase 11. Lo que sí tiene es cerrar sesión, con redirección explícita para no caer en el
+  bucle contra el middleware.
+- **El botón `+` de la barra apunta a Hoy.** La hoja de registro llega en la fase 7; hasta entonces
+  el enlace lleva a donde va a abrirse, en vez de a un `alert` como en el prototipo.
+
+**Aceptación de §9, cumplida:** el cascarón es navegable, los estados vacíos están, la app declara
+manifiesto, iconos, `theme-color` y `apple-mobile-web-app-capable`, y `viewport-fit=cover` con
+`env(safe-area-inset-*)` mantiene la barra inferior fuera del área del gesto en iPhone. Falta
+verificar la instalación en dispositivos reales — el build sirve el manifiesto y los tres iconos,
+pero eso se comprueba en el navegador, no en CI.
 
 ### Fase 5 — IA del paciente ✅ (2026-07-29)
 

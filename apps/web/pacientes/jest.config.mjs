@@ -4,8 +4,11 @@ const createJestConfig = nextJest({ dir: './' });
 
 /** @type {import('jest').Config} */
 const config = {
-  // Solo API en esta fase: los handlers corren en Node, no en el DOM. La
-  // fase 6 añadirá jsdom cuando entren componentes.
+  // Node, no jsdom. La fase 6 trajo componentes, pero son cascarón: enlaces,
+  // estados vacíos y clases de Tailwind. Su única lógica —qué pestaña se
+  // enciende— está extraída como función pura (`esRutaActiva`) y se prueba
+  // aquí mismo. El jsdom entra en la fase 7, con los formularios de registro,
+  // que sí tienen interacción que probar.
   testEnvironment: 'node',
   testPathIgnorePatterns: ['<rootDir>/e2e/', '<rootDir>/.next/'],
   coverageThreshold: {

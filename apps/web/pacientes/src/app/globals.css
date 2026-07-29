@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-stone-50 text-stone-800 font-sans antialiased;
+  /* En iOS el rebote del scroll deja ver el fondo del navegador debajo de la
+     navegación fija; fijarlo al color de la app evita esa franja blanca. */
+  overscroll-behavior-y: none;
+}
+
+/* La barra inferior queda pegada al borde del dispositivo. Sin este respiro,
+   en iPhone con gesto de inicio los iconos caen debajo del indicador. */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* La app se toca, no se apunta: el resaltado azul de tap de WebKit hace que
+   cada toque en una tarjeta parezca un error. */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
