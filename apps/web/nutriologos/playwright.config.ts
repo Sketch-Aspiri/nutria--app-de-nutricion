@@ -61,6 +61,10 @@ const AUTH_SECRET_E2E =
   process.env.E2E_AUTH_SECRET?.trim() || 'auth-secret-e2e-de-32-caracteres-no-produccion';
 const ENCRYPTION_KEY_E2E =
   process.env.ENCRYPTION_KEY ?? 'MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=';
+// La ruta de generación exige que el proveedor esté configurado antes de
+// evaluar la cuota. Esta clave es ficticia: los casos E2E agotan la cuota
+// previamente, por lo que nunca debe producir una llamada externa.
+const ANTHROPIC_API_KEY_E2E = 'clave-ficticia-e2e-no-valida';
 process.env.EMAIL_OUTBOX_FILE = BUZON_CORREO;
 process.env.CRON_SECRET = CRON_SECRET_E2E;
 process.env.AUTH_SECRET = AUTH_SECRET_E2E;
@@ -93,6 +97,7 @@ export default defineConfig({
     env: {
       AUTH_URL: BASE_URL,
       AUTH_SECRET: AUTH_SECRET_E2E,
+      ANTHROPIC_API_KEY: ANTHROPIC_API_KEY_E2E,
       DATABASE_URL: E2E_DATABASE_URL,
       DIRECT_URL: E2E_DATABASE_URL,
       E2E_DATABASE_URL,
