@@ -6,7 +6,7 @@ Monorepo (npm workspaces) de la plataforma de nutrición. Ver `CLAUDE.md` para c
 apps/
   web/
     nutriologos/  # Next.js (App Router) — panel del nutriólogo + API /api/v1
-    pacientes/    # Next.js — app del paciente (pendiente; ver plan)
+    pacientes/    # Next.js — app del paciente: API /api/v1/me lista, UI pendiente
 packages/
   servidor/   # capa de servidor compartida por las apps web: prisma (esquema,
               # migraciones, seed), auth, IA, cifrado, bitácora, repositorios

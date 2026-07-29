@@ -12,6 +12,8 @@
   "scripts": {
     "dev:nutriologos": "npm run dev --workspace apps/web/nutriologos",
     "build:nutriologos": "npm run build --workspace apps/web/nutriologos",
+    "dev:pacientes": "npm run dev --workspace apps/web/pacientes",
+    "build:pacientes": "npm run build --workspace apps/web/pacientes",
     "dev:web": "npm run dev --workspace apps/web/nutriologos",
     "build:web": "npm run build --workspace apps/web/nutriologos",
     "db:migrate": "npm run db:migrate --workspace apps/web/nutriologos",

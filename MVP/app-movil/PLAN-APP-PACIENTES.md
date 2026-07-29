@@ -377,7 +377,7 @@ y `patient.estado === 'ACTIVO'` (un paciente archivado pierde el acceso, no los 
 
 ---
 
-## 7. Fase 4 — API v1 del paciente
+## 7. Fase 4 — API v1 del paciente ✅
 
 Todas bajo `/api/v1/me/*`, montadas **solo** en `apps/web/pacientes`, siguiendo `api-conventions.md`
 (snake_case plural, `{ data, meta }`, errores `{ error: { code, message, details } }`, fechas ISO 8601 UTC).
@@ -590,7 +590,7 @@ Se dejan fuera a propósito, y se anotan aquí para que no se cuelen a mitad de 
 | 1 | **`packages/servidor`** ✅ ⚠️ | Capa de servidor compartida, panel intacto. **Gate de E2E (§4.4) sin cumplir — ver §15** | 0 |
 | 2 | **Modelo de datos** ✅ | Migraciones de `meal_logs`, `water_logs`, `patient_invites` | 1 |
 | 3 | **Identidad del paciente** ✅ | Invitación, activación, `requierePaciente` | 2 |
-| 4 | API `/api/v1/me/*` | Endpoints con tests de integración | 3 |
+| 4 | **API `/api/v1/me/*`** ✅ | Endpoints con tests de integración | 3 |
 | 5 | IA del paciente | Coach, estimación, sustitución, con cuotas y guardas | 4 |
 | 6 | Cascarón y PWA | App navegable e instalable | 3 |
 | 7 | Hoy y registro | Pantalla principal completa | 4, 5, 6 |
@@ -602,9 +602,139 @@ Se dejan fuera a propósito, y se anotan aquí para que no se cuelen a mitad de 
 
 Las fases 0 a 5 son secuenciales. De la 7 a la 11 son independientes entre sí una vez lista la 6.
 
+> **Corrección de la fase 4 (§15).** La 4 no podía ser puramente secuencial: montar `/api/v1/me/*`
+> exige que `apps/web/pacientes` exista, y crearla figuraba en la 6. La fase 4 creó el cascarón
+> **solo de API** (sin UI, PWA ni Tailwind); la 6 conserva íntegro su entregable visual.
+
 ---
 
 ## 15. Bitácora
+
+### Fase 4 — API `/api/v1/me/*` ✅ (2026-07-28)
+
+La app del paciente ya tiene backend completo: 15 endpoints montados en `apps/web/pacientes`,
+todos anclados en el `patientId` que resuelve `requierePaciente`. Ninguno acepta un identificador
+de paciente del cliente.
+
+**La fase obligó a crear `apps/web/pacientes`, y eso merece explicación.** §14 daba las fases 0–5
+por secuenciales, pero §2 exige que `/api/v1/me/*` se monte **solo** en la app del paciente, y
+crear esa app figuraba en la fase 6. Las dos cosas no podían ser ciertas a la vez. Se resolvió
+creando aquí el cascarón **estrictamente de API**:
+
+| Creado en la fase 4 | Sigue siendo de la fase 6 |
+|---|---|
+| `package.json` (puerto 3001), `tsconfig.json`, `next.config.mjs`, `jest.config.mjs` | Tailwind, `@nutria/ui-tokens`, `next/font` |
+| Handler de Auth.js y rutas `/api/v1/me/*` | Layout mobile-first, `BottomNav`, pantallas |
+| `.env.example` propio | `manifest.webmanifest`, iconos, service worker |
+| CSP y cabeceras de seguridad | `proxy.ts`, providers de React Query y Sentry |
+
+La alternativa —dejar la lógica en `packages/servidor` sin rutas— habría entregado una fase 4 sin
+un solo endpoint, que es justo lo que §14 pide como entregable. Se anotó la corrección en §14.
+
+**Un repositorio nuevo, no un parámetro más en el existente.** `packages/servidor/src/server/me/`
+es hermano de `patients/`, no una extensión suya. La diferencia es el ancla de autorización: en
+`patients/repository.ts` el filtro es `nutritionistId` y el `patientId` viene de la URL; en
+`me/repository.ts` el `patientId` **ya viene de la sesión** y es el único filtro. Fusionarlos
+habría creado funciones donde no se sabe a simple vista cuál de los dos filtros aplica — el tipo
+de ambigüedad que produce fugas entre pacientes.
+
+**La regla que gobierna todas las lecturas: el paciente ve lo aprobado, no lo existente.**
+
+| Recurso | Filtro |
+|---|---|
+| Plan alimenticio | `estado = ACTIVO` **y** `compartido_at != null` |
+| Recetas | `estado = ENVIADA` (las sugeridas son borrador del nutriólogo) |
+| Plan de actividad | `compartido_at != null` |
+| Citas | `estado = PROGRAMADA` y `inicio >= ahora` |
+
+Hay un test por cada uno que afirma el `where` exacto. Y tres campos se omiten deliberadamente de
+las respuestas: `comentario_nutriologo` de los registros de comida, `notas` de las citas y el
+`nutritionist_id` de todo. Son anotaciones del profesional sobre el paciente, no para él.
+
+**Endpoints.** 15 rutas; las tres de `/me/ai/*` son de la fase 5.
+
+| Ruta | Notas de diseño |
+|---|---|
+| `GET /me` | Metas del plan vigente; `null` si no hay plan compartido, nunca ceros (§5.4) |
+| `GET /me/today` | Una llamada: plan, comidas marcadas, registros libres, agua y adherencia |
+| `GET /me/meal_plan` | Devuelve `null`, no 404: no tener plan es un estado normal de la app |
+| `GET /me/recipes`, `GET /me/activity_plan` | |
+| `POST /me/meal_logs` | Marca del plan o registro libre; valida que la comida sea de un plan propio |
+| `DELETE /me/meal_logs/{id}` | La pertenencia va en el `where` del `deleteMany` |
+| `GET/POST /me/weight_logs` | `upsert` por día: volver a pesarse corrige, no duplica el punto |
+| `GET/POST /me/exercise_logs` | |
+| `PUT /me/water_logs` | **PUT**, no POST: la app manda el total del día |
+| `GET /me/progress` | Serie de peso, tendencia y logros calculados |
+| `GET/POST /me/messages` | `meta.sin_leer` viaja con el listado |
+| `POST /me/messages/read` | Solo marca los del nutriólogo |
+| `GET /me/appointments` | Solo lectura en V1 |
+| `POST /me/photos` | `multipart/form-data`, tipo decidido por los bytes |
+
+**El agua es PUT y eso no es cosmético.** La tarjeta del prototipo incrementa vasos de uno en uno.
+Un `POST /agua/+1` sobre una red móvil se pierde o se duplica con cada reintento, y el contador
+queda mal sin forma de detectarlo. Mandando el total del día, la operación es idempotente:
+llegue una vez o cinco, converge al mismo valor.
+
+**Logros calculados, no almacenados.** `packages/shared/src/logros.ts` produce los seis de §9
+—racha, meta de agua, semana completa, primeros kg, peso meta y días activo— desde los registros
+reales, con 20 tests de tabla. No hay columna que migrar ni estado que se desincronice cuando el
+paciente registra tarde o corrige un peso. `calcularRacha` se reutiliza de `adherencia.ts` en vez
+de reimplementarse, así que paciente y panel cuentan la misma racha.
+
+El logro de peso meta avanza en la dirección que corresponda: un objetivo de ganancia de masa es
+tan válido como uno de pérdida, y medir solo kilos hacia abajo dejaría a ese paciente en cero para
+siempre.
+
+**Fotos: el tipo lo deciden los bytes.** `me/fotos.ts` sigue el patrón de `profile/logoStorage.ts`.
+Se ignora el `Content-Type` que declara el cliente y se lee la firma binaria (JPEG, PNG, WebP): un
+SVG con script servido desde el dominio del blob sería un XSS almacenado. La ruta la construye el
+servidor con el `patientId` de la sesión, el nombre es el hash del contenido —subir dos veces la
+misma foto no duplica almacenamiento— y la URL que devuelve el adaptador se revalida antes de
+usarse, para que un almacenamiento comprometido no pueda inyectar una dirección arbitraria.
+
+**Límites de tasa por `user_id`, no por IP.** Todos los endpoints exigen sesión, y una red móvil
+compartida o un CGNAT pondrían a decenas de pacientes tras la misma dirección. Escritura 60/min,
+fotos 20/hora, según §7.
+
+**Un hueco real del modelo, que se documenta en vez de taparse.** §7 pide que `GET /me/progress`
+devuelva los kilos "faltantes", y §9 incluye un logro de peso meta. **No existe un peso objetivo
+en el esquema** —se verificó: ninguna columna, ningún campo del snapshot de cálculo—. Estimarlo
+desde el objetivo clínico sería inventarle una meta al paciente, justo lo que §5.4 prohíbe para
+las metas calóricas. Así que `falta_kg` viaja en `null` y el logro de peso meta queda bloqueado,
+con un test que lo afirma. Es un hueco del modelo del mismo tipo que los tres que resolvió la
+fase 2, y hay que decidirlo con criterio clínico antes de la fase 9.
+
+**Pruebas: la autorización se prueba una vez, sobre los 18 handlers.** El riesgo real no es que un
+handler traduzca mal un 403, sino que a alguno se le olvide llamar a la guarda. `autorizacion.test.ts`
+recorre los 18 puntos de entrada e invoca cada uno con sesión ausente y con rol equivocado; además
+afirma que **ninguna función del repositorio se llamó**, y que la guarda se consultó exactamente
+una vez por petición. Un endpoint nuevo que se olvide de la lista hace fallar el conteo.
+
+**Verificación**
+
+| Comprobación | Resultado |
+|---|---|
+| `npm install` | Workspace `pacientes` enlazado; 5 workspaces en el árbol |
+| `npm run type-check --workspaces` | Limpio en los **5** |
+| `npm run test --workspaces` | **827/827** — 93 `nutriologos` + 30 `pacientes` + 382 `servidor` + 322 `shared` |
+| Tests nuevos de la fase | **94** — 20 de logros, 23 del repositorio del paciente, 21 de fotos, 30 de handlers (5 de autorización + 25 de comportamiento) |
+| Cobertura de líneas | `pacientes` 74.35 % (umbral 70), `servidor` 65.48 % (60), `nutriologos` 49.94 % (45), `shared` 99.33 % (80) |
+| `npm run build:pacientes` | Build exitoso; **15 rutas** de `/api/v1/me/*` más el handler de Auth.js |
+| `npm run build:nutriologos` | Sin regresión |
+| Suite E2E y CI | No ejecutados (fuera de alcance por instrucción) |
+
+**Notas y deuda**
+
+- **La API del paciente no está en el OpenAPI.** `packages/servidor/src/server/openapi.ts` describe
+  la superficie del nutriólogo y se sirve en `/api/v1/docs` de esa app. Mezclar ahí 15 rutas que esa
+  app no monta confundiría el contrato. Corresponde un documento propio en `apps/web/pacientes`,
+  y se hace cuando la fase 5 cierre la superficie con los endpoints de IA.
+- `jsonList` acepta ahora un `meta` extensible —el hilo de mensajes agrega `sin_leer`— conservando
+  los tres campos de paginación. Es el único cambio a un módulo compartido preexistente.
+- La app del paciente **no monta** `proxy.ts` todavía: sin páginas que proteger, el middleware no
+  tiene qué hacer. Entra con el cascarón visual de la fase 6.
+- `apps/web/pacientes/.env.example` deja explícito que **no** lleva claves de Stripe: si algún día
+  aparecen ahí, es que alguien montó cobros en la app equivocada.
 
 ### Fase 3 — Identidad del paciente ✅ (2026-07-28)
 

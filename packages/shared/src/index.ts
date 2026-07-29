@@ -6,5 +6,6 @@ export * from './alimentos';
 export * from './nutricion';
 export * from './alergias';
 export * from './adherencia';
+export * from './logros';
 export * from './ia/index';
 export * from './suscripcion/index';

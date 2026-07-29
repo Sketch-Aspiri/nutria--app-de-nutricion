@@ -23,7 +23,8 @@ apps/
   mobile/     # React Native / Expo
   web/
     nutriologos/  # Next.js — panel del nutriólogo + API /api/v1
-    pacientes/    # Next.js — app del paciente (pendiente; ver MVP/app-movil/PLAN-APP-PACIENTES.md)
+    pacientes/    # Next.js — app del paciente: API /api/v1/me lista, UI pendiente
+                  # (ver MVP/app-movil/PLAN-APP-PACIENTES.md)
   api/        # NestJS
 packages/
   servidor/   # capa de servidor compartida: prisma (esquema, migraciones, seed),

@@ -90,8 +90,16 @@ export function jsonNoContent(): NextResponse {
   return new NextResponse(null, { status: 204 });
 }
 
-/** Listado paginado: siempre { data, meta }. */
-export function jsonList<T>(data: T[], meta: PaginationMeta): NextResponse {
+/**
+ * Listado paginado: siempre { data, meta }.
+ *
+ * `meta` es extensible por endpoint —el hilo del paciente añade `sin_leer`—
+ * mientras conserve los tres campos de paginación.
+ */
+export function jsonList<T, M extends PaginationMeta = PaginationMeta>(
+  data: T[],
+  meta: M,
+): NextResponse {
   return NextResponse.json({ data, meta });
 }
 

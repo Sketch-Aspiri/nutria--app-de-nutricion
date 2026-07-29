@@ -1,0 +1,33 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "noEmit": true,
+    "incremental": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "plugins": [{ "name": "next" }],
+    // Mismo alias con respaldo ordenado que la app de nutriólogos: primero el
+    // `src` de esta app y, si no encuentra, `packages/servidor/src`, que
+    // replica el layout (`server/`, `config/`, `domain/`). Así la capa de
+    // servidor compartida se importa con las mismas rutas en las dos apps.
+    "paths": {
+      "@/*": ["./src/*", "../../../packages/servidor/src/*"]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    // La ampliación de módulo de Auth.js vive con la configuración de sesión,
+    // en la capa compartida. Se incluye explícitamente porque un `.d.ts` solo
+    // surte efecto si forma parte del programa, y los alias no lo arrastran.
+    "../../../packages/servidor/src/types/*.d.ts"
+  ],
+  "exclude": ["node_modules"]
+}
