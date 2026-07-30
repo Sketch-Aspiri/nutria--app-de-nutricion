@@ -23,6 +23,8 @@
 - **Preview deploys**: automático en cada PR, con su propia URL para QA manual y para correr Playwright.
 - **Producción**: deploy automático al mergear a `main`, con rollback de un click desde Vercel si algo falla.
 - **Variables de entorno**: configuradas en Vercel por ambiente (`Development`/`Preview`/`Production`); nunca se commitean claves reales.
+- **Node**: fijado en `engines.node` del `package.json` de cada app (`24.x`, el default de Vercel). Sin fijarlo, Vercel puede cambiar de mayor entre despliegues.
+- **Tareas programadas**: **no** se usa `crons` de `vercel.json`. El plan Hobby solo admite crons diarios y una expresión más frecuente *falla el deployment* ("Hobby accounts are limited to daily cron jobs"). Los recordatorios de cita necesitan 15 minutos, así que el disparo es externo (cron-job.org o Upstash QStash) con `GET` a `/api/v1/cron/appointment_reminders` y el header `Authorization: Bearer $CRON_SECRET`. Si algún día se pasa a Vercel Pro, se puede devolver el bloque `crons` a `vercel.json` y retirar el disparador externo.
 - **Esquema y migraciones**: viven en `packages/servidor/prisma`, compartidos por las dos apps web. Los scripts `db:*` de `apps/web/nutriologos` apuntan ahí con `--schema`, así que se siguen corriendo desde esa app y leen su `.env`. Solo el proyecto de `nutriologos` ejecuta `prisma migrate deploy`; `pacientes` se limita a generar el cliente, para que dos despliegues simultáneos no compitan por el bloqueo de migración.
 
 ## Mobile (`apps/mobile`)
