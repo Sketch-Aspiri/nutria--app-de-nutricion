@@ -25,7 +25,8 @@
     "test:load": "tsx ../../../packages/servidor/scripts/load/smoke.ts",
     "test:load:k6": "k6 run ../../../packages/servidor/scripts/load/k6-smoke.js",
     "postinstall": "prisma generate --schema ../../../packages/servidor/prisma/schema.prisma",
-    "ai:check": "tsx --env-file=.env ../../../packages/servidor/scripts/verificar-ia.ts"
+    "ai:check": "tsx --env-file=.env ../../../packages/servidor/scripts/verificar-ia.ts",
+    "db:seed:demo": "tsx --env-file=.env ../../../packages/servidor/scripts/seed-demo.ts"
   },
   "dependencies": {
     "@nutria/servidor": "*",

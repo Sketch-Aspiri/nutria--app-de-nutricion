@@ -22,6 +22,7 @@
     "db:seed": "npm run db:seed --workspace apps/web/nutriologos",
     "test": "npm run test --workspaces --if-present",
     "type-check": "npm run type-check --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present"
+    "lint": "npm run lint --workspaces --if-present",
+    "db:seed:demo": "npm run db:seed:demo --workspace apps/web/nutriologos"
   }
 }
