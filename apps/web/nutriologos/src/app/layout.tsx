@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Fraunces, IBM_Plex_Mono, Inter } from 'next/font/google';
 
 import { Providers } from './providers';
@@ -16,6 +16,16 @@ const plexMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: 'nutria — Panel de nutriólogo',
   description: 'Pacientes, planes alimenticios y seguimiento con IA integrada.',
+};
+
+/**
+ * Sin `maximumScale`: limitar el zoom rompe la accesibilidad de quien necesita
+ * acercar una tabla de equivalentes en el teléfono.
+ */
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  themeColor: '#022c22',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

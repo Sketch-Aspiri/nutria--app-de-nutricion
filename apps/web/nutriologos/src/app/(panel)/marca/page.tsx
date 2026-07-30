@@ -56,20 +56,20 @@ export default function MarcaPage() {
 
   if (perfil.isPending) {
     return (
-      <div className="flex items-center gap-2 p-8 text-sm text-stone-500">
+      <div className="flex items-center gap-2 p-4 text-sm text-stone-500 sm:p-6 lg:p-8">
         <Loader2 size={16} className="animate-spin" /> Cargando tu identidad…
       </div>
     );
   }
 
   return (
-    <div className="max-w-3xl space-y-4 p-5 sm:p-8">
+    <div className="max-w-3xl space-y-4 p-4 sm:p-6 lg:p-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-lime-700">
             Identidad profesional
           </p>
-          <h1 className="font-display text-3xl font-medium text-emerald-950">Marca y datos</h1>
+          <h1 className="font-display text-2xl font-medium text-emerald-950 sm:text-3xl">Marca y datos</h1>
           <div className="mt-1 text-sm text-stone-500">
             Esta identidad aparece en cada plan alimenticio que entregas.
           </div>

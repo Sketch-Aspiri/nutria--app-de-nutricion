@@ -43,12 +43,12 @@ export default function PacienteDetallePage() {
   const [editando, setEditando] = useState(false);
 
   if (cargando) {
-    return <div className="p-8 text-stone-400 text-sm">Cargando expediente…</div>;
+    return <div className="p-4 text-sm text-stone-400 sm:p-6 lg:p-8">Cargando expediente…</div>;
   }
 
   if (!paciente) {
     return (
-      <div className="p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         <div className="text-stone-500 text-sm">
           No encontramos este paciente, o no pertenece a tu consulta.
         </div>
@@ -60,23 +60,25 @@ export default function PacienteDetallePage() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <Link
         href="/pacientes"
         className="flex items-center gap-1 text-stone-500 text-sm mb-5 hover:text-emerald-900 w-fit"
       >
         <ChevronLeft size={16} /> Pacientes
       </Link>
-      <div className="flex items-center gap-4 mb-6">
+      <div className="mb-6 flex flex-wrap items-center gap-4">
         <Avatar foto={paciente.foto} nombre={paciente.nombre} size={64} />
-        <div>
-          <h1 className="font-display text-2xl text-emerald-950 font-medium">{paciente.nombre}</h1>
-          <div className="text-stone-500 text-sm">
+        <div className="min-w-0 flex-1">
+          <h1 className="font-display text-xl font-medium text-emerald-950 sm:text-2xl">
+            {paciente.nombre}
+          </h1>
+          <div className="text-sm text-stone-500">
             {paciente.edad > 0 ? `${paciente.edad} años` : 'Sin fecha de nacimiento'} ·{' '}
             {etiquetaObjetivo(paciente.medico.objetivo, paciente.medico.objetivoOtro)}
           </div>
         </div>
-        <div className="ml-auto flex items-center gap-3">
+        <div className="flex w-full flex-wrap items-center justify-end gap-3 sm:w-auto">
           <InvitarApp pacienteId={params.id} acceso={accesoApp} />
           <Btn variant="outline" size="sm" onClick={() => setEditando(true)}>
             <Pencil size={14} /> Editar paciente

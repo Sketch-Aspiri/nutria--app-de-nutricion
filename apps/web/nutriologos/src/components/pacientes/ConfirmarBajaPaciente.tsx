@@ -34,7 +34,7 @@ export function ConfirmarBajaPaciente({
 
   return (
     <Modal>
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         <ModalHeader title="Eliminar paciente" onClose={onClose} />
         <p className="text-sm text-stone-600 leading-relaxed">
           Vas a eliminar a <span className="font-medium text-emerald-950">{paciente.nombre}</span>{' '}

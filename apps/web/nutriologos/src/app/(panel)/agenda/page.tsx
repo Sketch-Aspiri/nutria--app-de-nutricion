@@ -36,8 +36,8 @@ export default function AgendaPage() {
   const programadas = citas.filter((c) => c.estado === 'PROGRAMADA').length;
 
   return (
-    <div className="p-8 max-w-3xl">
-      <div className="flex items-center justify-between mb-6">
+    <div className="max-w-3xl p-4 sm:p-6 lg:p-8">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl text-emerald-950 font-medium">Agenda</h1>
           <div className="text-stone-500 text-sm mt-1">
@@ -101,7 +101,7 @@ export default function AgendaPage() {
 
       {videoCita && (
         <Modal>
-          <div className="p-6 text-center">
+          <div className="p-4 sm:p-6 text-center">
             <ModalHeader title="Videoconsulta" onClose={() => setVideoCita(null)} />
             <div className="bg-emerald-950 rounded-xl aspect-video flex flex-col items-center justify-center text-emerald-200 mb-4">
               <Video size={40} />

@@ -42,7 +42,7 @@ function Macro({
 export function PanelResultado({ resultado }: { resultado: CalculoNutricional }) {
   return (
     <SectionCard title="Resultado" icon={Flame}>
-      <div className="grid grid-cols-3 gap-4 mb-4">
+      <div className="mb-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
         <Cifra valor={String(resultado.bmr)} etiqueta="BMR (kcal)" />
         <Cifra valor={String(resultado.tdee)} etiqueta="TDEE / mantenimiento" />
         <Cifra valor={String(resultado.objetivoCalorias)} etiqueta="Objetivo diario" destacada />
@@ -58,7 +58,7 @@ export function PanelResultado({ resultado }: { resultado: CalculoNutricional })
       <div className="text-xs uppercase tracking-wide text-stone-400 mb-2">
         Distribución de macros
       </div>
-      <div className="flex gap-3 mb-4">
+      <div className="mb-4 grid grid-cols-3 gap-2 sm:gap-3">
         <Macro
           gramos={resultado.proteina_g}
           etiqueta="Proteína"
@@ -79,12 +79,13 @@ export function PanelResultado({ resultado }: { resultado: CalculoNutricional })
         />
       </div>
 
-      <div className="flex items-center gap-4 text-sm text-stone-600">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-stone-600">
         <span className="flex items-center gap-2">
           <Droplets size={14} className="text-sky-600" />
           Agua: <span className="font-mono">{(resultado.aguaMl / 1000).toFixed(1)} L/día</span>
         </span>
-        <span className="text-stone-400">·</span>
+        {/* El separador solo tiene sentido si ambos datos van en la misma línea. */}
+        <span className="hidden text-stone-400 sm:inline">·</span>
         <span>
           Proteína: <span className="font-mono">{resultado.proteinaGPorKg} g/kg</span>
         </span>

@@ -59,7 +59,7 @@ export function NuevaCitaModal({ pacientes, onClose, onCreada }: NuevaCitaModalP
 
   return (
     <Modal>
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         <ModalHeader title="Nueva cita" onClose={onClose} />
         <div className="space-y-3">
           <div>
@@ -79,7 +79,7 @@ export function NuevaCitaModal({ pacientes, onClose, onCreada }: NuevaCitaModalP
               ))}
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className={lbl} htmlFor="cita-fecha">
                 Fecha
@@ -105,7 +105,7 @@ export function NuevaCitaModal({ pacientes, onClose, onCreada }: NuevaCitaModalP
               />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className={lbl} htmlFor="cita-duracion">
                 Duración

@@ -35,7 +35,7 @@ export default function SuscripcionPage() {
 
 function Cargando() {
   return (
-    <div className="p-8 flex items-center gap-2 text-stone-400 text-sm">
+    <div className="flex items-center gap-2 p-4 text-sm text-stone-400 sm:p-6 lg:p-8">
       <Loader2 size={16} className="animate-spin" /> Cargando tu suscripción…
     </div>
   );
@@ -54,7 +54,7 @@ function ContenidoSuscripcion() {
 
   if (suscripcion.isError || !suscripcion.data) {
     return (
-      <div className="p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         <div className="bg-red-50 border border-red-200 text-red-800 rounded-xl p-4 text-sm">
           No pudimos cargar tu suscripción. Recarga la página en unos momentos.
         </div>
@@ -69,7 +69,7 @@ function ContenidoSuscripcion() {
   const errorAccion = checkout.error ?? portal.error;
 
   return (
-    <div className="p-8 max-w-5xl">
+    <div className="max-w-5xl p-4 sm:p-6 lg:p-8">
       <div className="mb-6">
         <h1 className="font-display text-2xl text-emerald-950 font-medium">Suscripción</h1>
         <div className="text-stone-500 text-sm mt-1">
@@ -105,7 +105,7 @@ function ContenidoSuscripcion() {
         </Aviso>
       )}
 
-      <div className="grid md:grid-cols-2 gap-4 mb-6">
+      <div className="mb-6 grid gap-4 md:grid-cols-2">
         <SectionCard
           title="Plan vigente"
           icon={CreditCard}
@@ -191,7 +191,7 @@ function ContenidoSuscripcion() {
         </SectionCard>
       </div>
 
-      <div className="flex items-center justify-between mb-3">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-display text-lg text-emerald-950 font-medium">Planes</h2>
         <div className="flex rounded-lg border border-stone-200 bg-white p-0.5 text-xs">
           {(['MENSUAL', 'ANUAL'] as const).map((opcion) => (
@@ -211,7 +211,7 @@ function ContenidoSuscripcion() {
         </div>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {datos.catalogo.map((plan) => (
           <TarjetaPlan
             key={plan.clave}

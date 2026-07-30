@@ -6,6 +6,19 @@ body {
   @apply bg-stone-50 text-stone-800 font-sans antialiased;
 }
 
+/*
+ * Safari en iOS hace zoom automático al enfocar un campo con tipografía menor a
+ * 16 px y ya no lo deshace: el panel queda desalineado a media captura. Se sube
+ * el mínimo solo en pantallas de teléfono; de `sm` en adelante mandan las clases.
+ */
+@media (max-width: 639px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
 @media print {
   body * {
     visibility: hidden;

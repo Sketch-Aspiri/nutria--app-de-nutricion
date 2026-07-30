@@ -46,8 +46,8 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="grid gap-4 border-t border-emerald-950/10 py-8 md:grid-cols-[13rem_1fr]">
-      <h2 className="font-display text-2xl leading-tight text-emerald-950">
+    <section className="grid gap-4 border-t border-emerald-950/10 py-6 sm:py-8 md:grid-cols-[13rem_1fr]">
+      <h2 className="font-display text-xl leading-tight text-emerald-950 sm:text-2xl">
         {title}
       </h2>
       <div className="space-y-4 text-sm leading-7 text-stone-600">{children}</div>
@@ -59,9 +59,9 @@ export default function PrivacyPage() {
   const responsible = getPrivacyResponsible();
 
   return (
-    <main className="min-h-screen bg-[#f2f0e8] text-stone-800">
+    <main className="min-h-dvh bg-[#f2f0e8] text-stone-800">
       <div className="border-b border-emerald-950/10 bg-emerald-950 text-stone-50">
-        <div className="mx-auto max-w-6xl px-6 py-5">
+        <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6">
           <Link
             href="/"
             className="inline-flex items-center gap-2 text-xs text-emerald-200 transition-colors hover:text-white"
@@ -71,8 +71,8 @@ export default function PrivacyPage() {
         </div>
       </div>
 
-      <article className="mx-auto max-w-6xl px-6 pb-20">
-        <header className="relative overflow-hidden border-x border-emerald-950/10 bg-[#f7f5ee] px-6 py-16 md:px-12 md:py-24">
+      <article className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
+        <header className="relative overflow-hidden border-x border-emerald-950/10 bg-[#f7f5ee] px-5 py-12 sm:px-6 sm:py-16 md:px-12 md:py-24">
           <div className="absolute -right-16 -top-24 h-72 w-72 rounded-full border-[44px] border-lime-300/40" />
           <div className="relative max-w-3xl">
             <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-emerald-800/20 bg-white/60 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-emerald-900">
@@ -90,7 +90,7 @@ export default function PrivacyPage() {
           </div>
         </header>
 
-        <div className="border-x border-b border-emerald-950/10 bg-[#f7f5ee] px-6 md:px-12">
+        <div className="border-x border-b border-emerald-950/10 bg-[#f7f5ee] px-5 sm:px-6 md:px-12">
           <Section title="Responsable">
             <p>
               <strong className="text-stone-900">{responsible.name}</strong>,

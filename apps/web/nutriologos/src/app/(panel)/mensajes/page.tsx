@@ -1,6 +1,6 @@
 'use client';
 
-import { Loader2, Send, Sparkles } from 'lucide-react';
+import { ChevronLeft, Loader2, Send, Sparkles } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 import { Avatar } from '@/components/ui/Avatar';
@@ -54,8 +54,14 @@ export default function MensajesPage() {
   };
 
   return (
+    // En móvil no caben las dos columnas: se ve la lista y, al elegir un
+    // paciente, el hilo la reemplaza con una flecha para volver.
     <div className="flex h-full">
-      <div className="w-64 border-r border-stone-200 bg-white overflow-auto">
+      <div
+        className={`w-full shrink-0 overflow-auto border-r border-stone-200 bg-white lg:block lg:w-64 ${
+          activo ? 'hidden' : 'block'
+        }`}
+      >
         <div className="p-4 text-xs uppercase tracking-wide text-stone-400">Conversaciones</div>
         {cargando && <div className="px-4 text-sm text-stone-400">Cargando…</div>}
         {!cargando && conversaciones.length === 0 && (
@@ -91,14 +97,22 @@ export default function MensajesPage() {
         ))}
       </div>
 
-      <div className="flex-1 flex flex-col">
+      <div className={`min-w-0 flex-1 flex-col lg:flex ${activo ? 'flex' : 'hidden'}`}>
         {!activo ? (
           <div className="flex-1 flex items-center justify-center text-sm text-stone-400">
             Elige una conversación para empezar.
           </div>
         ) : (
           <>
-            <div className="px-6 py-4 border-b border-stone-200 bg-white flex items-center gap-3">
+            <div className="flex items-center gap-3 border-b border-stone-200 bg-white px-3 py-3 sm:px-6 sm:py-4">
+              <button
+                type="button"
+                onClick={() => setActivo('')}
+                aria-label="Volver a conversaciones"
+                className="-ml-1 rounded-lg p-2 text-stone-500 hover:bg-stone-100 lg:hidden"
+              >
+                <ChevronLeft size={20} />
+              </button>
               <Avatar
                 foto={conversacion?.paciente.foto_url ?? null}
                 nombre={conversacion?.paciente.nombre ?? '?'}
@@ -109,7 +123,7 @@ export default function MensajesPage() {
               </div>
             </div>
 
-            <div className="flex-1 overflow-auto p-6 space-y-3 bg-stone-50">
+            <div className="flex-1 space-y-3 overflow-auto bg-stone-50 p-3 sm:p-6">
               {cargandoHilo && (
                 <div className="text-sm text-stone-400 text-center">Cargando mensajes…</div>
               )}
@@ -123,7 +137,7 @@ export default function MensajesPage() {
                 return (
                   <div key={m.id} className={`flex ${propio ? 'justify-end' : 'justify-start'}`}>
                     <div
-                      className={`max-w-xs rounded-2xl px-4 py-2 text-sm whitespace-pre-wrap break-words ${
+                      className={`max-w-[85%] whitespace-pre-wrap break-words rounded-2xl px-4 py-2 text-sm sm:max-w-xs ${
                         propio
                           ? 'bg-emerald-900 text-white'
                           : 'bg-white border border-stone-200 text-emerald-950'
@@ -142,7 +156,7 @@ export default function MensajesPage() {
               <div ref={finDelHilo} />
             </div>
 
-            <div className="p-4 border-t border-stone-200 bg-white">
+            <div className="border-t border-stone-200 bg-white p-3 sm:p-4">
               <div className="flex items-center gap-2">
                 <button
                   type="button"

@@ -9,9 +9,13 @@ type ModalProps = {
 
 export function Modal({ children, wide }: ModalProps) {
   return (
-    <div className="fixed inset-0 bg-emerald-950/40 flex items-center justify-center z-50 p-4">
+    // `dvh` en vez de `vh`: en móvil la barra del navegador se contrae y con
+    // `vh` el pie del modal (los botones de guardar) queda fuera de pantalla.
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-emerald-950/40 p-0 sm:items-center sm:p-4">
       <div
-        className={`bg-stone-50 rounded-2xl w-full ${wide ? 'max-w-2xl' : 'max-w-lg'} max-h-[90vh] overflow-auto`}
+        className={`max-h-[92dvh] w-full overflow-auto rounded-t-2xl bg-stone-50 sm:max-h-[90dvh] sm:rounded-2xl ${
+          wide ? 'max-w-2xl' : 'max-w-lg'
+        }`}
       >
         {children}
       </div>

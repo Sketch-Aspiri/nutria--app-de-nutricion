@@ -26,7 +26,7 @@ export function TemplatePicker({
 }: TemplatePickerProps) {
   return (
     <Modal>
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         <ModalHeader title="Aplicar plantilla" onClose={onClose} />
         <p className="-mt-2 mb-4 text-sm text-stone-500">
           Se creará un borrador independiente; la plantilla original no cambia.

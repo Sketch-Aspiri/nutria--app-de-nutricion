@@ -49,13 +49,13 @@ export default function PlantillasPage() {
   const errorGuardado = (editando ? actualizar.error : crear.error)?.message ?? null;
 
   return (
-    <div className="max-w-5xl p-8">
+    <div className="max-w-5xl p-4 sm:p-6 lg:p-8">
       <header className="mb-7 flex flex-wrap items-end justify-between gap-4">
         <div>
           <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-700">
             <LayoutTemplate size={13} /> Biblioteca clínica
           </div>
-          <h1 className="font-display text-3xl font-medium text-emerald-950">
+          <h1 className="font-display text-2xl font-medium text-emerald-950 sm:text-3xl">
             Plantillas de planes
           </h1>
           <p className="mt-1 max-w-xl text-sm leading-6 text-stone-500">

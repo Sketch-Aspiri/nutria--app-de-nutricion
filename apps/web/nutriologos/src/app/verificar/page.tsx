@@ -6,7 +6,7 @@ export const metadata = { title: 'Confirmar correo — nutria' };
 
 export default function VerificarPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-emerald-950" />}>
+    <Suspense fallback={<div className="min-h-dvh bg-emerald-950" />}>
       <VerificarPanel />
     </Suspense>
   );

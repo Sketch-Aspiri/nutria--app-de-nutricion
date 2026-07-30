@@ -95,7 +95,7 @@ export function TemplateEditorModal({
     <>
       <Modal wide>
         <form
-          className="p-6"
+          className="p-4 sm:p-6"
           onSubmit={(evento) => {
             evento.preventDefault();
             onSave({

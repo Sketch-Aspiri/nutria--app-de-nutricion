@@ -1,5 +1,6 @@
 'use client';
 
+import { Menu } from 'lucide-react';
 import Link from 'next/link';
 
 import { ETIQUETA_PLAN } from '@/components/suscripcion/formato';
@@ -23,7 +24,12 @@ const COLOR_PUNTO: Record<Tono, string> = {
   alto: 'bg-red-500',
 };
 
-export function TopBar() {
+type TopBarProps = {
+  /** Abre el cajón de navegación; solo visible abajo de `md`. */
+  onAbrirMenu?: () => void;
+};
+
+export function TopBar({ onAbrirMenu }: TopBarProps) {
   const suscripcion = useSuscripcion();
   const datos = suscripcion.data;
 
@@ -42,22 +48,32 @@ export function TopBar() {
           : 'ok';
 
   return (
-    <div className="flex justify-end items-center gap-3 px-8 py-4 border-b border-stone-200 bg-white shrink-0">
-      {datos && !beta && ia && ia.limite !== null && (
-        <span className="text-xs text-stone-400 hidden sm:inline">
-          {ia.restantes} generaciones de IA restantes
-        </span>
-      )}
-      <Link
-        href="/suscripcion"
-        className="flex items-center gap-2 bg-white border border-stone-200 rounded-full pl-3 pr-4 py-1.5 text-xs hover:border-emerald-300 transition-colors"
+    <div className="flex shrink-0 items-center gap-3 border-b border-stone-200 bg-white px-3 py-3 sm:px-6 sm:py-4 lg:px-8">
+      <button
+        type="button"
+        onClick={onAbrirMenu}
+        aria-label="Abrir menú"
+        className="-ml-1 rounded-lg p-2 text-emerald-900 hover:bg-stone-100 lg:hidden"
       >
-        <span className={`w-2 h-2 rounded-full ${COLOR_PUNTO[tono]}`} />
-        <span className="text-stone-600">
-          Plan <span className="font-semibold text-emerald-900">{etiqueta}</span>
-          {beta && <span className="text-stone-400"> · beta</span>}
-        </span>
-      </Link>
+        <Menu size={20} />
+      </button>
+      <div className="ml-auto flex min-w-0 items-center gap-3">
+        {datos && !beta && ia && ia.limite !== null && (
+          <span className="hidden text-xs text-stone-400 sm:inline">
+            {ia.restantes} generaciones de IA restantes
+          </span>
+        )}
+        <Link
+          href="/suscripcion"
+          className="flex shrink-0 items-center gap-2 rounded-full border border-stone-200 bg-white py-1.5 pl-3 pr-4 text-xs transition-colors hover:border-emerald-300"
+        >
+          <span className={`h-2 w-2 rounded-full ${COLOR_PUNTO[tono]}`} />
+          <span className="text-stone-600">
+            Plan <span className="font-semibold text-emerald-900">{etiqueta}</span>
+            {beta && <span className="text-stone-400"> · beta</span>}
+          </span>
+        </Link>
+      </div>
     </div>
   );
 }

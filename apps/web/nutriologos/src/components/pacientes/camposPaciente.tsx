@@ -153,7 +153,7 @@ export function CamposDatosGenerales({ form, set }: CamposProps) {
         <label className={lbl} htmlFor="paciente-nombre">Nombre completo</label>
         <input id="paciente-nombre" className={inp} value={form.nombre} onChange={(e) => set('nombre', e.target.value)} placeholder="Ej. Ana López" />
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <label className={lbl} htmlFor="paciente-fecha-nacimiento">Fecha de nacimiento</label>
           <input
@@ -178,7 +178,7 @@ export function CamposDatosGenerales({ form, set }: CamposProps) {
           </select>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <label className={lbl} htmlFor="paciente-telefono">Teléfono</label>
           <input id="paciente-telefono" className={inp} value={form.telefono} onChange={(e) => set('telefono', e.target.value)} />
@@ -230,7 +230,7 @@ export function CamposExpedienteMedico({ form, set }: CamposProps) {
         <label className={lbl} htmlFor="paciente-medicamentos">Medicamentos actuales</label>
         <input id="paciente-medicamentos" className={inp} value={form.medicamentos} onChange={(e) => set('medicamentos', e.target.value)} />
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <label className={lbl} htmlFor="paciente-actividad">Nivel de actividad</label>
           <select id="paciente-actividad" className={inp} value={form.nivelActividad} onChange={(e) => set('nivelActividad', e.target.value as NivelActividad)}>
@@ -327,7 +327,7 @@ export function CamposPreferencias({ form, set }: CamposProps) {
         <label className={lbl} htmlFor="paciente-disgustos">Alimentos que no le gustan</label>
         <input id="paciente-disgustos" className={inp} value={form.disgustos} onChange={(e) => set('disgustos', e.target.value)} placeholder="Ej. cilantro, hígado" />
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <label className={lbl} htmlFor="paciente-comidas">Comidas al día</label>
           <input id="paciente-comidas" type="number" className={inp} value={form.comidasPorDia} onChange={(e) => set('comidasPorDia', e.target.value)} />

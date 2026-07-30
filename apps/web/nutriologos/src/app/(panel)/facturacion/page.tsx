@@ -46,8 +46,8 @@ export default function FacturacionPage() {
     setFacturas((f) => f.map((x) => (x.id === id ? { ...x, pagada: !x.pagada } : x)));
 
   return (
-    <div className="p-8 max-w-3xl">
-      <div className="flex items-center justify-between mb-6">
+    <div className="max-w-3xl p-4 sm:p-6 lg:p-8">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl text-emerald-950 font-medium">Facturación</h1>
           <div className="text-stone-500 text-sm mt-1">Cobros y comprobantes</div>
@@ -68,9 +68,9 @@ export default function FacturacionPage() {
       </div>
       <div className="bg-white border border-stone-200 rounded-xl divide-y divide-stone-100">
         {facturas.map((f) => (
-          <div key={f.id} className="flex items-center gap-4 p-4">
-            <div className="flex-1">
-              <div className="text-sm text-emerald-950 font-medium">{f.paciente}</div>
+          <div key={f.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 p-4">
+            <div className="min-w-0 flex-1 basis-full sm:basis-0">
+              <div className="truncate text-sm font-medium text-emerald-950">{f.paciente}</div>
               <div className="text-xs text-stone-400">
                 {f.concepto} · {f.fecha} {f.cfdi && <span className="text-emerald-600">· CFDI</span>}
               </div>
@@ -79,7 +79,7 @@ export default function FacturacionPage() {
             <button
               type="button"
               onClick={() => togglePago(f.id)}
-              className={`flex items-center gap-1 text-xs rounded-full px-3 py-1 border ${
+              className={`ml-auto flex shrink-0 items-center gap-1 rounded-full border px-3 py-1 text-xs ${
                 f.pagada
                   ? 'text-emerald-700 border-emerald-200 bg-emerald-50'
                   : 'text-orange-600 border-orange-200 bg-orange-50'
@@ -98,7 +98,7 @@ export default function FacturacionPage() {
       </div>
       {nueva && (
         <Modal>
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <ModalHeader title="Nuevo cobro" onClose={() => setNueva(false)} />
             <div className="space-y-3">
               <div>

@@ -46,7 +46,7 @@ export function TabExpediente({ paciente }: { paciente: Paciente }) {
         </div>
       </SectionCard>
       <SectionCard title="Antropometría" icon={Sparkles}>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
             <div className="text-stone-400">Peso</div>
             <div className="text-emerald-950 font-medium">{paciente.antropometria.peso} kg</div>

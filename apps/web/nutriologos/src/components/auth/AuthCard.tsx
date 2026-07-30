@@ -10,8 +10,8 @@ type AuthCardProps = {
 /** Marco compartido por las pantallas de acceso, alta y verificación. */
 export function AuthCard({ titulo, descripcion, children, pie }: AuthCardProps) {
   return (
-    <div className="min-h-screen bg-emerald-950 flex items-center justify-center p-4">
-      <div className="bg-stone-50 rounded-2xl max-w-sm w-full p-8">
+    <div className="flex min-h-dvh items-center justify-center bg-emerald-950 p-4">
+      <div className="w-full max-w-sm rounded-2xl bg-stone-50 p-6 sm:p-8">
         <div className="text-center">
           <Link href="/" className="font-display text-3xl text-emerald-950 font-medium">
             nutria

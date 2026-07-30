@@ -11,6 +11,7 @@ import {
   Receipt,
   Users,
   Utensils,
+  X,
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 import Link from 'next/link';
@@ -30,7 +31,13 @@ const NAV_ITEMS = [
   { href: '/suscripcion', label: 'Suscripción', icon: CreditCard },
 ];
 
-export function Sidebar() {
+type SidebarProps = {
+  /** Solo aplica abajo de `md`, donde la navegación es un cajón superpuesto. */
+  abierto?: boolean;
+  onCerrar?: () => void;
+};
+
+export function Sidebar({ abierto = false, onCerrar }: SidebarProps) {
   const pathname = usePathname();
   const perfil = usePerfil();
   const nombreMarca = perfil.data?.perfil?.marca_nombre || 'nutria';
@@ -39,24 +46,40 @@ export function Sidebar() {
     void signOut({ redirectTo: '/login' });
   };
 
+  // Cerrado en móvil se oculta con `invisible`, no solo desplazado: así sale
+  // también del orden de tabulación en vez de quedar enfocable fuera de pantalla.
+  const visibilidad = abierto ? 'translate-x-0' : '-translate-x-full invisible';
+
   return (
-    <div className="w-56 bg-emerald-950 text-stone-100 flex flex-col shrink-0">
-      <div className="px-6 py-7">
-        <div className="font-display text-2xl font-medium tracking-tight">
-          {nombreMarca}
+    <nav
+      aria-label="Navegación principal"
+      className={`fixed inset-y-0 left-0 z-50 flex w-64 shrink-0 flex-col bg-emerald-950 text-stone-100 transition-transform duration-200 lg:static lg:w-56 lg:translate-x-0 lg:visible ${visibilidad}`}
+    >
+      <div className="flex items-start justify-between px-6 py-7">
+        <div>
+          <div className="font-display text-2xl font-medium tracking-tight">{nombreMarca}</div>
+          <div className="mt-1 text-xs uppercase tracking-wide text-emerald-400">
+            Panel de nutriólogo
+          </div>
         </div>
-        <div className="text-emerald-400 text-xs mt-1 tracking-wide uppercase">
-          Panel de nutriólogo
-        </div>
+        <button
+          type="button"
+          onClick={onCerrar}
+          aria-label="Cerrar menú"
+          className="-mr-2 rounded-lg p-2 text-emerald-300 hover:bg-emerald-900/60 lg:hidden"
+        >
+          <X size={18} />
+        </button>
       </div>
-      <nav className="flex-1 px-3 space-y-1">
+      <div className="flex-1 space-y-1 overflow-y-auto px-3">
         {NAV_ITEMS.map((it) => {
           const activo = pathname.startsWith(it.href);
           return (
             <Link
               key={it.href}
               href={it.href}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
+              onClick={onCerrar}
+              className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
                 activo ? 'bg-emerald-900 text-lime-300' : 'text-emerald-200 hover:bg-emerald-900/60'
               }`}
             >
@@ -64,16 +87,16 @@ export function Sidebar() {
             </Link>
           );
         })}
-      </nav>
-      <div className="px-3 pb-5 border-t border-emerald-900 pt-4">
+      </div>
+      <div className="border-t border-emerald-900 px-3 pb-5 pt-4">
         <button
           type="button"
           onClick={cerrarSesion}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-emerald-300 hover:bg-emerald-900/60"
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-emerald-300 hover:bg-emerald-900/60"
         >
           <LogOut size={17} /> Cerrar sesión
         </button>
       </div>
-    </div>
+    </nav>
   );
 }

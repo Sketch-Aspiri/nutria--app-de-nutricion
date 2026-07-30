@@ -20,7 +20,7 @@ export function PdfPreview({ planId, onClose }: PdfPreviewProps) {
 
   return (
     <Modal wide>
-      <div className="p-5">
+      <div className="p-4 sm:p-5">
         <div className="mb-4 flex items-start justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-800 text-white">

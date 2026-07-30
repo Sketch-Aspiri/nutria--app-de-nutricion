@@ -100,7 +100,7 @@ export function NuevoPacienteWizard({ onClose, onCreado }: NuevoPacienteWizardPr
 
   return (
     <Modal>
-      <div className="p-6 pb-0">
+      <div className="p-4 sm:p-6 pb-0">
         <ModalHeader title="Nuevo paciente" onClose={onClose} />
         <div className="flex gap-1.5 mb-5">
           {PASOS.map((s, i) => (

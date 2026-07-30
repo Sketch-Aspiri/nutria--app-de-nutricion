@@ -35,14 +35,14 @@ export default async function InicioPage() {
   const siguiente = avance.pasos.find((paso) => !paso.completado);
 
   return (
-    <main className="mx-auto max-w-5xl p-5 sm:p-8">
+    <main className="mx-auto max-w-5xl p-4 sm:p-6 lg:p-8">
       <section className="overflow-hidden rounded-3xl bg-emerald-950 text-stone-50">
-        <div className="grid gap-8 p-7 md:grid-cols-[1fr_15rem] md:p-10">
+        <div className="grid gap-8 p-5 sm:p-7 md:grid-cols-[1fr_15rem] md:p-10">
           <div>
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-lime-300/30 bg-lime-300/10 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.2em] text-lime-200">
               <Sparkles size={13} /> Programa piloto
             </div>
-            <h1 className="max-w-xl font-display text-4xl font-medium leading-tight">
+            <h1 className="max-w-xl font-display text-3xl font-medium leading-tight sm:text-4xl">
               Tu consulta, lista para una prueba segura.
             </h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-emerald-100">

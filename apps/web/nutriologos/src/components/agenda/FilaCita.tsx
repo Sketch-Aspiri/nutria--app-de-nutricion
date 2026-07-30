@@ -24,18 +24,18 @@ export function FilaCita({ cita, onCancelar, onCompletar, onAbrirVideo, ocupada 
 
   return (
     <div
-      className={`bg-white border border-stone-200 rounded-xl p-4 flex items-center gap-4 ${
+      className={`flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-stone-200 bg-white p-4 ${
         abierta ? '' : 'opacity-70'
       }`}
       data-testid="fila-cita"
     >
-      <div className="text-center shrink-0 w-16">
-        <div className="font-mono text-emerald-900 text-lg">{horaDeCita(cita.inicio)}</div>
+      <div className="w-16 shrink-0 text-center">
+        <div className="font-mono text-lg text-emerald-900">{horaDeCita(cita.inicio)}</div>
         <div className="text-[10px] text-stone-400">{cita.duracion_min} min</div>
       </div>
 
-      <div className="flex-1 min-w-0">
-        <div className="text-sm text-emerald-950 font-medium truncate">{cita.paciente.nombre}</div>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-medium text-emerald-950">{cita.paciente.nombre}</div>
         <div className="text-xs text-stone-400">
           {ETIQUETA_TIPO_CITA[cita.tipo]}
           {cita.notas ? ` · ${cita.notas}` : ''}
@@ -43,7 +43,7 @@ export function FilaCita({ cita, onCancelar, onCompletar, onAbrirVideo, ocupada 
       </div>
 
       <span
-        className={`text-xs rounded-full px-2.5 py-1 border ${CLASE_ESTADO_CITA[cita.estado]}`}
+        className={`rounded-full border px-2.5 py-1 text-xs ${CLASE_ESTADO_CITA[cita.estado]}`}
         data-testid="estado-cita"
       >
         {ETIQUETA_ESTADO_CITA[cita.estado]}
@@ -69,7 +69,7 @@ export function FilaCita({ cita, onCancelar, onCompletar, onAbrirVideo, ocupada 
       )}
 
       {abierta && (
-        <div className="flex gap-1">
+        <div className="ml-auto flex gap-1">
           <button
             type="button"
             onClick={() => onCompletar(cita.id)}

@@ -105,7 +105,7 @@ export function EditarPacienteModal({ paciente, onClose }: Props) {
 
   return (
     <Modal wide>
-      <div className="p-6 pb-0">
+      <div className="p-4 sm:p-6 pb-0">
         <ModalHeader title="Editar paciente" onClose={onClose} />
       </div>
       <div className="px-6 space-y-6">

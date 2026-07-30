@@ -16,8 +16,8 @@ export default function GlobalError({
 
   return (
     <html lang="es">
-      <body className="flex min-h-screen items-center justify-center bg-stone-50 p-6">
-        <main className="max-w-md rounded-2xl border border-stone-200 bg-white p-8 text-center">
+      <body className="flex min-h-dvh items-center justify-center bg-stone-50 p-4 sm:p-6">
+        <main className="max-w-md rounded-2xl border border-stone-200 bg-white p-6 text-center sm:p-8">
           <div className="font-display text-3xl text-emerald-950">nutria</div>
           <h1 className="mt-6 text-lg font-semibold text-stone-900">
             Algo no salió como esperábamos

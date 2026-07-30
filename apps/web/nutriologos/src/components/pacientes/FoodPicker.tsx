@@ -16,7 +16,7 @@ type FoodPickerProps = {
 export function FoodPicker({ onAdd, onClose }: FoodPickerProps) {
   return (
     <Modal wide>
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         <ModalHeader title="Base de alimentos y equivalencias" onClose={onClose} />
         <BuscadorAlimentos
           accion={(alimento) => (

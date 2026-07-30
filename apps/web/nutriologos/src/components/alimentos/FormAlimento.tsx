@@ -145,13 +145,13 @@ export function FormAlimento({
 
   return (
     <Modal wide>
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         <ModalHeader
           title={inicial ? 'Editar alimento' : 'Nuevo alimento propio'}
           onClose={onClose}
         />
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="col-span-2">
             <label className={labelClass} htmlFor="alimento-nombre">
               Nombre
@@ -266,7 +266,7 @@ export function FormAlimento({
           <summary className="text-xs text-stone-500 cursor-pointer">
             Micronutrimentos (opcionales)
           </summary>
-          <div className="grid grid-cols-3 gap-3 mt-3">
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
             {MICRONUTRIMENTOS.map(({ clave, etiqueta }) => (
               <CampoNumero
                 key={clave}
