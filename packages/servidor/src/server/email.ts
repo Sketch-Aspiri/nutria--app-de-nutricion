@@ -222,6 +222,83 @@ export async function enviarRecordatorioCita(
 }
 
 /**
+ * Enmascara la parte local de un correo: `andres@gmail.com` → `a***s@gmail.com`.
+ *
+ * Se usa en el aviso interno de altas. El dominio se conserva porque no
+ * identifica a nadie por sí solo y sí sirve para distinguir tráfico real de
+ * pruebas; la parte local se recorta porque el titular de ese buzón no aceptó
+ * que su dirección viaje a un buzón administrativo.
+ */
+export function enmascararCorreo(email: string): string {
+  const arroba = email.lastIndexOf('@');
+  if (arroba <= 0) return '***';
+
+  const local = email.slice(0, arroba);
+  const dominio = email.slice(arroba);
+  if (local.length <= 2) return `***${dominio}`;
+  return `${local[0]}***${local[local.length - 1]}${dominio}`;
+}
+
+export type AltaParaAviso =
+  | { tipo: 'nutriologo'; nombre: string; email: string }
+  /**
+   * Del paciente no se manda nombre y el correo va enmascarado: es titular de
+   * un tercero (su nutriólogo), no cliente de la plataforma.
+   */
+  | { tipo: 'paciente'; email: string; consultorio: string };
+
+function cuerpoDelAviso(alta: AltaParaAviso): { asunto: string; titulo: string; cuerpo: string } {
+  if (alta.tipo === 'nutriologo') {
+    return {
+      asunto: '[nutria] Alta nueva: nutriólogo',
+      titulo: 'Se registró un nutriólogo',
+      cuerpo: `<strong>${escaparHtml(alta.nombre)}</strong><br>${escaparHtml(
+        alta.email,
+      )}<br><br>La cuenta queda pendiente hasta que confirme su correo.`,
+    };
+  }
+
+  return {
+    asunto: '[nutria] Alta nueva: paciente',
+    titulo: 'Un paciente activó su cuenta',
+    cuerpo: `${escaparHtml(enmascararCorreo(alta.email))}<br>Consultorio: <strong>${escaparHtml(
+      alta.consultorio,
+    )}</strong>`,
+  };
+}
+
+/**
+ * Aviso interno al equipo cada vez que se da de alta una cuenta.
+ *
+ * Es una señal de operación, no parte del flujo del usuario: **nunca lanza**, y
+ * quien lo llama ignora el resultado. Que el buzón administrativo esté caído no
+ * puede tumbar un registro que ya se guardó en la base.
+ *
+ * Sin `ADMIN_NOTIFY_EMAIL` no se envía nada y no se registra error: en local y
+ * en los previews es lo normal.
+ */
+export async function avisarAltaAlEquipo(alta: AltaParaAviso): Promise<ResultadoEnvio> {
+  const destino = process.env.ADMIN_NOTIFY_EMAIL;
+  if (!destino) return { enviado: false, motivo: 'sin_configurar' };
+
+  try {
+    const { asunto, titulo, cuerpo } = cuerpoDelAviso(alta);
+    const resultado = await enviar(
+      destino,
+      asunto,
+      plantilla(titulo, cuerpo, undefined, 'Aviso interno automático de nutria. No hace falta responder.'),
+    );
+    if (!resultado.enviado) {
+      logger.warn('No se pudo avisar del alta al equipo', { motivo: resultado.motivo });
+    }
+    return resultado;
+  } catch (error: unknown) {
+    logger.error('Falló el aviso interno de alta', error);
+    return { enviado: false, motivo: 'error_proveedor' };
+  }
+}
+
+/**
  * Copia electrónica del aviso simplificado al dar de alta un expediente.
  *
  * El mensaje no enumera condiciones, mediciones ni motivo de consulta. Solo

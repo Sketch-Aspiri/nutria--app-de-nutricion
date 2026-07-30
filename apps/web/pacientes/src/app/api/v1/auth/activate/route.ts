@@ -1,5 +1,6 @@
 import { activarCuentaPaciente } from '@/server/auth/invitaciones';
 import { activarCuentaSchema } from '@/server/auth/schemasPaciente';
+import { avisarAltaAlEquipo } from '@/server/email';
 import {
   ErrorCode,
   internalError,
@@ -63,6 +64,15 @@ export async function POST(request: Request) {
     if (!resultado.ok) {
       return jsonError(400, ErrorCode.INVALID_TOKEN, RECHAZO);
     }
+
+    // Aviso interno de operación. No lanza y su resultado no cambia la
+    // respuesta: la cuenta ya quedó creada y el paciente tiene que poder entrar
+    // aunque el buzón administrativo esté caído.
+    await avisarAltaAlEquipo({
+      tipo: 'paciente',
+      email: resultado.email,
+      consultorio: resultado.consultorio,
+    });
 
     // El correo se devuelve para prellenar el formulario de acceso; ni el
     // token ni el identificador del expediente salen de aquí.

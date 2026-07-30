@@ -4,6 +4,7 @@ import Credentials from 'next-auth/providers/credentials';
 import { z } from 'zod';
 
 import { prisma } from '@/server/db';
+import { avisarAltaAlEquipo } from '@/server/email';
 import { logger } from '@/server/logger';
 import { ipDe, rateLimit } from '@/server/rate-limit';
 
@@ -86,11 +87,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     async createUser({ user }) {
       if (!user.id) return;
+      const nombre = user.name ?? user.email ?? 'Nutriólogo';
       try {
-        await asegurarCuentaNutriologo(user.id, user.name ?? user.email ?? 'Nutriólogo');
+        await asegurarCuentaNutriologo(user.id, nombre);
       } catch (error: unknown) {
         logger.error('No se pudo provisionar la cuenta del nutriólogo', error);
       }
+      // Solo pasa por aquí el alta con Google: el alta con contraseña crea el
+      // usuario en `POST /api/v1/auth/register` y avisa desde allí.
+      await avisarAltaAlEquipo({ tipo: 'nutriologo', nombre, email: user.email ?? 'sin correo' });
     },
   },
 });

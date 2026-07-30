@@ -113,7 +113,14 @@ export type MotivoActivacionRechazada =
   | 'correo_ocupado';
 
 export type ResultadoActivacion =
-  | { ok: true; userId: string; patientId: string; email: string }
+  | {
+      ok: true;
+      userId: string;
+      patientId: string;
+      email: string;
+      /** Consultorio que invitó, para el aviso interno de alta. Sin dato clínico. */
+      consultorio: string;
+    }
   | { ok: false; motivo: MotivoActivacionRechazada };
 
 /**
@@ -137,7 +144,15 @@ export async function activarCuentaPaciente(
       email: true,
       usedAt: true,
       expiresAt: true,
-      patient: { select: { id: true, userId: true, estado: true, deletedAt: true } },
+      patient: {
+        select: {
+          id: true,
+          userId: true,
+          estado: true,
+          deletedAt: true,
+          nutritionist: { select: { name: true } },
+        },
+      },
     },
   });
 
@@ -201,7 +216,13 @@ export async function activarCuentaPaciente(
     resourceId: paciente.id,
   });
 
-  return { ok: true, userId, patientId: paciente.id, email };
+  return {
+    ok: true,
+    userId,
+    patientId: paciente.id,
+    email,
+    consultorio: paciente.nutritionist.name ?? 'Sin nombre de consultorio',
+  };
 }
 
 /** Señal interna para revertir la transacción cuando otra petición se adelantó. */

@@ -58,6 +58,7 @@ enlace de verificación aparece en la pantalla de alta y en la consola del servi
 |---|---|
 | `ANTHROPIC_API_KEY` | Las acciones de IA muestran un error amigable; el resto funciona. |
 | `RESEND_API_KEY` | No se envían correos; en desarrollo se muestra el enlace de verificación. |
+| `ADMIN_NOTIFY_EMAIL` | No se manda el aviso interno de cada alta (nutriólogo o paciente). |
 | `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | Solo se ofrece acceso con correo y contraseña. |
 
 ## Tests y checks

@@ -56,7 +56,13 @@ const INVITACION_VIGENTE = {
   email: 'paciente@ejemplo.mx',
   usedAt: null,
   expiresAt: EN_UNA_HORA(),
-  patient: { id: PACIENTE_ID, userId: null, estado: 'ACTIVO', deletedAt: null },
+  patient: {
+    id: PACIENTE_ID,
+    userId: null,
+    estado: 'ACTIVO',
+    deletedAt: null,
+    nutritionist: { name: 'Consultorio Nutria' },
+  },
 };
 
 /** Simula la transacción interactiva ejecutando el callback con los mocks. */
@@ -224,6 +230,7 @@ describe('activarCuentaPaciente', () => {
       userId: 'user-nuevo',
       patientId: PACIENTE_ID,
       email: 'paciente@ejemplo.mx',
+      consultorio: 'Consultorio Nutria',
     });
     expect(mockPatientUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({

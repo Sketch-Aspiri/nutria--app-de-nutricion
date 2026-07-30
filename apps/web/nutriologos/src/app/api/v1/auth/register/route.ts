@@ -6,7 +6,7 @@ import { hashPassword, normalizarEmail, passwordSchema } from '@/server/auth/pas
 import { asegurarCuentaNutriologo } from '@/server/auth/provisioning';
 import { crearTokenVerificacion } from '@/server/auth/tokens';
 import { prisma } from '@/server/db';
-import { enviarVerificacionEmail } from '@/server/email';
+import { avisarAltaAlEquipo, enviarVerificacionEmail } from '@/server/email';
 import {
   ErrorCode,
   internalError,
@@ -100,7 +100,12 @@ export async function POST(request: Request) {
   }
 
   const token = await crearTokenVerificacion(usuarioId);
-  const envio = await enviarVerificacionEmail(email, token);
+  // En paralelo: el aviso interno no debe sumar latencia al alta ni condicionarla.
+  // `avisarAltaAlEquipo` no lanza, así que `Promise.all` no puede fallar por él.
+  const [envio] = await Promise.all([
+    enviarVerificacionEmail(email, token),
+    avisarAltaAlEquipo({ tipo: 'nutriologo', nombre: parsed.data.nombre_completo, email }),
+  ]);
 
   return jsonCreated({
     id: usuarioId,
