@@ -63,7 +63,18 @@ function main(): void {
   present('RATE_LIMIT_HASH_KEY', 32);
   present('SENTRY_DSN');
   present('NEXT_PUBLIC_SENTRY_DSN');
-  present('RESEND_API_KEY');
+  // El correo sale por Resend (dominio verificado) o por SMTP de un buzón
+  // propio, la salida de la fase de prueba. Basta con que uno esté configurado.
+  const haySmtp = Boolean(
+    process.env.SMTP_HOST?.trim() &&
+      process.env.SMTP_USER?.trim() &&
+      process.env.SMTP_PASSWORD?.trim(),
+  );
+  add(
+    'Proveedor de correo configurado',
+    Boolean(process.env.RESEND_API_KEY?.trim()) || haySmtp,
+    haySmtp ? 'SMTP' : 'configura RESEND_API_KEY o SMTP_HOST/SMTP_USER/SMTP_PASSWORD',
+  );
   present('EMAIL_FROM');
   present('CRON_SECRET', 32);
   present('PRIVACY_RESPONSIBLE_NAME');

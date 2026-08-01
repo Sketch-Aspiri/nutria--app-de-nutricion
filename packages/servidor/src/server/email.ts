@@ -24,6 +24,70 @@ export type ResultadoEnvio =
   | { enviado: true }
   | { enviado: false; motivo: 'sin_configurar' | 'error_proveedor'; enlaceDev?: string };
 
+type ConfigSmtp = {
+  host: string;
+  port: number;
+  /** Buzón que autentica y que aparece como remitente real del mensaje. */
+  user: string;
+  pass: string;
+};
+
+/**
+ * Configuración SMTP de un buzón propio (Gmail, Outlook, el correo del dominio).
+ *
+ * Es la salida para la fase de prueba con pocos nutriólogos: Resend y cualquier
+ * otro proveedor transaccional exigen un dominio verificado para escribirle a
+ * terceros, mientras que un buzón personal ya está autenticado ante su propio
+ * proveedor. A cambio hay un tope diario bajo (500 mensajes en Gmail gratuito),
+ * así que al abrir el registro conviene volver a Resend con dominio propio.
+ */
+function configSmtp(): ConfigSmtp | null {
+  const host = process.env.SMTP_HOST?.trim();
+  const user = process.env.SMTP_USER?.trim();
+  const pass = process.env.SMTP_PASSWORD?.trim();
+  if (!host || !user || !pass) return null;
+
+  const port = Number(process.env.SMTP_PORT ?? 465);
+  return { host, port: Number.isFinite(port) ? port : 465, user, pass };
+}
+
+/**
+ * El transporte se reutiliza entre envíos para no renegociar TLS en cada correo;
+ * `nodemailer` se carga bajo demanda para no arrastrarlo al bundle de quien
+ * despliegue con Resend.
+ */
+let transporteSmtp: { sendMail: (correo: Record<string, string>) => Promise<unknown> } | null = null;
+
+async function enviarPorSmtp(
+  config: ConfigSmtp,
+  correo: { para: string; asunto: string; html: string },
+): Promise<ResultadoEnvio> {
+  try {
+    if (!transporteSmtp) {
+      const { createTransport } = await import('nodemailer');
+      transporteSmtp = createTransport({
+        host: config.host,
+        port: config.port,
+        secure: config.port === 465,
+        auth: { user: config.user, pass: config.pass },
+      });
+    }
+
+    await transporteSmtp.sendMail({
+      // Gmail reescribe el remitente si no coincide con la cuenta autenticada:
+      // por eso el usuario SMTP es el respaldo, no una dirección inventada.
+      from: process.env.EMAIL_FROM ?? `nutria <${config.user}>`,
+      to: correo.para,
+      subject: correo.asunto,
+      html: correo.html,
+    });
+    return { enviado: true };
+  } catch (error: unknown) {
+    logger.error('El servidor SMTP rechazó el envío', error);
+    return { enviado: false, motivo: 'error_proveedor' };
+  }
+}
+
 /**
  * Buzón de pruebas de los E2E.
  *
@@ -52,6 +116,11 @@ async function enviar(para: string, asunto: string, html: string): Promise<Resul
   const buzonDePruebas = process.env.EMAIL_OUTBOX_FILE;
   if (buzonDePruebas) {
     return anexarAlBuzonDePruebas(buzonDePruebas, { para, asunto, html });
+  }
+
+  const smtp = configSmtp();
+  if (smtp) {
+    return enviarPorSmtp(smtp, { para, asunto, html });
   }
 
   const apiKey = process.env.RESEND_API_KEY;
@@ -113,8 +182,8 @@ function plantilla(
 }
 
 /**
- * Sin RESEND_API_KEY el registro no se rompe: en desarrollo se devuelve el
- * enlace para copiarlo desde la consola del servidor.
+ * Sin proveedor de correo configurado el registro no se rompe: en desarrollo se
+ * devuelve el enlace para copiarlo desde la consola del servidor.
  */
 export async function enviarVerificacionEmail(
   para: string,
@@ -132,7 +201,7 @@ export async function enviarVerificacionEmail(
   );
 
   if (!resultado.enviado && esDesarrollo()) {
-    logger.warn('Correo no enviado (RESEND_API_KEY sin configurar). Enlace de verificación:', {
+    logger.warn('Correo no enviado (sin proveedor configurado). Enlace de verificación:', {
       url,
     });
     return { ...resultado, enlaceDev: url };
@@ -172,7 +241,7 @@ export async function enviarInvitacionPaciente(
   );
 
   if (!resultado.enviado && esDesarrollo()) {
-    logger.warn('Correo no enviado (RESEND_API_KEY sin configurar). Enlace de activación:', {
+    logger.warn('Correo no enviado (sin proveedor configurado). Enlace de activación:', {
       url,
     });
     return { ...resultado, enlaceDev: url };

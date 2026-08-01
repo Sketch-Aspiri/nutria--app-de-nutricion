@@ -68,7 +68,7 @@ export function RegistroForm() {
       >
         {alta.enlace_verificacion_dev && (
           <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs text-amber-900 break-all">
-            <strong className="block mb-1">Modo desarrollo (sin RESEND_API_KEY)</strong>
+            <strong className="block mb-1">Modo desarrollo (sin proveedor de correo)</strong>
             <Link href={alta.enlace_verificacion_dev} className="underline">
               {alta.enlace_verificacion_dev}
             </Link>

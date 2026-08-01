@@ -49,15 +49,28 @@ cd apps/web/nutriologos && npx auth secret     # escribe AUTH_SECRET en .env
 npm run dev:nutriologos  # http://localhost:3000
 ```
 
-Crea tu cuenta en `/registro`. Sin `RESEND_API_KEY` no se envían correos: el
-enlace de verificación aparece en la pantalla de alta y en la consola del servidor.
+Crea tu cuenta en `/registro`. Sin proveedor de correo configurado no se envían
+correos: el enlace de verificación aparece en la pantalla de alta y en la consola
+del servidor.
+
+### Salida de correo
+
+Hay dos caminos y el SMTP tiene prioridad si está configurado:
+
+| Camino | Variables | Cuándo |
+|---|---|---|
+| SMTP de un buzón propio | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` | Fase de prueba: no requiere dominio. Con Gmail hace falta verificación en dos pasos y una **contraseña de aplicación**; el tope es de ~500 correos al día. |
+| Resend | `RESEND_API_KEY` | Producción abierta, con dominio verificado. Sin dominio, Resend solo entrega al correo de la propia cuenta. |
+
+`EMAIL_FROM` debe coincidir con el buzón de `SMTP_USER` cuando se usa SMTP: Gmail
+reescribe el remitente si no corresponde a la cuenta que autentica.
 
 ### Variables opcionales
 
 | Variable | Efecto si falta |
 |---|---|
 | `ANTHROPIC_API_KEY` | Las acciones de IA muestran un error amigable; el resto funciona. |
-| `RESEND_API_KEY` | No se envían correos; en desarrollo se muestra el enlace de verificación. |
+| `RESEND_API_KEY` / `SMTP_*` | No se envían correos; en desarrollo se muestra el enlace de verificación. |
 | `ADMIN_NOTIFY_EMAIL` | No se manda el aviso interno de cada alta (nutriólogo o paciente). |
 | `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | Solo se ofrece acceso con correo y contraseña. |
 
