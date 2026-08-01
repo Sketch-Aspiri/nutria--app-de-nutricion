@@ -56,7 +56,14 @@ const MENSAJES: Record<MotivoActivacionRechazada, string> = {
   ya_vinculado:
     'Esta invitación ya se usó para crear tu cuenta. Entra con tu correo y tu contraseña.',
   paciente_inactivo: RECHAZO,
-  correo_ocupado: RECHAZO,
+  /**
+   * Llegar aquí exige una invitación vigente en la mano, así que el paciente ya
+   * conoce el correo del que se habla: decírselo no revela nada que no tenga, y
+   * callarlo lo dejaba pidiendo reenvíos contra un choque que ningún correo
+   * nuevo resuelve.
+   */
+  correo_ocupado:
+    'Ya existe una cuenta de nutria con este correo. Si es tuya, entra con tu contraseña; si no, pídele a tu nutrióloga que te invite con otro correo.',
 };
 
 export async function POST(request: Request) {
@@ -80,6 +87,10 @@ export async function POST(request: Request) {
   try {
     const resultado = await activarCuentaPaciente(parsed.data.token, parsed.data.password);
     if (!resultado.ok) {
+      // Solo el motivo: ni token, ni correo, ni expediente. Sin esta línea, un
+      // rechazo en producción es indistinguible de otro y el diagnóstico pasa
+      // por leer la base a mano.
+      logger.warn('Activación rechazada', { motivo: resultado.motivo });
       return jsonError(400, ErrorCode.INVALID_TOKEN, MENSAJES[resultado.motivo]);
     }
 

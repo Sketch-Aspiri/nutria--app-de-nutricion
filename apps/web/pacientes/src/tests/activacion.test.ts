@@ -142,14 +142,14 @@ describe('rechazos', () => {
    * Por eso el estado del expediente —archivado, correo ya registrado— sigue
    * detrás del mismo mensaje que un token inventado.
    */
-  it.each(['invalido', 'paciente_inactivo', 'correo_ocupado'] as const)(
+  it.each(['invalido', 'paciente_inactivo'] as const)(
     'no revela el estado del expediente en %s',
     async (motivo) => {
       const { cuerpo } = await rechazar(motivo);
       const generico = (await rechazar('invalido')).cuerpo;
 
       expect(cuerpo).toEqual(generico);
-      expect(cuerpo.error.message).not.toMatch(/inactiv|archivad|registrad|ocupad/i);
+      expect(cuerpo.error.message).not.toMatch(/inactiv|archivad/i);
     },
   );
 
@@ -166,6 +166,18 @@ describe('rechazos', () => {
     const { cuerpo } = await rechazar('ya_vinculado');
 
     expect(cuerpo.error.message).toMatch(/entra/i);
+  });
+
+  /**
+   * El caso que costó una tarde: el correo del expediente ya tenía cuenta en la
+   * plataforma. Con el mensaje genérico, "pídele que te reenvíe la invitación"
+   * mandaba a repetir lo único que no arreglaba nada.
+   */
+  it('dice que el correo ya tiene cuenta en vez de mandar a pedir otro reenvío', async () => {
+    const { cuerpo } = await rechazar('correo_ocupado');
+
+    expect(cuerpo.error.message).toMatch(/ya existe una cuenta/i);
+    expect(cuerpo.error.message).not.toMatch(/reenv/i);
   });
 
   it('ofrece un reenvío cuando el enlace venció', async () => {
