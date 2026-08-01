@@ -1,24 +1,13 @@
-export type ItemPlanHoy = {
-  id: string;
-  descripcion_libre: string | null;
-  energia_kcal: number;
-  proteina_g: number;
-  carbohidratos_g: number;
-  lipidos_g: number;
-  food: {
-    nombre: string;
-    porcion_descripcion: string;
-  } | null;
-};
+import type { ComidaPlan, ItemPlan } from '@/features/plan/types';
 
-export type ComidaPlanHoy = {
-  id: string;
-  orden: number;
-  nombre: string;
-  horario: string | null;
-  descripcion: string | null;
-  items: ItemPlanHoy[];
-};
+/**
+ * Las comidas que `/me/today` incluye son el mismo plan que sirve
+ * `/me/meal_plan`, serializado por la misma función. Se declaran una sola vez,
+ * en la feature dueña del plan, y aquí se conservan los nombres con los que ya
+ * se lee el resto de Hoy.
+ */
+export type ItemPlanHoy = ItemPlan;
+export type ComidaPlanHoy = ComidaPlan;
 
 export type PlanHoy = {
   id: string;
@@ -93,9 +82,4 @@ export type RespuestaCoach = {
   cuota: { usadas: number; limite: number; restantes: number };
 };
 
-export type TotalesNutricionales = {
-  calorias: number;
-  proteina: number;
-  carbos: number;
-  grasa: number;
-};
+export type { TotalesNutricionales } from '@/features/plan/calculos';

@@ -41,6 +41,16 @@ const repositorio = {
   proximasCitas: jest.fn(),
 };
 
+// Cuenta y derechos ARCO (fase 11). Entran a la misma lista negra: exportar o
+// dar de baja pese al rechazo de la guarda sería el peor fallo posible aquí.
+const cuenta = {
+  exportarDatosDelPaciente: jest.fn(),
+  registrarExportacionPropia: jest.fn(),
+  cambiarPassword: jest.fn(),
+  verificarPassword: jest.fn(),
+  darDeBajaCuenta: jest.fn(),
+};
+
 // La IA cuenta como capa de datos para esta prueba: llamarla pese al rechazo de
 // la guarda sacaría datos del expediente hacia el proveedor.
 const ia = {
@@ -50,6 +60,11 @@ const ia = {
 };
 
 jest.mock('@/server/me/repository', () => repositorio);
+jest.mock('@/server/me/cuenta', () => ({
+  ...cuenta,
+  ExportacionDemasiadoGrandeError: class extends Error {},
+}));
+jest.mock('@/server/email', () => ({ avisarBajaDePacienteApp: jest.fn() }));
 jest.mock('@/server/me/fotos', () => ({
   MAX_FOTO_BYTES: 5 * 1024 * 1024,
   subirFotoComida: jest.fn(),
@@ -103,6 +118,9 @@ async function endpoints(): Promise<Array<[string, Invocacion]>> {
   const coach = await import('@/app/api/v1/me/ai/coach/route');
   const estimacion = await import('@/app/api/v1/me/ai/meal_estimate/route');
   const sustitucion = await import('@/app/api/v1/me/ai/substitution/route');
+  const exportar = await import('@/app/api/v1/me/export/route');
+  const password = await import('@/app/api/v1/me/password/route');
+  const baja = await import('@/app/api/v1/me/account/route');
 
   const params = { params: Promise.resolve({ id: 'cualquiera' }) };
   const url = new Request('http://localhost:3001/api/v1/me');
@@ -132,6 +150,12 @@ async function endpoints(): Promise<Array<[string, Invocacion]>> {
     ['POST /me/ai/coach', () => coach.POST(peticion({ mensaje: 'Hola' }))],
     ['POST /me/ai/meal_estimate', () => estimacion.POST(peticion({ texto: '2 tacos' }))],
     ['POST /me/ai/substitution', () => sustitucion.POST(peticion({ ingrediente: 'pollo' }))],
+    ['GET /me/export', () => exportar.GET(url)],
+    ['POST /me/password', () => password.POST(peticion({ actual: 'a', nueva: 'b' }))],
+    [
+      'DELETE /me/account',
+      () => baja.DELETE(peticion({ password: 'x', confirmacion: true })),
+    ],
   ];
 }
 
@@ -140,9 +164,9 @@ beforeEach(() => {
 });
 
 describe('guarda de sesión en /api/v1/me/*', () => {
-  it('cubre los endpoints publicados de las fases 4 y 5', async () => {
+  it('cubre los endpoints publicados de las fases 4, 5 y 11', async () => {
     // Si se agrega un endpoint y no se agrega aquí, este conteo lo delata.
-    expect(await endpoints()).toHaveLength(21);
+    expect(await endpoints()).toHaveLength(24);
   });
 
   it('responde 401 en todos los endpoints cuando no hay sesión', async () => {
@@ -171,7 +195,7 @@ describe('guarda de sesión en /api/v1/me/*', () => {
 
     for (const [, invocar] of await endpoints()) await invocar();
 
-    for (const [nombre, fn] of Object.entries({ ...repositorio, ...ia })) {
+    for (const [nombre, fn] of Object.entries({ ...repositorio, ...ia, ...cuenta })) {
       expect(`${nombre}: ${fn.mock.calls.length}`).toBe(`${nombre}: 0`);
     }
   });

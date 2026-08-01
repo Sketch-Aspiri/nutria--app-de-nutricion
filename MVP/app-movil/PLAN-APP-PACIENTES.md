@@ -470,13 +470,13 @@ instala desde Chrome Android e iOS Safari.
 
 **Aceptación:** marcar una comida se refleja de inmediato en la pestaña de seguimiento del nutriólogo.
 
-### Fase 8 — Plan y recetas
+### Fase 8 — Plan y recetas ✅
 
 - Plan diario vigente con porciones y kcal por comida; estado vacío si no hay plan compartido.
 - Recetas enviadas, detalle con ingredientes y pasos, sustitución de ingrediente con IA.
 - Plan de actividad compartido, si existe.
 
-### Fase 9 — Progreso y logros
+### Fase 9 — Progreso y logros ✅
 
 - Tarjetas perdido/actual/falta y gráfica de peso (reutilizar `WeightChart.tsx` del panel — se mueve
   a `packages/ui-tokens` o a un `packages/ui` nuevo si crece; mientras tanto se copia con nota de deuda).
@@ -484,13 +484,13 @@ instala desde Chrome Android e iOS Safari.
   racha de N días, meta de agua N días, semana completa de registros, primeros N kg, peso meta, N días
   activo. Función pura con tests de tabla — no hay estado que se desincronice ni tabla que migrar.
 
-### Fase 10 — Mensajes
+### Fase 10 — Mensajes ✅
 
 - Hilo con el nutriólogo, polling cada 15 s (mismo patrón que `useMensajes.ts` del panel), marcado
   de leídos, indicador de no leídos en la nav inferior.
 - Sin simulaciones: el `setTimeout` que fingía la respuesta de la nutrióloga desaparece.
 
-### Fase 11 — Perfil, privacidad y cuenta
+### Fase 11 — Perfil, privacidad y cuenta ✅
 
 - Datos del paciente (lectura), nutriólogo asignado, objetivo, recordatorios, aviso de privacidad
   versionado, cambio de contraseña, cerrar sesión.
@@ -587,17 +587,17 @@ Se dejan fuera a propósito, y se anotan aquí para que no se cuelen a mitad de 
 | # | Fase | Entregable | Depende de |
 |---|---|---|---|
 | 0 | **Reorganización** ✅ | `apps/web/nutriologos` funcionando idéntico | — |
-| 1 | **`packages/servidor`** ✅ ⚠️ | Capa de servidor compartida, panel intacto. **Gate de E2E (§4.4) sin cumplir — ver §15** | 0 |
+| 1 | **`packages/servidor`** ✅ | Capa de servidor compartida, panel intacto. **Gate de E2E (§4.4) sin cumplir — ver §15** | 0 |
 | 2 | **Modelo de datos** ✅ | Migraciones de `meal_logs`, `water_logs`, `patient_invites` | 1 |
 | 3 | **Identidad del paciente** ✅ | Invitación, activación, `requierePaciente` | 2 |
 | 4 | **API `/api/v1/me/*`** ✅ | Endpoints con tests de integración | 3 |
 | 5 | **IA del paciente** ✅ | Coach, estimación, sustitución, con cuotas y guardas | 4 |
 | 6 | **Cascarón y PWA** ✅ | App navegable e instalable | 3 |
 | 7 | Hoy y registro ✅ | Pantalla principal completa | 4, 5, 6 |
-| 8 | Plan y recetas | Plan y recetas compartidas | 4, 6 |
-| 9 | Progreso y logros | Gráfica y logros calculados | 4, 6 |
-| 10 | Mensajes | Chat real bidireccional | 4, 6 |
-| 11 | Perfil y ARCO | Cuenta, privacidad, exportación y baja | 4, 6 |
+| 8 | Plan y recetas ✅ | Plan y recetas compartidas | 4, 6 |
+| 9 | Progreso y logros ✅ | Gráfica y logros calculados | 4, 6 |
+| 10 | Mensajes ✅ | Chat real bidireccional | 4, 6 |
+| 11 | Perfil y ARCO ✅ | Cuenta, privacidad, exportación y baja | 4, 6 |
 | 12 | E2E y despliegue | 8 specs en verde, dos proyectos en Vercel | 7–11 |
 
 Las fases 0 a 5 son secuenciales. De la 7 a la 11 son independientes entre sí una vez lista la 6.
@@ -609,6 +609,388 @@ Las fases 0 a 5 son secuenciales. De la 7 a la 11 son independientes entre sí u
 ---
 
 ## 15. Bitácora
+
+### Fase 11 — Perfil, privacidad y cuenta ✅ (2026-08-01)
+
+La última pestaña dejó de ser un estado vacío, y es la única de la serie 7–11 que **sí agregó
+endpoints**: `GET /api/v1/me/export`, `POST /api/v1/me/password` y `DELETE /api/v1/me/account`. Las
+fases 8, 9 y 10 fueron UI sobre contrato existente porque la 4 ya había dejado listo lo que leían;
+los derechos ARCO no tenían nada del otro lado, así que aquí había que construirlo.
+
+#### La frontera que define esta fase
+
+§9 lo dice en una línea y la línea es todo: la baja **desvincula `user_id` y borra la cuenta; el
+expediente clínico permanece con el nutriólogo, que es su responsable**. `darDeBajaCuenta` hace
+exactamente eso y nada más. Borrar mediciones, notas y planes desde el teléfono del paciente sería
+que un usuario destruyera el registro clínico de un tercero **obligado a conservarlo** por la
+NOM-004-SSA3 — no es un derecho ARCO mal implementado, es el derecho de otro incumplido.
+
+Esa frontera se repite en tres lugares, a propósito: en `cuenta.ts` como comentario, en la pantalla
+antes de que el paciente escriba su contraseña, y **dentro del propio JSON exportado**, en un campo
+`expediente_clinico_completo` que dice `incluido: false`, por qué, y a quién pedírselo con nombre y
+correo. Un archivo que el paciente cree completo y no lo es sería peor que no ofrecerlo: se entera
+el día que lo necesita, no el día que lo descarga.
+
+Las dos escrituras de la baja van en una `$transaction`. Una cuenta desvinculada pero viva, o una
+cuenta muerta todavía vinculada, dejarían un estado que ningún guard sabe leer.
+
+#### Qué sale en la exportación y qué no
+
+Sale lo que el paciente registró y lo que su nutrióloga le compartió: mediciones, planes y recetas
+**ya compartidos** (`compartidoAt`/`ENVIADA`, mismo filtro que usa toda la app del paciente), sus
+registros de comida, peso, ejercicio y agua, sus citas, sus mensajes y la evidencia de su
+consentimiento con la versión del aviso.
+
+No salen `motivo`, `hallazgos`, `plan` ni `seguimiento` de las consultas, ni el texto libre del
+expediente. De `medicalRecord` se toma **solo** `objetivo` y `objetivoOtro`: ese mismo registro
+guarda antecedentes y medicamentos, que son nota clínica. Un `include: true` cómodo habría sacado
+el expediente entero por la puerta de atrás.
+
+Los mensajes se **descifran** antes de exportarse. Entregar el ciphertext habría sido cumplir la
+letra del derecho de acceso y ninguna parte de su propósito.
+
+De las citas se copian cinco campos a mano en vez de volcar la fila: `notas` es del nutriólogo, y
+`GET /me/appointments` ya lo excluye desde la fase 4. Un volcado directo lo habría filtrado por una
+ruta nueva la misma semana que se cerró la vieja.
+
+#### Tres límites de tasa, tres razones distintas
+
+3 por hora para la exportación —el mismo tope que la del panel—, porque arma un JSON con todo el
+expediente y es la consulta más cara de la app. 5 por hora para la contraseña, porque ese endpoint
+**es un oráculo**: comprueba la contraseña actual, y sin tope una sesión robada la adivinaría a
+fuerza bruta desde dentro. 5 por hora para la baja, por lo mismo. Los tres cortan **antes** de tocar
+la base o comprobar nada, y hay prueba de cada uno.
+
+`cambiarPassword` responde igual ante contraseña incorrecta y ante cuenta inexistente. Detrás de
+`requierePaciente` el segundo caso no debería ocurrir, y distinguirlo solo daría señal a quien
+esté probando. Hay una prueba que compara los dos cuerpos y falla si divergen.
+
+Un expediente que excede `MAX_EXPORT_ROWS` responde **413**, no 500: el paciente sabe que sus datos
+existen y que hay que pedírselos a su nutrióloga, en vez de leer "algo salió mal".
+
+#### El interruptor que no se puso
+
+Recordatorios es un párrafo informativo, no un switch. El modelo no guarda una preferencia de
+recordatorios por paciente —§12 deja las notificaciones push fuera de la V1 y los avisos siguen por
+correo, con el cron que ya existe del lado del panel—, así que un control aquí no escribiría en
+ningún lado. Un interruptor que finge guardar es peor que su ausencia: el paciente lo apaga, cree
+que dejó de recibir correos, y los sigue recibiendo.
+
+Por la misma razón todo el perfil es de **lectura**. Nombre, objetivo y nutrióloga los define la
+profesional en consulta; un campo editable aquí crearía dos fuentes de verdad para el mismo dato
+clínico.
+
+#### La baja pide contraseña, y lo dice antes de pedirla
+
+Es la única acción irreversible de la app, así que `DELETE /me/account` lleva cuerpo —contraseña más
+`confirmacion: true` literal— aunque sea un `DELETE`. Un teléfono desbloqueado sobre una mesa no
+debería bastar.
+
+La confirmación es de dos pasos y el texto enumera qué se va y qué se queda **antes** de que el
+paciente escriba nada, con la sugerencia de descargar sus datos primero. Por eso las dos acciones
+ARCO viven en la misma tarjeta: a nadie se le pide que se dé de baja sin tener al lado el botón para
+llevarse lo suyo.
+
+El aviso a la nutrióloga —que sigue siendo la responsable del expediente— no puede tumbar la
+operación: `avisarBajaDePacienteApp` atrapa su propio error y devuelve `{ enviado: false }`. La baja
+ya se ejecutó en la transacción y no se deshace porque Resend esté caído.
+
+Las tres operaciones dejan rastro en `audit_logs` (`PATIENT_SELF_EXPORT`,
+`PATIENT_PASSWORD_CHANGED`, `PATIENT_ACCOUNT_DELETED`), como pide §9. Ninguna escribe la contraseña
+ni el contenido exportado en la bitácora.
+
+#### 400, no 422
+
+Los tres handlers responden **400** ante un payload inválido. §10 los describe como "(422)", pero
+`rules/api-conventions.md` reserva 400 para validación y 422 para regla de negocio violada, y toda
+la API del paciente ya sigue esa convención desde la fase 4. Se alineó la prueba al contrato real
+en vez de tocar `validationError`, que es compartido con el panel: cambiarlo por una nota de este
+plan habría roto el contrato de 20 endpoints ajenos a esta fase.
+
+#### Verificación
+
+| Comprobación | Resultado |
+|---|---|
+| Suite de `apps/web/pacientes` | **298/298**, 36 suites (eran 248 en 32 al cerrar la fase 10) |
+| Cobertura de `features/perfil` | **95.1 %** de sentencias, **96.3 %** de líneas |
+| Suite de `packages/servidor` | **518/518**, 57 suites (eran 502 en 56) |
+| Suite de `apps/web/nutriologos` | **90/90**, 13 suites — la fase no tocó el panel |
+| `type-check` | Limpio en `pacientes` y `nutriologos`; sigue abierto el hallazgo de `servidor` |
+| `next build` de pacientes | Exitoso; `/perfil` estático y los tres endpoints nuevos en la ruta |
+
+Los handlers nuevos entran a las dos suites de contrato que ya existían: `autorizacion.test.ts` los
+recorre con la guarda rechazando —exportar o dar de baja pese a un 401 sería el peor fallo posible
+de esta fase— y `endpoints.test.ts` cubre caso feliz, validación y límite de tasa de cada uno.
+
+Sigue abierto el hallazgo de la fase 9: 11 errores `TS18048` en
+`packages/servidor/src/server/email.test.ts`, ajenos a esta fase. Se confirmó que son previos —ni el
+archivo ni `tsconfig.base.json` cambiaron, y lo que esta fase agregó a `email.ts` es aditivo—.
+**Merece su propio cambio antes de la fase 12.**
+
+El E2E `arco.spec.ts` (§10.8) queda para la fase 12, junto con los de las fases 7 a 10.
+
+### Fase 10 — Mensajes ✅ (2026-07-31)
+
+La pestaña Mensajes dejó de ser un estado vacío. Consume los dos endpoints que la fase 4 dejó listos
+—`GET`/`POST /api/v1/me/messages` y `POST /api/v1/me/messages/read`— sin agregar ninguno: tercera fase
+seguida de UI sobre contrato existente.
+
+El hilo es la **misma** tabla `messages` que lee el panel del otro lado. No hay copia, ni cola, ni
+espejo: lo que la nutrióloga escribe en su panel aparece en el siguiente sondeo del teléfono.
+
+#### La simulación desaparece, y era lo importante
+
+El prototipo respondía solo. Un `setTimeout` de 1 200 ms inyectaba *"¡Gracias por avisarme, Camila!
+Lo reviso y te comento."* como si lo hubiera escrito la profesional. En una app de salud eso no es una
+maqueta inofensiva: es ponerle palabras en la boca a quien responde por el tratamiento, y un paciente
+que lee esa frase se queda tranquilo creyendo que alguien ya vio su mensaje.
+
+`MensajesCliente.test.tsx` tiene una prueba que envía un mensaje, **espera 1 400 ms** —más que el
+`setTimeout` del prototipo— y falla si aparece cualquiera de las dos frases. Si alguien vuelve a
+meter la simulación, la suite lo dice con el motivo escrito en el test.
+
+#### Sondeo: los mismos números del panel, una sola consulta
+
+15 s con el hilo abierto y 30 s desde la nav inferior, igual que `useMensajes.ts` del panel. Las dos
+pantallas comparten llave de React Query, así que hay **una** consulta y no dos: entrar a Mensajes no
+duplica el sondeo del mismo recurso, y hay prueba de eso. El goteo se detiene solo cuando la pestaña
+deja de estar visible —`refetchIntervalInBackground` es `false` por omisión—, así que una PWA abierta
+en segundo plano no consulta toda la tarde.
+
+**Trade-off consciente:** el indicador de la nav se alimenta de `meta.sin_leer`, que viaja dentro de
+la respuesta del hilo completo. Traer hasta 100 mensajes para leer un entero es caro, pero el endpoint
+de conteo aparte no existe y crearlo habría sacado a esta fase de su alcance de UI. Si el sondeo pesa
+en producción, un `GET /me/messages/unread_count` es un cambio de una tarde.
+
+#### El orden que había que voltear
+
+`listarMensajes` ordena `createdAt: 'desc'` y toma 100. Está bien así: con un tope, lo que hay que
+conservar son los **últimos** mensajes, no los primeros. Pero un chat se lee al revés, y la inversión
+tenía que ocurrir en el cliente: cambiarla en el servidor le habría dado al paciente los 100 mensajes
+más antiguos del hilo. `ordenarMensajes` también desempata por id, para que dos mensajes del mismo
+milisegundo no bailen entre sondeos.
+
+Los separadores de día (`Hoy`, `Ayer`, `20 jul`) cortan por la fecha **local**: un mensaje de las
+23:40 en México pertenece a ese día aunque en UTC ya sea el siguiente. Misma trampa que la fase 9
+esquivó en `fechaCorta`, distinto lugar.
+
+#### Lo que se ve antes de que el servidor confirme
+
+El envío pinta la burbuja al instante, atenuada y con acuse "Enviando". Si falla, la burbuja
+desaparece y **el texto se queda escrito en el redactor**: perder lo que uno acaba de teclear por un
+bache de red es peor que reintentar. La burbuja optimista no toca `sin_leer` —ese número cuenta
+mensajes *del nutriólogo*, y escribir uno propio no lo cambia—; tocarlo habría apagado el indicador
+por error.
+
+Los tres acuses (*Enviando*, *Enviado*, *Leído*) llevan texto para lector de pantalla además del
+icono: una palomita doble no significa nada para quien no la ve. Igual el globo de no leídos, que es
+`aria-hidden` con un "3 mensajes sin leer" al lado — un "3" suelto junto a "Mensajes" no dice de qué
+son.
+
+#### Detalles que no se heredaron del prototipo
+
+El redactor es un `<form>`, no un `onKeyDown` que espía la tecla Enter: así el teclado de iOS muestra
+"enviar" y el envío funciona igual con teclado físico o lector de pantalla. Tope de 2 000 caracteres
+avisado en el cliente, que es el mismo de `enviarMensajeSchema` —mejor decirlo antes que gastar un
+viaje para recibir un 422.
+
+`CuerpoDelHilo` es un componente de nivel superior y no una función declarada dentro de
+`MensajesCliente`: anidarlo le habría dado identidad nueva en cada render y, con un sondeo cada 15 s,
+eso desmonta el hilo —y la posición de lectura— cuatro veces por minuto.
+
+#### `features/perfil/`, cimiento de la fase 11
+
+El encabezado del hilo necesita el nombre de la nutrióloga, y `GET /api/v1/me` ya lo servía sin que
+nada lo consumiera. Se creó `features/perfil/` con la lectura y el hook, **sin UI**: la pantalla de
+perfil, las metas, los recordatorios y los derechos ARCO son de la fase 11, que extiende este módulo
+en vez de abrir un segundo cliente para el mismo endpoint. El tipo declara solo los campos que algo
+pinta hoy; varios de los que faltan son sensibles y un tipo que los promete invita a usarlos.
+
+Sin nombre todavía, el encabezado dice "Tu nutrióloga". Un nombre de ejemplo diría una mentira sobre
+quién la atiende.
+
+#### Verificación
+
+| Comprobación | Resultado |
+|---|---|
+| Suite de `apps/web/pacientes` | **248/248**, 32 suites (eran 198 en 26 suites al cerrar la fase 9) |
+| Cobertura de `features/mensajes` | **96.5 %** de sentencias, **99.2 %** de líneas |
+| Suite de `packages/servidor` | **502/502**, 56 suites |
+| Suite de `apps/web/nutriologos` | **90/90**, 13 suites — la fase no tocó el panel |
+| `type-check` | Limpio en `pacientes` y `nutriologos`; sigue abierto el hallazgo de `servidor` |
+| `next build` de pacientes | Exitoso; `/mensajes` estático |
+
+Sigue abierto el hallazgo de la fase 9: 11 errores `TS18048` en
+`packages/servidor/src/server/email.test.ts`, ajenos a esta fase y a la anterior. **Merece su propio
+cambio antes de la fase 12.**
+
+El E2E `mensajes.spec.ts` (§10.6) —ida y vuelta real contra la app del nutriólogo— queda para la fase
+12, como los de las fases 7 a 9. Es el único de los ocho que necesita las dos apps corriendo a la vez,
+así que pertenece a esa fase por naturaleza y no por calendario.
+
+### Fase 9 — Progreso y logros ✅ (2026-07-31)
+
+La pestaña Progreso dejó de ser un estado vacío. Consume **un solo** endpoint,
+`GET /api/v1/me/progress`, que la fase 4 dejó listo con la serie de peso, la tendencia y los logros
+ya calculados. Como en la fase 8, no se agregó ni un endpoint: es UI sobre contrato existente.
+
+Que la lectura sea una sola no es casualidad: la gráfica y los logros salen de la misma respuesta, así
+que no pueden describir dos momentos distintos del mismo paciente.
+
+#### Los logros ya existían, y por eso no se tocaron
+
+`packages/shared/src/logros.ts` se escribió en la fase 4 con sus pruebas de tabla, y
+`resumenDeProgreso` ya lo invocaba. La app **no** vuelve a derivar la racha ni el avance: los pinta.
+Recalcularlos en el cliente habría creado una segunda implementación de la misma regla, que es
+exactamente lo que §9 evita al calcularlos en vez de almacenarlos.
+
+#### Tres tarjetas, y lo que ninguna hace
+
+**"Perdido" no siempre dice "Perdido".** El servidor manda `cambio_kg` con signo y la tarjeta lo
+traduce a palabras: *Perdido*, *Ganado* o *Sin cambio*. Un paciente con objetivo de ganancia de masa
+habría visto "Perdido −2 kg" justo al cumplir su meta. La dirección la decide el dato, no el título
+que traía el prototipo. Es el mismo criterio que `avanceHaciaMeta` ya aplicaba en `logros.ts`.
+
+**"Falta" no estima nada.** `falta_kg` viaja siempre en `null` porque el esquema no guarda un peso
+objetivo; la tarjeta dice "tu nutrióloga aún no fija una meta de peso" en vez de inventar una cifra.
+Inventarle una meta clínica al paciente es peor que dejar el hueco, y hay una prueba que lo fija.
+El día que el modelo guarde la meta, la tarjeta ya sabe pintarla —hay prueba de eso también.
+
+**Un cero solo aparece cuando es un dato.** Si el paciente se pesó dos veces y no se movió, la tarjeta
+muestra `0 kg` y "Igual que al inicio": eso lo midió él. Si nunca se ha pesado, no hay cero —hay una
+frase que dice qué falta. En una app de salud un cero de relleno se lee como información sobre el
+propio cuerpo, y es el mismo criterio de `caloriasPorPorcion` en la fase 8.
+
+#### La gráfica, y la deuda que se declara en vez de esconderse
+
+`GraficaPeso.tsx` es hermana de `apps/web/nutriologos/src/components/ui/WeightChart.tsx`. §9 permitía
+copiarla con nota de deuda y eso se hizo: `packages/ui-tokens` hoy solo exporta tokens —colores,
+tipografía, espaciado— y meterle el primer componente React obligaría a darle build de JSX y
+dependencia de React por un solo consumidor. Cuando exista un segundo componente compartido se crea
+`packages/ui` y las dos se mudan. **Está anotado en el encabezado del archivo, no solo aquí.**
+
+Las diferencias con la del panel no son cosméticas: esta escala al ancho del teléfono con `viewBox`
+en vez de fijar 220×70 px —en un contenedor de 480 px la del panel queda a media tarjeta— y anuncia la
+tendencia completa a un lector de pantalla ("de 78 kilos el 1 jul a 75 kilos el 15 jul"), que la del
+panel no hace.
+
+Con menos de dos pesajes no dibuja nada: un solo punto insinúa una línea plana que nadie midió. Una
+serie casi plana (71.2 → 71.4) tampoco se pinta como un desplome —hay media res de holgura mínima en
+la escala, que de paso garantiza que el rango nunca sea cero y no haya división entre cero.
+
+#### La fecha que no se corre un día
+
+`fechaCorta` parte `YYYY-MM-DD` a mano en vez de usar `new Date(iso).toLocaleDateString()`. Esa forma
+interpreta la cadena como medianoche **UTC**, y en México (UTC−6) el pesaje del 3 de julio se
+etiquetaría como 2 de julio. El campo ya es un día natural resuelto en la zona del paciente por
+`soloFecha`; volver a moverlo solo lo estropea. Hay prueba con los bordes del año.
+
+#### Deuda de la fase 7 que se saldó de paso
+
+`PROGRESO_QUERY_KEY` la declaraba `features/hoy/useRegistro.ts` cuando registrar el peso era lo único
+que tocaba este recurso y la pantalla no existía. Ahora vive en `features/progreso/useProgreso.ts`
+junto a su consumidor, y la hoja de registro la importa: dos constantes con el mismo valor en archivos
+distintos aguantan hasta que alguien cambia una.
+
+Al mudarla apareció un hueco real: **registrar ejercicio no invalidaba nada**, y el ejercicio alimenta
+el logro "10 días activo". Registrar comida invalidaba solo Hoy, aunque la racha y la semana completa
+se calculan con esos mismos registros. El síntoma era silencioso: el paciente registraba su cena,
+entraba a Progreso y veía la racha de ayer durante los cinco minutos que dura `staleTime`. Las tres
+mutaciones —comida, foto, ejercicio— ahora invalidan Progreso, y `useRegistro.test.tsx` lo fija.
+
+#### Verificación
+
+| Comprobación | Resultado |
+|---|---|
+| Suite de `apps/web/pacientes` | **198/198**, 26 suites (eran 147 en 19 suites al cerrar la fase 8) |
+| Cobertura de `features/progreso` | **100 %** de sentencias, ramas, funciones y líneas |
+| Suite de `packages/servidor` | **502/502**, 56 suites |
+| Suite de `apps/web/nutriologos` | **90/90**, 13 suites — la fase no tocó el panel |
+| `type-check` | Limpio en `pacientes` y `nutriologos`; ver el hallazgo de abajo para `servidor` |
+| `next build` de pacientes | Exitoso; `/progreso` estático |
+
+#### Hallazgo abierto, fuera del alcance de esta fase
+
+`npx tsc --noEmit` en `packages/servidor` reporta **11 errores `TS18048` ('correo' is possibly
+'undefined')**, los 11 en `src/server/email.test.ts`. El archivo no lo tocó esta fase —`git status`
+lo confirma sin modificar— y los tests pasan en runtime porque Jest no compila con `tsc`. La
+verificación de la fase 8 lo dio por limpio; no lo estaba, o dejó de estarlo después. Se anota en vez
+de arreglarse porque §"Principios generales" 4 pide que los refactors no relacionados vayan aparte,
+aunque se detecten de paso. **Merece su propio cambio antes de la fase 12.**
+
+El E2E `progreso.spec.ts` (§10.5) queda para la fase 12, donde el plan agrupa los ocho specs de
+Playwright — mismo criterio que las fases 7 y 8. Lo que ese spec debe probar ya está cubierto por
+unitarios con el borde afilado: registrar peso invalida la caché de Progreso, y sin pesajes no
+aparece ninguna cifra inventada.
+
+### Fase 8 — Plan y recetas ✅ (2026-07-30)
+
+La pestaña Plan dejó de ser un estado vacío. Consume los tres endpoints que la fase 4 dejó listos
+—`/me/meal_plan`, `/me/recipes`, `/me/activity_plan`— y el de IA de la fase 5,
+`/me/ai/substitution`, sin agregar un solo endpoint nuevo: esta fase es UI sobre contrato existente.
+
+Tres secciones en `/plan`, con la activa en la URL (`?vista=recetas`), y el detalle de receta como
+ruta propia (`/plan/recetas/[id]`) — la que el test de `BottomNav` ya anticipaba desde la fase 6.
+
+#### Lo que no se construyó, y por qué
+
+**No hay vista semanal.** El prototipo pintaba `L M M J V S D` con el martes resaltado, y ninguno de
+esos días tenía contenido propio: el modelo guarda **un** plan diario. §12 deja la semana fuera de la
+V1 y aquí se respeta. `ComidasDelPlan.test.tsx` tiene una prueba que falla si alguien vuelve a
+meter la tira de días, con el motivo escrito en el test.
+
+**No hay `GET /me/recipes/:id`.** El detalle resuelve la receta desde el listado, que solo trae
+`estado = ENVIADA` del paciente de la sesión. Un id ajeno, o el de un borrador que la nutrióloga
+aún no envía, simplemente no aparece en la lista y la pantalla dice "esta receta ya no está
+disponible". No hay endpoint por id que autorizar porque no hay endpoint por id.
+
+**La sugerencia de la IA no se guarda.** El prototipo armaba el prompt en el navegador, le mandaba al
+modelo el objetivo del paciente y el nombre de la receta desde el cliente, y presentaba la respuesta
+como si editara la receta. Aquí el cliente manda dos campos —`ingrediente` y `receta_id`— y el
+servidor arma el prompt, seudonimiza y rechaza la salida si menciona un alérgeno declarado. La
+sugerencia se muestra con su aviso y la cuota restante, y se va cuando el paciente cierra la
+pantalla: `useSustituirIngrediente` no invalida ni escribe en caché a propósito. Guardarla sería
+editar contenido que la profesional aprobó, y eso lo prohíbe `ai-guidelines.md`.
+
+#### Deuda de la fase 7 que se saldó de paso
+
+El envoltorio de `fetch` vivía dentro de `features/hoy/api.ts` cuando Hoy era la única pantalla que
+hablaba con la API. Se movió a `src/lib/apiCliente.ts` (con `pedirLista` para los `{ data, meta }`)
+y `hoy/api.ts` reexporta `ApiPacienteError` para que nada de la fase 7 cambie de forma. Igual con
+`totalesDeComida` y `descripcionDeComida`: eran del plan, no de Hoy, y ahora viven en
+`features/plan/calculos.ts`; `hoy/calculos.ts` las reexporta. Cero cambios de comportamiento —los
+97 tests de la fase 7 pasan sin tocarlos.
+
+#### Datos que la UI no se cree
+
+`ingredientes` es una columna JSON y el serializador solo comprueba que sea un arreglo, así que
+`ingredientesDeReceta` descarta lo que no sea texto en vez de reventar el detalle. `pasos` es un solo
+texto con saltos de línea que la nutrióloga a veces numera a mano: se le quita esa numeración para no
+pintar "1. 1. Calienta el agua". `caloriasPorPorcion` no divide entre cero y devuelve `null` —no un
+cero— cuando la receta no trae calorías: en una app de salud un cero se lee como un dato.
+
+#### Corrección al contrato de `/me/meal_plan`
+
+`me/openapi.ts` documentaba la llave del arreglo de comidas como `meals`, pero `serializarPlan`
+siempre emitió `comidas` (`meals` era el nombre de la relación de Prisma y nunca salió por la API), y
+`itemPlanSchema` omitía el `food` que el serializador sí manda. La app del paciente es el primer
+consumidor real de ese contrato y las dos cosas la habrían mandado al campo equivocado; se corrigió
+la documentación, no el serializador.
+
+#### Verificación
+
+| Comprobación | Resultado |
+|---|---|
+| Suite de `apps/web/pacientes` | **147/147**, 19 suites (eran 97 en 12 suites al cerrar la fase 7) |
+| Cobertura de `features/plan` + `lib` | **91.7 %** de sentencias, **94 %** de líneas |
+| Suite de `packages/servidor` | **502/502**, 56 suites |
+| Suite de `apps/web/nutriologos` | **90/90**, 13 suites — la extracción no tocó el panel |
+| `type-check` | Limpio en `pacientes`, `nutriologos` y `servidor` |
+| `next build` de pacientes | Exitoso; `/plan` estático, `/plan/recetas/[id]` dinámico |
+
+El E2E `plan-recetas.spec.ts` (§10.4) queda para la fase 12, donde el plan agrupa los ocho specs de
+Playwright — mismo criterio que la fase 7. Lo que ese spec debe probar ya está cubierto por unitarios
+con el borde afilado: una receta que no está en el listado no se muestra.
 
 ### Fase 7 — Hoy y registro ✅ (2026-07-29)
 

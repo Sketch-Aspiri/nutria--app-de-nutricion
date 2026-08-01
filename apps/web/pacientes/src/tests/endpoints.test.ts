@@ -16,6 +16,8 @@ const USER_ID = '22222222-2222-4222-8222-222222222222';
 const mockLimiteEscritura = jest.fn();
 const mockLimiteFotos = jest.fn();
 const mockSubirFoto = jest.fn();
+const mockRateLimit = jest.fn();
+const mockAvisarBaja = jest.fn();
 
 jest.mock('@/server/auth/guards', () => ({
   requierePaciente: jest.fn().mockResolvedValue({
@@ -47,7 +49,27 @@ const repositorio = {
   proximasCitas: jest.fn(),
 };
 
+// Cuenta y derechos ARCO (fase 11). El doble de
+// `ExportacionDemasiadoGrandeError` es la misma clase que ve el handler y la
+// que lanza la prueba, así que el `instanceof` del 413 se ejerce de verdad.
+class ExportacionDemasiadoGrandeError extends Error {}
+
+const cuenta = {
+  exportarDatosDelPaciente: jest.fn(),
+  registrarExportacionPropia: jest.fn(),
+  cambiarPassword: jest.fn(),
+  verificarPassword: jest.fn(),
+  darDeBajaCuenta: jest.fn(),
+};
+
 jest.mock('@/server/me/repository', () => repositorio);
+jest.mock('@/server/me/cuenta', () => ({ ...cuenta, ExportacionDemasiadoGrandeError }));
+jest.mock('@/server/email', () => ({
+  avisarBajaDePacienteApp: (...a: unknown[]) => mockAvisarBaja(...a),
+}));
+jest.mock('@/server/rate-limit', () => ({
+  rateLimit: (...a: unknown[]) => mockRateLimit(...a),
+}));
 jest.mock('@/server/me/limites', () => ({
   limiteDeEscritura: (...a: unknown[]) => mockLimiteEscritura(...a),
   limiteDeFotos: (...a: unknown[]) => mockLimiteFotos(...a),
@@ -75,6 +97,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockLimiteEscritura.mockResolvedValue({ permitido: true });
   mockLimiteFotos.mockResolvedValue({ permitido: true });
+  mockRateLimit.mockResolvedValue({ permitido: true });
 });
 
 describe('GET /me', () => {
@@ -431,5 +454,158 @@ describe('POST /me/photos', () => {
 
     expect(respuesta.status).toBe(429);
     expect(mockSubirFoto).not.toHaveBeenCalled();
+  });
+});
+
+describe('GET /me/export', () => {
+  const peticion = () => new Request('http://localhost:3001/api/v1/me/export');
+
+  it('devuelve el archivo del paciente de la sesión y lo registra en la bitácora', async () => {
+    cuenta.exportarDatosDelPaciente.mockResolvedValue({ schema_version: 1, paciente: { id: PACIENTE_ID } });
+    const { GET } = await import('@/app/api/v1/me/export/route');
+
+    const respuesta = await GET(peticion());
+
+    expect(respuesta.status).toBe(200);
+    expect(cuenta.exportarDatosDelPaciente).toHaveBeenCalledWith(PACIENTE_ID);
+    expect(cuenta.registrarExportacionPropia).toHaveBeenCalledWith(
+      USER_ID,
+      PACIENTE_ID,
+      expect.anything(),
+    );
+  });
+
+  it('se descarga como archivo y no queda en cachés intermedias', async () => {
+    cuenta.exportarDatosDelPaciente.mockResolvedValue({ schema_version: 1 });
+    const { GET } = await import('@/app/api/v1/me/export/route');
+
+    const respuesta = await GET(peticion());
+
+    expect(respuesta.headers.get('Content-Disposition')).toContain('attachment');
+    expect(respuesta.headers.get('Cache-Control')).toContain('no-store');
+  });
+
+  it('responde 404 si el expediente ya no existe, sin dejar rastro de exportación', async () => {
+    cuenta.exportarDatosDelPaciente.mockResolvedValue(null);
+    const { GET } = await import('@/app/api/v1/me/export/route');
+
+    expect((await GET(peticion())).status).toBe(404);
+    expect(cuenta.registrarExportacionPropia).not.toHaveBeenCalled();
+  });
+
+  it('responde 413 en vez de 500 cuando el expediente excede el tope', async () => {
+    cuenta.exportarDatosDelPaciente.mockRejectedValue(new ExportacionDemasiadoGrandeError());
+    const { GET } = await import('@/app/api/v1/me/export/route');
+
+    const respuesta = await GET(peticion());
+
+    expect(respuesta.status).toBe(413);
+    expect(await cuerpo<{ error: { code: string } }>(respuesta)).toMatchObject({
+      error: { code: ErrorCode.EXPORT_TOO_LARGE },
+    });
+  });
+
+  it('corta con 429 sin tocar el expediente cuando se abusa de la descarga', async () => {
+    mockRateLimit.mockResolvedValue({ permitido: false, reintentarEnSegundos: 900 });
+    const { GET } = await import('@/app/api/v1/me/export/route');
+
+    expect((await GET(peticion())).status).toBe(429);
+    expect(cuenta.exportarDatosDelPaciente).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /me/password', () => {
+  it('cambia la contraseña del usuario de la sesión', async () => {
+    cuenta.cambiarPassword.mockResolvedValue({ ok: true });
+    const { POST } = await import('@/app/api/v1/me/password/route');
+
+    const respuesta = await POST(json({ actual: 'Anterior123', nueva: 'NuevaSegura123' }));
+
+    expect(respuesta.status).toBe(200);
+    expect(await cuerpo(respuesta)).toEqual({ actualizada: true });
+    expect(cuenta.cambiarPassword).toHaveBeenCalledWith(USER_ID, 'Anterior123', 'NuevaSegura123');
+  });
+
+  it('responde 400 ante una contraseña nueva que no cumple la política', async () => {
+    const { POST } = await import('@/app/api/v1/me/password/route');
+
+    const respuesta = await POST(json({ actual: 'Anterior123', nueva: '123' }));
+
+    expect(respuesta.status).toBe(400);
+    expect(cuenta.cambiarPassword).not.toHaveBeenCalled();
+  });
+
+  it('responde 400 sin distinguir contraseña incorrecta de cuenta inexistente', async () => {
+    const { POST } = await import('@/app/api/v1/me/password/route');
+
+    cuenta.cambiarPassword.mockResolvedValue({ ok: false, motivo: 'password_incorrecta' });
+    const incorrecta = await POST(json({ actual: 'Mala123456', nueva: 'NuevaSegura123' }));
+    cuenta.cambiarPassword.mockResolvedValue({ ok: false, motivo: 'sin_cuenta' });
+    const sinCuenta = await POST(json({ actual: 'Mala123456', nueva: 'NuevaSegura123' }));
+
+    expect(incorrecta.status).toBe(400);
+    expect(sinCuenta.status).toBe(400);
+    expect(await cuerpo(incorrecta)).toEqual(await cuerpo(sinCuenta));
+  });
+
+  it('corta con 429 antes de comprobar la contraseña: el endpoint es un oráculo', async () => {
+    mockRateLimit.mockResolvedValue({ permitido: false, reintentarEnSegundos: 600 });
+    const { POST } = await import('@/app/api/v1/me/password/route');
+
+    const respuesta = await POST(json({ actual: 'Anterior123', nueva: 'NuevaSegura123' }));
+
+    expect(respuesta.status).toBe(429);
+    expect(cuenta.cambiarPassword).not.toHaveBeenCalled();
+  });
+});
+
+describe('DELETE /me/account', () => {
+  const baja = (body: unknown) => json(body, 'DELETE');
+
+  it('da de baja la cuenta y avisa a quien conserva el expediente', async () => {
+    cuenta.verificarPassword.mockResolvedValue(true);
+    cuenta.darDeBajaCuenta.mockResolvedValue({
+      ok: true,
+      nutriologo: { nombre: 'Dra. Ruiz', email: 'ruiz@ejemplo.mx' },
+      pacienteNombre: 'Ana',
+    });
+    const { DELETE } = await import('@/app/api/v1/me/account/route');
+
+    const respuesta = await DELETE(baja({ password: 'Anterior123', confirmacion: true }));
+
+    expect(respuesta.status).toBe(200);
+    expect(await cuerpo(respuesta)).toEqual({ baja: true });
+    expect(cuenta.darDeBajaCuenta).toHaveBeenCalledWith(PACIENTE_ID, USER_ID);
+    expect(mockAvisarBaja).toHaveBeenCalledWith('ruiz@ejemplo.mx', 'Ana');
+  });
+
+  it('responde 400 si falta la confirmación explícita', async () => {
+    const { DELETE } = await import('@/app/api/v1/me/account/route');
+
+    const respuesta = await DELETE(baja({ password: 'Anterior123' }));
+
+    expect(respuesta.status).toBe(400);
+    expect(cuenta.darDeBajaCuenta).not.toHaveBeenCalled();
+  });
+
+  it('no da de baja nada si la contraseña no es correcta', async () => {
+    cuenta.verificarPassword.mockResolvedValue(false);
+    const { DELETE } = await import('@/app/api/v1/me/account/route');
+
+    const respuesta = await DELETE(baja({ password: 'Mala123456', confirmacion: true }));
+
+    expect(respuesta.status).toBe(400);
+    expect(cuenta.darDeBajaCuenta).not.toHaveBeenCalled();
+    expect(mockAvisarBaja).not.toHaveBeenCalled();
+  });
+
+  it('corta con 429 sin comprobar la contraseña', async () => {
+    mockRateLimit.mockResolvedValue({ permitido: false, reintentarEnSegundos: 600 });
+    const { DELETE } = await import('@/app/api/v1/me/account/route');
+
+    const respuesta = await DELETE(baja({ password: 'Anterior123', confirmacion: true }));
+
+    expect(respuesta.status).toBe(429);
+    expect(cuenta.verificarPassword).not.toHaveBeenCalled();
   });
 });

@@ -22,3 +22,9 @@ service-account*.json
 
 .vercel
 .env*
+
+# Artefactos de herramientas locales, no del proyecto
+*.stackdump
+.agents/
+skills-lock.json
+.claude/skills/

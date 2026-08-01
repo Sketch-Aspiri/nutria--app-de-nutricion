@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { passwordSchema } from '@/server/auth/password';
+
 /**
  * Entradas de `/api/v1/me/*`.
  *
@@ -69,9 +71,36 @@ export const enviarMensajeSchema = z.object({
   texto: z.string().trim().min(1, 'Escribe un mensaje.').max(2_000),
 });
 
+/**
+ * Cambio de contraseña del paciente.
+ *
+ * `actual` no lleva reglas de longitud a propósito: es lo que el paciente ya
+ * tiene, y validarla contra la política de hoy rechazaría contraseñas viejas
+ * legítimas antes siquiera de comprobarlas. La política se aplica a `nueva`.
+ */
+export const cambiarPasswordSchema = z.object({
+  actual: z.string().min(1, 'Escribe tu contraseña actual.').max(200),
+  nueva: passwordSchema,
+});
+
+/**
+ * Baja de la cuenta.
+ *
+ * Exige la contraseña: es la última acción irreversible de la app, y un
+ * teléfono desbloqueado sobre una mesa no debería bastar para ejecutarla.
+ */
+export const darDeBajaSchema = z.object({
+  password: z.string().min(1, 'Escribe tu contraseña para confirmar.').max(200),
+  confirmacion: z.literal(true, {
+    message: 'Necesitas confirmar que entiendes qué pasa al darte de baja.',
+  }),
+});
+
 export type FiltroFechasInput = z.infer<typeof filtroFechasSchema>;
 export type RegistrarComidaInput = z.infer<typeof registrarComidaSchema>;
 export type RegistrarPesoInput = z.infer<typeof registrarPesoSchema>;
 export type RegistrarEjercicioInput = z.infer<typeof registrarEjercicioSchema>;
 export type GuardarAguaInput = z.infer<typeof guardarAguaSchema>;
 export type EnviarMensajeInput = z.infer<typeof enviarMensajeSchema>;
+export type CambiarPasswordInput = z.infer<typeof cambiarPasswordSchema>;
+export type DarDeBajaInput = z.infer<typeof darDeBajaSchema>;

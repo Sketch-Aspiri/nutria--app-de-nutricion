@@ -1,4 +1,13 @@
+import { descripcionDeComida, totalesDeComida } from '@/features/plan/calculos';
+
 import type { ComidaPlanHoy, RegistroComidaHoy, ResumenHoy, TotalesNutricionales } from './types';
+
+/**
+ * Sumar los nutrientes de una comida del plan y describirla son operaciones del
+ * plan, no de Hoy: las usan las dos pantallas y viven en `features/plan`. Se
+ * reexportan para que quien lee Hoy siga encontrándolas donde las espera.
+ */
+export { descripcionDeComida, totalesDeComida };
 
 const VACIO: TotalesNutricionales = {
   calorias: 0,
@@ -14,19 +23,6 @@ function numero(valor: number | null | undefined): number {
 
 function redondear(valor: number): number {
   return Math.round(valor * 10) / 10;
-}
-
-/** Suma los snapshots del plan; no recalcula nutrientes desde el catálogo actual. */
-export function totalesDeComida(comida: ComidaPlanHoy): TotalesNutricionales {
-  return comida.items.reduce<TotalesNutricionales>(
-    (total, item) => ({
-      calorias: total.calorias + numero(item.energia_kcal),
-      proteina: total.proteina + numero(item.proteina_g),
-      carbos: total.carbos + numero(item.carbohidratos_g),
-      grasa: total.grasa + numero(item.lipidos_g),
-    }),
-    { ...VACIO },
-  );
 }
 
 /**
@@ -97,12 +93,4 @@ function nutrientesDeRegistro(registro: RegistroComidaHoy): TotalesNutricionales
     carbos: numero(registro.carbos_g),
     grasa: numero(registro.grasa_g),
   };
-}
-
-export function descripcionDeComida(comida: ComidaPlanHoy): string {
-  if (comida.descripcion?.trim()) return comida.descripcion;
-  const alimentos = comida.items
-    .map((item) => item.food?.nombre ?? item.descripcion_libre)
-    .filter((nombre): nombre is string => Boolean(nombre));
-  return alimentos.length > 0 ? alimentos.join(' · ') : 'Consulta los detalles en tu plan.';
 }

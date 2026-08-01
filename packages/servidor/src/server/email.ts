@@ -320,3 +320,37 @@ export function enviarAvisoPrivacidadPaciente(
     ),
   );
 }
+
+/**
+ * Aviso a la nutrióloga de que un paciente se dio de baja de la app.
+ *
+ * Sigue siendo la responsable del expediente clínico, que permanece intacto:
+ * lo que terminó es el acceso del paciente a la app, no el tratamiento. Por eso
+ * el mensaje aclara qué se conservó, en vez de dejarle creer que perdió datos.
+ *
+ * **Nunca lanza** y su resultado no cambia la respuesta: la baja ya se ejecutó
+ * en una transacción y el paciente no puede quedar con la cuenta viva porque el
+ * proveedor de correo esté caído.
+ */
+export async function avisarBajaDePacienteApp(
+  para: string,
+  pacienteNombre: string,
+): Promise<ResultadoEnvio> {
+  try {
+    return await enviar(
+      para,
+      '[nutria] Un paciente cerró su acceso a la app',
+      plantilla(
+        'Baja de acceso a la app',
+        `<strong>${escaparHtml(
+          pacienteNombre,
+        )}</strong> se dio de baja de la app del paciente y ya no podrá entrar ni registrar comidas, peso o mensajes.<br><br>Su <strong>expediente clínico permanece intacto</strong> en tu panel: mediciones, notas, planes e historial siguen bajo tu resguardo, como responsable del expediente. Si te pide cancelar esos datos, atiéndelo por el procedimiento del aviso de privacidad.`,
+        undefined,
+        'Aviso automático de nutria. No contiene información clínica.',
+      ),
+    );
+  } catch (error: unknown) {
+    logger.error('Falló el aviso de baja al nutriólogo', error);
+    return { enviado: false, motivo: 'error_proveedor' };
+  }
+}

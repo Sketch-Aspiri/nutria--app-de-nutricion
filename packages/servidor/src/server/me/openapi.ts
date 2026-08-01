@@ -8,6 +8,8 @@ import {
 } from '@/server/ai/schemasPaciente';
 
 import {
+  cambiarPasswordSchema,
+  darDeBajaSchema,
   enviarMensajeSchema,
   filtroFechasSchema,
   guardarAguaSchema,
@@ -89,6 +91,13 @@ const itemPlanSchema = z.object({
   proteina_g: z.number(),
   carbohidratos_g: z.number(),
   lipidos_g: z.number(),
+  /** Snapshot del alimento al armar el plan; `null` si el renglón es texto libre. */
+  food: z
+    .object({
+      nombre: z.string(),
+      porcion_descripcion: z.string().nullable(),
+    })
+    .nullable(),
 });
 
 const comidaPlanSchema = z.object({
@@ -110,7 +119,9 @@ const planSchema = z
     grasa_g: z.number(),
     nota: z.string().nullable(),
     compartido_at: fechaHora.nullable(),
-    meals: z.array(comidaPlanSchema),
+    // `comidas`, no `meals`: es la llave que emite `serializarPlan`. El nombre en
+    // inglés era el de la relación de Prisma y no salía nunca por la API.
+    comidas: z.array(comidaPlanSchema),
   })
   .meta({ id: 'PlanDelPaciente' });
 
@@ -181,9 +192,7 @@ const hoySchema = z
 const progresoSchema = z
   .object({
     pesos: z.array(registroPesoSchema),
-    peso: z
-      .object({ inicial: z.number(), actual: z.number(), cambio_kg: z.number() })
-      .nullable(),
+    peso: z.object({ inicial: z.number(), actual: z.number(), cambio_kg: z.number() }).nullable(),
     /**
      * Siempre `null` en la V1: el esquema no guarda un peso objetivo y estimarlo
      * sería inventarle una meta clínica al paciente.
@@ -349,6 +358,7 @@ export const openApiPacientes = createDocument({
     { name: 'Progreso' },
     { name: 'Mensajes' },
     { name: 'IA' },
+    { name: 'Cuenta' },
   ],
   paths: {
     '/api/v1/me': {
@@ -551,6 +561,56 @@ export const openApiPacientes = createDocument({
         summary: 'Marca como leídos los mensajes del nutriólogo',
         responses: {
           '200': respuesta('Conteo marcado', z.object({ marcados: z.number().int() })),
+          ...erroresComunes,
+        },
+      },
+    },
+    '/api/v1/me/password': {
+      post: {
+        tags: ['Cuenta'],
+        summary: 'Cambia la contraseña del paciente',
+        description:
+          'Exige la contraseña actual. Límite propio de 5 intentos por hora: el endpoint ' +
+          'comprueba una contraseña y sin tope sería un oráculo de fuerza bruta.',
+        requestBody: { required: true, content: json(cambiarPasswordSchema) },
+        responses: {
+          '200': respuesta('Contraseña actualizada', z.object({ actualizada: z.literal(true) })),
+          '400': respuesta('JSON inválido, validación fallida o contraseña incorrecta', errorSchema),
+          ...erroresComunes,
+        },
+      },
+    },
+    '/api/v1/me/export': {
+      get: {
+        tags: ['Cuenta'],
+        summary: 'Descarga los datos del paciente (derecho de acceso ARCO)',
+        description:
+          'Devuelve un archivo JSON con lo que el paciente registró y lo que su nutrióloga le ' +
+          'compartió. **No** incluye notas de consulta ni el expediente clínico de texto libre: ' +
+          'son responsabilidad de la nutrióloga (NOM-004-SSA3) y el propio archivo lo declara en ' +
+          '`expediente_clinico_completo`. Máximo 3 descargas por hora.',
+        responses: {
+          '200': {
+            description: 'Archivo JSON con los datos del paciente',
+            content: { 'application/json': { schema: { type: 'object' } } },
+          },
+          '413': respuesta('Demasiados datos para una descarga inmediata', errorSchema),
+          ...erroresComunes,
+        },
+      },
+    },
+    '/api/v1/me/account': {
+      delete: {
+        tags: ['Cuenta'],
+        summary: 'Da de baja la cuenta del paciente (derecho de cancelación ARCO)',
+        description:
+          'Desvincula `user_id` y borra la cuenta de acceso en una transacción. El expediente ' +
+          'clínico **permanece** con el nutriólogo, que es su responsable, y se le notifica. ' +
+          'Exige la contraseña: es la única acción irreversible de la app.',
+        requestBody: { required: true, content: json(darDeBajaSchema) },
+        responses: {
+          '200': respuesta('Cuenta dada de baja', z.object({ baja: z.literal(true) })),
+          '400': respuesta('JSON inválido, validación fallida o contraseña incorrecta', errorSchema),
           ...erroresComunes,
         },
       },

@@ -1,18 +1,19 @@
-import { CalendarDays } from 'lucide-react';
+import { Suspense } from 'react';
 
-import { EstadoVacio, Pantalla } from '@/components/ui/Pantalla';
+import { PlanCliente } from '@/features/plan/PlanCliente';
 
 export const metadata = { title: 'Tu plan — nutria' };
 
-/** Cascarón de Plan y recetas. La fase 8 lo llena desde `/me/meal_plan`. */
+/**
+ * La pestaña activa se lee de la query con `useSearchParams`, y eso obliga a un
+ * límite de Suspense: sin él, Next no puede prerenderizar nada de esta rama.
+ * El fallback es el fondo de la app, no un esqueleto de tarjetas: las tarjetas
+ * falsas de un plan que aún no llegó son justo lo que no queremos mostrar.
+ */
 export default function PlanPage() {
   return (
-    <Pantalla titulo="Tu plan" subtitulo="Diseñado por tu nutrióloga">
-      <EstadoVacio
-        icono={CalendarDays}
-        titulo="Tu nutrióloga aún no comparte tu plan"
-        descripcion="En cuanto lo apruebe y te lo envíe, aparecerá aquí con tus comidas, porciones y recetas."
-      />
-    </Pantalla>
+    <Suspense fallback={<div className="min-h-screen" />}>
+      <PlanCliente />
+    </Suspense>
   );
 }

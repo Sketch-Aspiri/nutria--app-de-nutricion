@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 import { useAbrirRegistro } from '@/features/hoy/registro/RegistroProvider';
+import { useSinLeer } from '@/features/mensajes/useMensajes';
 
 /**
  * Navegación inferior: Hoy · Plan · **+** · Progreso · Mensajes.
@@ -31,6 +32,7 @@ export function esRutaActiva(pathname: string, href: string): boolean {
 export function BottomNav() {
   const pathname = usePathname();
   const abrirRegistro = useAbrirRegistro();
+  const sinLeer = useSinLeer();
   const [hoy, plan, progreso, mensajes] = DESTINOS;
 
   return (
@@ -51,11 +53,17 @@ export function BottomNav() {
         <Plus size={24} aria-hidden />
       </button>
 
-      {[progreso, mensajes].map((destino) => (
-        <Destino key={destino.href} {...destino} pathname={pathname} />
-      ))}
+      <Destino key={progreso.href} {...progreso} pathname={pathname} />
+      <Destino key={mensajes.href} {...mensajes} pathname={pathname} sinLeer={sinLeer} />
     </nav>
   );
+}
+
+/** Tope del globo: "9+" en vez de un número que deforme la pestaña. */
+const MAX_INDICADOR = 9;
+
+export function textoDelIndicador(sinLeer: number): string {
+  return sinLeer > MAX_INDICADOR ? `${MAX_INDICADOR}+` : String(sinLeer);
 }
 
 function Destino({
@@ -63,7 +71,8 @@ function Destino({
   etiqueta,
   icono: Icono,
   pathname,
-}: (typeof DESTINOS)[number] & { pathname: string }) {
+  sinLeer = 0,
+}: (typeof DESTINOS)[number] & { pathname: string; sinLeer?: number }) {
   const activo = esRutaActiva(pathname, href);
 
   return (
@@ -74,10 +83,27 @@ function Destino({
       aria-current={activo ? 'page' : undefined}
       className="flex flex-1 flex-col items-center gap-0.5 pb-3"
     >
-      <Icono size={22} aria-hidden className={activo ? 'text-emerald-900' : 'text-stone-400'} />
+      <span className="relative">
+        <Icono size={22} aria-hidden className={activo ? 'text-emerald-900' : 'text-stone-400'} />
+        {sinLeer > 0 && (
+          <span
+            aria-hidden
+            className="absolute -right-2 -top-1 min-w-4 rounded-full bg-emerald-700 px-1 text-center font-mono text-[9px] leading-4 text-white"
+          >
+            {textoDelIndicador(sinLeer)}
+          </span>
+        )}
+      </span>
       <span className={`text-[10px] ${activo ? 'font-medium text-emerald-900' : 'text-stone-400'}`}>
         {etiqueta}
       </span>
+      {/* El globo es `aria-hidden`: el conteo se anuncia aquí, con palabras,
+          porque un "3" suelto junto a "Mensajes" no dice de qué son. */}
+      {sinLeer > 0 && (
+        <span className="sr-only">
+          {sinLeer === 1 ? '1 mensaje sin leer' : `${sinLeer} mensajes sin leer`}
+        </span>
+      )}
     </Link>
   );
 }

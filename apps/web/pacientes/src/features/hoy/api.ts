@@ -1,3 +1,5 @@
+import { json, pedir } from '@/lib/apiCliente';
+
 import type {
   EstimacionComida,
   RegistroComidaHoy,
@@ -7,61 +9,7 @@ import type {
   TurnoCoach,
 } from './types';
 
-type ErrorApi = {
-  code: string;
-  message: string;
-};
-
-export class ApiPacienteError extends Error {
-  readonly code: string;
-  readonly status: number;
-
-  constructor(error: ErrorApi, status: number) {
-    super(error.message);
-    this.name = 'ApiPacienteError';
-    this.code = error.code;
-    this.status = status;
-  }
-}
-
-async function pedir<T>(url: string, init?: RequestInit): Promise<T> {
-  let respuesta: Response;
-  try {
-    respuesta = await fetch(url, init);
-  } catch {
-    throw new ApiPacienteError(
-      {
-        code: 'NETWORK_ERROR',
-        message: 'No pudimos completar la solicitud. Revisa tu conexión e intenta de nuevo.',
-      },
-      0,
-    );
-  }
-  if (respuesta.status === 204) return undefined as T;
-
-  const cuerpo = (await respuesta.json().catch(() => null)) as T | { error?: ErrorApi } | null;
-
-  if (!respuesta.ok) {
-    const error = (cuerpo as { error?: ErrorApi } | null)?.error;
-    throw new ApiPacienteError(
-      error ?? {
-        code: 'NETWORK_ERROR',
-        message: 'No pudimos completar la solicitud. Revisa tu conexión e intenta de nuevo.',
-      },
-      respuesta.status,
-    );
-  }
-
-  return cuerpo as T;
-}
-
-function json<T>(url: string, method: string, body: unknown): Promise<T> {
-  return pedir<T>(url, {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-}
+export { ApiPacienteError } from '@/lib/apiCliente';
 
 export function obtenerHoy(): Promise<ResumenHoy> {
   return pedir<ResumenHoy>('/api/v1/me/today');
