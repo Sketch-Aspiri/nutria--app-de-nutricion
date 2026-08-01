@@ -60,7 +60,7 @@ let transporteSmtp: { sendMail: (correo: Record<string, string>) => Promise<unkn
 
 async function enviarPorSmtp(
   config: ConfigSmtp,
-  correo: { para: string; asunto: string; html: string },
+  correo: { para: string; asunto: string } & Correo,
 ): Promise<ResultadoEnvio> {
   try {
     if (!transporteSmtp) {
@@ -79,6 +79,7 @@ async function enviarPorSmtp(
       from: process.env.EMAIL_FROM ?? `nutria <${config.user}>`,
       to: correo.para,
       subject: correo.asunto,
+      text: correo.texto,
       html: correo.html,
     });
     return { enviado: true };
@@ -100,7 +101,7 @@ async function enviarPorSmtp(
  */
 async function anexarAlBuzonDePruebas(
   ruta: string,
-  correo: { para: string; asunto: string; html: string },
+  correo: { para: string; asunto: string } & Correo,
 ): Promise<ResultadoEnvio> {
   try {
     await mkdir(path.dirname(ruta), { recursive: true });
@@ -112,15 +113,15 @@ async function anexarAlBuzonDePruebas(
   }
 }
 
-async function enviar(para: string, asunto: string, html: string): Promise<ResultadoEnvio> {
+async function enviar(para: string, asunto: string, correo: Correo): Promise<ResultadoEnvio> {
   const buzonDePruebas = process.env.EMAIL_OUTBOX_FILE;
   if (buzonDePruebas) {
-    return anexarAlBuzonDePruebas(buzonDePruebas, { para, asunto, html });
+    return anexarAlBuzonDePruebas(buzonDePruebas, { para, asunto, ...correo });
   }
 
   const smtp = configSmtp();
   if (smtp) {
-    return enviarPorSmtp(smtp, { para, asunto, html });
+    return enviarPorSmtp(smtp, { para, asunto, ...correo });
   }
 
   const apiKey = process.env.RESEND_API_KEY;
@@ -133,7 +134,8 @@ async function enviar(para: string, asunto: string, html: string): Promise<Resul
       from: process.env.EMAIL_FROM ?? FROM_DEFAULT,
       to: para,
       subject: asunto,
-      html,
+      html: correo.html,
+      text: correo.texto,
     });
     if (error) {
       logger.error('Resend rechazó el envío', error.message);
@@ -162,16 +164,47 @@ function escaparHtml(valor: string): string {
     .replace(/'/g, '&#39;');
 }
 
+/**
+ * Convierte a texto plano un fragmento de los que arma `plantilla`.
+ *
+ * No pretende ser un conversor de HTML general: solo cubre las etiquetas y
+ * entidades que produce `escaparHtml` y las plantillas de este archivo.
+ */
+function aTextoPlano(fragmento: string): string {
+  return fragmento
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    // `&amp;` va al final: si se deshiciera primero, un `&amp;lt;` del original
+    // acabaría convertido en `<` y volvería a colarse el marcado que se escapó.
+    .replace(/&amp;/g, '&')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+/**
+ * Cada correo viaja en sus dos versiones.
+ *
+ * La alternativa en texto plano no es un adorno de accesibilidad: un mensaje
+ * *solo* HTML es una de las señales que más pesa para que Gmail lo mande a spam,
+ * y con un remitente sin dominio propio no sobra margen.
+ */
+type Correo = { html: string; texto: string };
+
 function plantilla(
   titulo: string,
   cuerpo: string,
   cta?: { texto: string; url: string },
   pie = 'Si no solicitaste este correo, puedes ignorarlo.',
-): string {
+): Correo {
   const boton = cta
     ? `<a href="${cta.url}" style="display:inline-block;margin-top:20px;background:#065f46;color:#fff;text-decoration:none;padding:12px 20px;border-radius:999px;font-size:14px">${cta.texto}</a>`
     : '';
-  return `<!doctype html><html lang="es"><body style="font-family:system-ui,sans-serif;background:#fafaf9;padding:32px">
+  const html = `<!doctype html><html lang="es"><body style="font-family:system-ui,sans-serif;background:#fafaf9;padding:32px">
   <div style="max-width:480px;margin:0 auto;background:#fff;border-radius:16px;padding:32px">
     <div style="font-size:24px;color:#064e3b;font-weight:600">nutria</div>
     <h1 style="font-size:18px;color:#1c1917;margin:24px 0 8px">${titulo}</h1>
@@ -179,6 +212,14 @@ function plantilla(
     ${boton}
     <p style="color:#a8a29e;font-size:12px;margin-top:24px">${pie}</p>
   </div></body></html>`;
+
+  // En texto plano el enlace tiene que ir visible: no hay `href` donde esconderlo.
+  const enlace = cta ? `\n\n${cta.texto}:\n${cta.url}` : '';
+  const texto = `nutria\n\n${aTextoPlano(titulo)}\n\n${aTextoPlano(
+    cuerpo,
+  )}${enlace}\n\n${aTextoPlano(pie)}`;
+
+  return { html, texto };
 }
 
 /**

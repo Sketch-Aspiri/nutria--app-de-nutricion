@@ -207,6 +207,23 @@ describe('envío por SMTP', () => {
     expect(correo.html).toContain('tok-123');
   });
 
+  /**
+   * Un correo solo-HTML es de las señales que más pesan para acabar en spam, y
+   * con remitente de Gmail no sobra margen: el enlace tiene que ser utilizable
+   * también desde la versión de texto.
+   */
+  it('lleva alternativa en texto plano con el enlace visible', async () => {
+    const { enviarVerificacionEmail } = await moduloConSmtp();
+
+    await enviarVerificacionEmail('nueva@nutriologa.mx', 'tok-123');
+
+    const [correo] = mockSendMail.mock.calls[0] as [Record<string, string>];
+    expect(correo.texto).toBeUndefined();
+    expect(correo.text).toContain('tok-123');
+    expect(correo.text).toContain('Confirmar mi correo');
+    expect(correo.text).not.toContain('<');
+  });
+
   it('usa el buzón autenticado como remitente cuando no hay EMAIL_FROM', async () => {
     const { enviarVerificacionEmail } = await moduloConSmtp();
 
