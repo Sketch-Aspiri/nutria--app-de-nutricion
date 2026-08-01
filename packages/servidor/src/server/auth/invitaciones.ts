@@ -107,6 +107,12 @@ export async function invitarPaciente(
 
 export type MotivoActivacionRechazada =
   | 'invalido'
+  /**
+   * El token existió, pero una invitación posterior lo desactivó. Se distingue
+   * de `invalido` porque la salida para el paciente es otra: no necesita que le
+   * reenvíen nada, tiene que abrir el correo más reciente.
+   */
+  | 'reemplazado'
   | 'expirado'
   | 'ya_vinculado'
   | 'paciente_inactivo'
@@ -156,10 +162,16 @@ export async function activarCuentaPaciente(
     },
   });
 
-  if (!invitacion || invitacion.usedAt) return { ok: false, motivo: 'invalido' };
-  if (invitacion.expiresAt.getTime() < Date.now()) return { ok: false, motivo: 'expirado' };
+  if (!invitacion) return { ok: false, motivo: 'invalido' };
 
   const paciente = invitacion.patient;
+  // Un token gastado tiene dos historias distintas: o creó la cuenta que ya
+  // existe, o lo apagó una reinvitación. `userId` las separa, porque la
+  // activación es lo único que enlaza el expediente.
+  if (invitacion.usedAt) {
+    return { ok: false, motivo: paciente.userId ? 'ya_vinculado' : 'reemplazado' };
+  }
+  if (invitacion.expiresAt.getTime() < Date.now()) return { ok: false, motivo: 'expirado' };
   if (paciente.userId) return { ok: false, motivo: 'ya_vinculado' };
   if (paciente.deletedAt || paciente.estado !== 'ACTIVO') {
     return { ok: false, motivo: 'paciente_inactivo' };

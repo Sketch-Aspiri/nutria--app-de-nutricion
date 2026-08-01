@@ -275,7 +275,7 @@ export async function enviarInvitacionPaciente(
     'Tu acceso a la app de nutria',
     plantilla(
       `Hola, ${escaparHtml(invitacion.pacienteNombre)}`,
-      `<strong>${consultorio}</strong> te invita a usar la app de nutria para seguir tu plan, registrar tus comidas y escribirle desde tu teléfono. Crea tu contraseña para entrar; el enlace vence en ${INVITACION_VALIDA_DIAS} días.`,
+      `<strong>${consultorio}</strong> te invita a usar la app de nutria para seguir tu plan, registrar tus comidas y escribirle desde tu teléfono. Crea tu contraseña para entrar; el enlace vence en ${INVITACION_VALIDA_DIAS} días.<br><br>Si te llegó más de una invitación, abre siempre la más reciente: por seguridad, cada invitación nueva desactiva el enlace de la anterior.`,
       { texto: 'Crear mi contraseña', url },
       'Si no reconoces esta invitación, ignora este correo: la cuenta no se crea hasta que abras el enlace.',
     ),

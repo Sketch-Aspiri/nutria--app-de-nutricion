@@ -1,4 +1,7 @@
-import { activarCuentaPaciente } from '@/server/auth/invitaciones';
+import {
+  activarCuentaPaciente,
+  type MotivoActivacionRechazada,
+} from '@/server/auth/invitaciones';
 import { activarCuentaSchema } from '@/server/auth/schemasPaciente';
 import { avisarAltaAlEquipo } from '@/server/email';
 import {
@@ -32,14 +35,29 @@ const INTENTOS_POR_IP = 10;
 const VENTANA_MS = 15 * 60 * 1000;
 
 /**
- * Los cinco motivos de rechazo se responden **igual**: 400 `INVALID_TOKEN` con
- * un solo mensaje. Distinguir "expirado" de "ya usado" o de "el expediente está
- * archivado" le contaría a quien pruebe tokens al azar en qué estado está una
- * cuenta que no es suya. La salida para el paciente legítimo es la misma en los
- * cinco casos: pedirle a su nutrióloga que le reenvíe la invitación.
+ * Todos los rechazos son 400 `INVALID_TOKEN`; lo que cambia es el mensaje, y
+ * solo para los motivos que exigen **tener** un token real en la mano.
+ *
+ * Quien prueba tokens al azar nunca encuentra uno (son 256 bits aleatorios):
+ * su respuesta es siempre `RECHAZO`, así que no aprende en qué estado está una
+ * cuenta ajena. Al paciente legítimo, en cambio, el mensaje único lo dejaba
+ * atorado: con varias invitaciones en el buzón —cada emisión apaga la anterior—
+ * "pídele que te reenvíe" solo genera otro correo y el mismo error. Distinguir
+ * "hay uno más nuevo" de "ya tienes cuenta" es lo que lo desatora.
  */
 const RECHAZO =
   'Este enlace ya no es válido. Pídele a tu nutrióloga que te reenvíe la invitación.';
+
+const MENSAJES: Record<MotivoActivacionRechazada, string> = {
+  invalido: RECHAZO,
+  reemplazado:
+    'Esta invitación se reemplazó por una más reciente. Abre el último correo de nutria y usa el enlace de ahí.',
+  expirado: 'Este enlace venció. Pídele a tu nutrióloga que te reenvíe la invitación.',
+  ya_vinculado:
+    'Esta invitación ya se usó para crear tu cuenta. Entra con tu correo y tu contraseña.',
+  paciente_inactivo: RECHAZO,
+  correo_ocupado: RECHAZO,
+};
 
 export async function POST(request: Request) {
   const limite = await rateLimit(`activar:${ipDe(request)}`, INTENTOS_POR_IP, VENTANA_MS);
@@ -62,7 +80,7 @@ export async function POST(request: Request) {
   try {
     const resultado = await activarCuentaPaciente(parsed.data.token, parsed.data.password);
     if (!resultado.ok) {
-      return jsonError(400, ErrorCode.INVALID_TOKEN, RECHAZO);
+      return jsonError(400, ErrorCode.INVALID_TOKEN, MENSAJES[resultado.motivo]);
     }
 
     // Aviso interno de operación. No lanza y su resultado no cambia la

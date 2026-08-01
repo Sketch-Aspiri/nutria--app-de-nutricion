@@ -297,14 +297,41 @@ describe('activarCuentaPaciente', () => {
     expect(mockTransaction).not.toHaveBeenCalled();
   });
 
-  it('rechaza un token ya usado sin crear otra cuenta', async () => {
+  it('trata el token que apagó una reinvitación como reemplazado, no como inválido', async () => {
     mockInviteFindUnique.mockResolvedValue({ ...INVITACION_VIGENTE, usedAt: new Date() });
 
     await expect(activarCuentaPaciente('reusado', 'contraseña-larga')).resolves.toEqual({
       ok: false,
-      motivo: 'invalido',
+      motivo: 'reemplazado',
     });
     expect(mockUserCreate).not.toHaveBeenCalled();
+  });
+
+  it('distingue el token gastado que sí creó la cuenta del que quedó reemplazado', async () => {
+    mockInviteFindUnique.mockResolvedValue({
+      ...INVITACION_VIGENTE,
+      usedAt: new Date(),
+      patient: { ...INVITACION_VIGENTE.patient, userId: 'user-previo' },
+    });
+
+    await expect(activarCuentaPaciente('reusado', 'contraseña-larga')).resolves.toEqual({
+      ok: false,
+      motivo: 'ya_vinculado',
+    });
+    expect(mockUserCreate).not.toHaveBeenCalled();
+  });
+
+  it('un token vencido y además reemplazado se rechaza como reemplazado', async () => {
+    mockInviteFindUnique.mockResolvedValue({
+      ...INVITACION_VIGENTE,
+      usedAt: new Date(),
+      expiresAt: HACE_UNA_HORA(),
+    });
+
+    await expect(activarCuentaPaciente('viejo', 'contraseña-larga')).resolves.toEqual({
+      ok: false,
+      motivo: 'reemplazado',
+    });
   });
 
   it('distingue el token vencido para poder ofrecer una nueva invitación', async () => {

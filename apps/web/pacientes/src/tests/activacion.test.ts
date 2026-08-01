@@ -9,8 +9,8 @@ import { ErrorCode } from '@/server/http';
  *
  * La transacción de activación ya la probó la fase 3 en `invitaciones.test.ts`;
  * lo que se verifica aquí es la envoltura HTTP que añadió la fase 6: límite por
- * IP, validación del consentimiento y —lo importante— que los cinco motivos de
- * rechazo se vean **idénticos** desde fuera.
+ * IP, validación del consentimiento y —lo importante— dónde pasa la línea entre
+ * lo que se le explica al paciente y lo que se le calla a quien prueba tokens.
  */
 
 const mockActivar = jest.fn();
@@ -114,40 +114,63 @@ describe('validación', () => {
   });
 });
 
-describe('rechazo uniforme', () => {
-  const MOTIVOS = ['invalido', 'expirado', 'ya_vinculado', 'paciente_inactivo'] as const;
+describe('rechazos', () => {
+  const MOTIVOS = [
+    'invalido',
+    'reemplazado',
+    'expirado',
+    'ya_vinculado',
+    'paciente_inactivo',
+    'correo_ocupado',
+  ] as const;
 
-  it('responde igual ante todos los motivos de rechazo', async () => {
-    const respuestas = [];
+  async function rechazar(motivo: (typeof MOTIVOS)[number]) {
+    mockActivar.mockResolvedValue({ ok: false, motivo });
+    return activar({ token: TOKEN, password: PASSWORD, acepta_privacidad: true });
+  }
 
-    for (const motivo of MOTIVOS) {
-      mockActivar.mockResolvedValue({ ok: false, motivo });
-      const { respuesta, cuerpo } = await activar({
-        token: TOKEN,
-        password: PASSWORD,
-        acepta_privacidad: true,
-      });
-      respuestas.push({ status: respuesta.status, cuerpo });
-    }
+  it.each(MOTIVOS)('responde 400 INVALID_TOKEN ante %s', async (motivo) => {
+    const { respuesta, cuerpo } = await rechazar(motivo);
 
-    // Distinguir "expirado" de "ya usado" le contaría a quien prueba tokens en
-    // qué estado está una cuenta ajena. Los cuatro tienen que ser idénticos.
-    for (const respuesta of respuestas) {
-      expect(respuesta.status).toBe(400);
-      expect(respuesta.cuerpo.error.code).toBe(ErrorCode.INVALID_TOKEN);
-      expect(respuesta.cuerpo).toEqual(respuestas[0]?.cuerpo);
-    }
+    expect(respuesta.status).toBe(400);
+    expect(cuerpo.error.code).toBe(ErrorCode.INVALID_TOKEN);
   });
 
-  it('el mensaje no menciona el motivo y le dice al paciente qué hacer', async () => {
-    mockActivar.mockResolvedValue({ ok: false, motivo: 'expirado' });
-    const { cuerpo } = await activar({
-      token: TOKEN,
-      password: PASSWORD,
-      acepta_privacidad: true,
-    });
+  /**
+   * Quien prueba tokens al azar solo puede caer en `invalido`: los demás motivos
+   * exigen que el token exista en la base, o sea, haberlo recibido por correo.
+   * Por eso el estado del expediente —archivado, correo ya registrado— sigue
+   * detrás del mismo mensaje que un token inventado.
+   */
+  it.each(['invalido', 'paciente_inactivo', 'correo_ocupado'] as const)(
+    'no revela el estado del expediente en %s',
+    async (motivo) => {
+      const { cuerpo } = await rechazar(motivo);
+      const generico = (await rechazar('invalido')).cuerpo;
 
-    expect(cuerpo.error.message).not.toMatch(/expirad|venc|usad|vinculad|inactiv|archivad/i);
+      expect(cuerpo).toEqual(generico);
+      expect(cuerpo.error.message).not.toMatch(/inactiv|archivad|registrad|ocupad/i);
+    },
+  );
+
+  it('manda al paciente al correo más reciente cuando su enlace fue reemplazado', async () => {
+    const { cuerpo } = await rechazar('reemplazado');
+
+    expect(cuerpo.error.message).toMatch(/más reciente/i);
+    // Pedir otro reenvío es justo lo que no lo desatora: generaría un tercer
+    // correo y el mismo error.
+    expect(cuerpo.error.message).not.toMatch(/reenv/i);
+  });
+
+  it('manda a iniciar sesión cuando la invitación ya creó la cuenta', async () => {
+    const { cuerpo } = await rechazar('ya_vinculado');
+
+    expect(cuerpo.error.message).toMatch(/entra/i);
+  });
+
+  it('ofrece un reenvío cuando el enlace venció', async () => {
+    const { cuerpo } = await rechazar('expirado');
+
     expect(cuerpo.error.message).toMatch(/reenv/i);
   });
 });
