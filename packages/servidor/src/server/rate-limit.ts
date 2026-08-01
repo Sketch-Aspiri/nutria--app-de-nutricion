@@ -95,18 +95,37 @@ function localRateLimit(key: string, maxRequests: number, windowMs: number): Lim
   };
 }
 
-function hasUpstashConfig(): boolean {
-  return Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
+type CredencialesRedis = { url: string; token: string };
+
+/**
+ * Credenciales del Redis compartido, con los dos nombres que existen en Vercel.
+ *
+ * Conectar el store de Upstash desde el panel inyecta `KV_REST_API_URL` y
+ * `KV_REST_API_TOKEN` —nomenclatura heredada de Vercel KV—, mientras que
+ * `Redis.fromEnv()` solo mira `UPSTASH_REDIS_REST_*`. Aceptar ambos evita que un
+ * proyecto correctamente conectado caiga al cierre seguro y responda 429 desde
+ * el primer intento, que es justo lo que pasó con la app del paciente.
+ */
+function credencialesRedis(): CredencialesRedis | null {
+  const url = process.env.UPSTASH_REDIS_REST_URL?.trim() || process.env.KV_REST_API_URL?.trim();
+  const token =
+    process.env.UPSTASH_REDIS_REST_TOKEN?.trim() || process.env.KV_REST_API_TOKEN?.trim();
+  if (!url || !token) return null;
+  return { url, token };
 }
 
-function distributedLimiter(maxRequests: number, windowMs: number): Ratelimit {
+function distributedLimiter(
+  credenciales: CredencialesRedis,
+  maxRequests: number,
+  windowMs: number,
+): Ratelimit {
   const configKey = `${maxRequests}:${windowMs}`;
   const existing = distributedLimiters.get(configKey);
   if (existing) return existing;
 
   const duration = `${windowMs} ms` as `${number} ms`;
   const limiter = new Ratelimit({
-    redis: Redis.fromEnv(),
+    redis: new Redis({ url: credenciales.url, token: credenciales.token }),
     limiter: Ratelimit.slidingWindow(maxRequests, duration),
     // Analytics de Upstash conserva identifiers; Nutria no necesita ese
     // historial para aplicar el límite y evita enviar metadatos personales.
@@ -130,7 +149,8 @@ export async function rateLimit(
   windowMs: number,
 ): Promise<LimitResult> {
   const pseudonymousKey = pseudonymizeRateLimitKey(key);
-  if (!hasUpstashConfig()) {
+  const credenciales = credencialesRedis();
+  if (!credenciales) {
     if (process.env.NODE_ENV === 'production' && !allowsLocalRateLimitInE2E()) {
       logger.error('Rate limit distribuido no configurado');
       return {
@@ -143,7 +163,9 @@ export async function rateLimit(
   }
 
   try {
-    const result = await distributedLimiter(maxRequests, windowMs).limit(pseudonymousKey);
+    const result = await distributedLimiter(credenciales, maxRequests, windowMs).limit(
+      pseudonymousKey,
+    );
     return {
       permitido: result.success,
       reintentarEnSegundos: result.success

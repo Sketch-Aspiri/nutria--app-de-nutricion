@@ -3,6 +3,23 @@ import { randomUUID } from 'node:crypto';
 import { pseudonymizeRateLimitKey } from './rate-limit-key';
 import { rateLimit } from './rate-limit';
 
+const mockRedisCtor = jest.fn();
+const mockLimit = jest.fn();
+
+jest.mock('@upstash/redis', () => ({
+  Redis: jest.fn().mockImplementation((config: unknown) => {
+    mockRedisCtor(config);
+    return {};
+  }),
+}));
+
+jest.mock('@upstash/ratelimit', () => ({
+  Ratelimit: Object.assign(
+    jest.fn().mockImplementation(() => ({ limit: mockLimit })),
+    { slidingWindow: jest.fn(() => 'ventana-deslizante') },
+  ),
+}));
+
 describe('pseudonymizeKey', () => {
   beforeEach(() => {
     process.env.RATE_LIMIT_HASH_KEY = 'clave-de-prueba-con-mas-de-32-caracteres';
@@ -22,6 +39,66 @@ describe('pseudonymizeKey', () => {
     expect(pseudonymizeRateLimitKey('login:source:192.0.2.1')).not.toBe(
       pseudonymizeRateLimitKey('login:source:192.0.2.2'),
     );
+  });
+});
+
+/**
+ * Conectar el store de Upstash desde el panel de Vercel inyecta las
+ * credenciales como `KV_REST_API_*`. Cuando solo se miraba `UPSTASH_REDIS_REST_*`,
+ * la app del paciente quedó con el limitador "sin configurar" y respondía 429 en
+ * el primer intento de activación, con un mensaje que además pedía esperar.
+ */
+describe('credenciales del Redis compartido', () => {
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    mockRedisCtor.mockClear();
+    mockLimit.mockReset().mockResolvedValue({ success: true, reset: Date.now() + 60_000 });
+    process.env = { ...originalEnv, NODE_ENV: 'production' };
+    delete process.env.UPSTASH_REDIS_REST_URL;
+    delete process.env.UPSTASH_REDIS_REST_TOKEN;
+    delete process.env.KV_REST_API_URL;
+    delete process.env.KV_REST_API_TOKEN;
+  });
+
+  afterAll(() => {
+    process.env = originalEnv;
+  });
+
+  it('acepta los nombres KV_REST_API_* que inyecta la integración de Vercel', async () => {
+    process.env.KV_REST_API_URL = 'https://kv.example.test';
+    process.env.KV_REST_API_TOKEN = 'token-kv';
+
+    await expect(rateLimit(`kv:${randomUUID()}`, 5, 60_000)).resolves.toMatchObject({
+      permitido: true,
+      distribuido: true,
+    });
+    expect(mockRedisCtor).toHaveBeenCalledWith(
+      expect.objectContaining({ url: 'https://kv.example.test', token: 'token-kv' }),
+    );
+  });
+
+  it('prefiere UPSTASH_REDIS_REST_* cuando conviven los dos juegos', async () => {
+    process.env.KV_REST_API_URL = 'https://kv.example.test';
+    process.env.KV_REST_API_TOKEN = 'token-kv';
+    process.env.UPSTASH_REDIS_REST_URL = 'https://upstash.example.test';
+    process.env.UPSTASH_REDIS_REST_TOKEN = 'token-upstash';
+
+    await rateLimit(`ambos:${randomUUID()}`, 6, 60_000);
+
+    expect(mockRedisCtor).toHaveBeenCalledWith(
+      expect.objectContaining({ url: 'https://upstash.example.test', token: 'token-upstash' }),
+    );
+  });
+
+  it('conserva el cierre seguro si solo llega la mitad de las credenciales', async () => {
+    process.env.KV_REST_API_URL = 'https://kv.example.test';
+
+    await expect(rateLimit(`incompleto:${randomUUID()}`, 7, 60_000)).resolves.toMatchObject({
+      permitido: false,
+      distribuido: false,
+    });
+    expect(mockRedisCtor).not.toHaveBeenCalled();
   });
 });
 

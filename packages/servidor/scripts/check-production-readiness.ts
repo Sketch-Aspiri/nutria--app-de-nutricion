@@ -58,8 +58,18 @@ function main(): void {
     keyBytes === 32 ? 'correcto' : 'genera una clave base64 de 32 bytes',
   );
   present('ENCRYPTION_KEY_ID');
-  present('UPSTASH_REDIS_REST_URL');
-  present('UPSTASH_REDIS_REST_TOKEN');
+  // Conectar el store desde el panel de Vercel inyecta `KV_REST_API_*`; el
+  // limitador acepta los dos juegos de nombres, así que el check también.
+  const redisUrl = process.env.UPSTASH_REDIS_REST_URL?.trim() || process.env.KV_REST_API_URL?.trim();
+  const redisToken =
+    process.env.UPSTASH_REDIS_REST_TOKEN?.trim() || process.env.KV_REST_API_TOKEN?.trim();
+  add(
+    'Redis del rate limit configurado',
+    Boolean(redisUrl && redisToken),
+    redisUrl && redisToken
+      ? 'configurado'
+      : 'faltan UPSTASH_REDIS_REST_URL/TOKEN (o KV_REST_API_URL/TOKEN)',
+  );
   present('RATE_LIMIT_HASH_KEY', 32);
   present('SENTRY_DSN');
   present('NEXT_PUBLIC_SENTRY_DSN');
