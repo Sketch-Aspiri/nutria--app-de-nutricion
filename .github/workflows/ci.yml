@@ -63,8 +63,7 @@ jobs:
         run: node --test .github/scripts/auditoria-npm-core.test.mjs
 
       - name: Auditar herramientas de desarrollo
-        # La única excepción vigente es brace-expansion dentro de Jest 29. El
-        # script falla ante cualquier advisory nuevo o cuando vence la excepción.
+        # El script falla ante cualquier advisory alto o crítico.
         run: node .github/scripts/verificar-auditoria-npm.mjs
 
       - name: Preparar base de sombra

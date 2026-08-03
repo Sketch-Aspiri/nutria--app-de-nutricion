@@ -8,6 +8,15 @@ const ADVISORY_PERMITIDO = {
   source: 1,
   url: 'https://github.com/advisories/GHSA-mh99-v99m-4gvg',
 };
+const ADVISORIES_DE_PRUEBA = new Map([
+  [
+    'GHSA-mh99-v99m-4gvg',
+    {
+      vence: '2026-09-30',
+      motivo: 'Excepción usada exclusivamente para probar el evaluador.',
+    },
+  ],
+]);
 
 function reporteCon(vulnerabilities) {
   return { auditReportVersion: 2, vulnerabilities };
@@ -24,7 +33,15 @@ describe('evaluarAuditoria', () => {
       minimatch: vulnerabilidad(['brace-expansion']),
     });
 
-    assert.equal(evaluarAuditoria({ reporte, status: 1, hoy: HOY }).ok, true);
+    assert.equal(
+      evaluarAuditoria({
+        reporte,
+        status: 1,
+        hoy: HOY,
+        advisoriesPermitidos: ADVISORIES_DE_PRUEBA,
+      }).ok,
+      true,
+    );
   });
 
   it('rechaza la excepción después de su vencimiento', () => {
@@ -36,6 +53,7 @@ describe('evaluarAuditoria', () => {
       reporte,
       status: 1,
       hoy: '2026-10-01',
+      advisoriesPermitidos: ADVISORIES_DE_PRUEBA,
     });
 
     assert.equal(resultado.ok, false);
@@ -52,7 +70,12 @@ describe('evaluarAuditoria', () => {
       ]),
     });
 
-    const resultado = evaluarAuditoria({ reporte, status: 1, hoy: HOY });
+    const resultado = evaluarAuditoria({
+      reporte,
+      status: 1,
+      hoy: HOY,
+      advisoriesPermitidos: ADVISORIES_DE_PRUEBA,
+    });
 
     assert.equal(resultado.ok, false);
     assert.match(resultado.mensaje, /GHSA-xxxx-yyyy-zzzz/);

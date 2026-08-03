@@ -6,15 +6,7 @@ const SEVERIDAD = new Map([
   ['critical', 4],
 ]);
 
-export const ADVISORIES_PERMITIDOS = new Map([
-  [
-    'GHSA-mh99-v99m-4gvg',
-    {
-      vence: '2026-09-30',
-      motivo: 'Jest 29 depende de brace-expansion sin una actualización compatible con ts-jest 29.',
-    },
-  ],
-]);
+export const ADVISORIES_PERMITIDOS = new Map();
 
 function esObjeto(valor) {
   return valor !== null && typeof valor === 'object' && !Array.isArray(valor);
