@@ -13,7 +13,7 @@ export function RegistrosDia({ registros }: { registros: RegistroComidaHoy[] }) 
   return (
     <section className="mt-5">
       <h2 className="mb-2 px-5 font-display text-lg text-emerald-950">Registrado por ti</h2>
-      <div className="mx-5 space-y-2">
+      <div className="mx-5 space-y-2 lg:mx-0 lg:grid lg:grid-cols-2 lg:gap-2 lg:space-y-0">
         {libres.map((registro) => (
           <article
             key={registro.id}
@@ -63,7 +63,7 @@ export function RegistrosDia({ registros }: { registros: RegistroComidaHoy[] }) 
         ))}
       </div>
       {borrar.isError && (
-        <p role="alert" className="mx-5 mt-2 text-center text-xs text-red-700">
+        <p role="alert" className="mx-5 mt-2 text-center text-xs text-red-700 lg:mx-0">
           {borrar.error.message}
         </p>
       )}

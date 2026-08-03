@@ -38,17 +38,17 @@ export function ComidasDelPlan() {
     <>
       <MetasDelPlan plan={plan.data} />
       {plan.data.nota && (
-        <p className="mx-5 mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs leading-relaxed text-emerald-900">
+        <p className="mx-5 mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs leading-relaxed text-emerald-900 lg:mx-0">
           {plan.data.nota}
         </p>
       )}
-      <div className="mx-5 mt-3 space-y-2">
+      <div className="mx-5 mt-3 space-y-2 lg:mx-0 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
         {plan.data.comidas.map((comida) => (
           <TarjetaComida key={comida.id} comida={comida} />
         ))}
       </div>
       {plan.data.comidas.length === 0 && (
-        <p className="mx-5 mt-3 rounded-2xl border border-dashed border-stone-300 bg-white px-4 py-6 text-center text-xs text-stone-500">
+        <p className="mx-5 mt-3 rounded-2xl border border-dashed border-stone-300 bg-white px-4 py-6 text-center text-xs text-stone-500 lg:mx-0">
           Tu plan todavía no tiene comidas capturadas. Pregúntale a tu nutrióloga.
         </p>
       )}
@@ -67,7 +67,7 @@ function MetasDelPlan({ plan }: { plan: PlanPaciente }) {
   return (
     <section
       aria-label="Metas diarias de tu plan"
-      className="mx-5 rounded-2xl bg-emerald-900 px-4 py-4 text-white"
+      className="mx-5 rounded-2xl bg-emerald-900 px-4 py-4 text-white lg:mx-0"
     >
       <p className="text-[11px] uppercase tracking-wide text-emerald-300">Meta diaria</p>
       <p className="mt-0.5 font-mono text-2xl">

@@ -17,7 +17,7 @@ export function TarjetasDia({ resumen }: { resumen: ResumenHoy }) {
     resumen.agua.meta > 0 ? Math.min((resumen.agua.vasos / resumen.agua.meta) * 100, 100) : 0;
 
   return (
-    <div className="mx-5 mt-3 grid grid-cols-2 gap-3">
+    <div className="mx-5 mt-3 grid grid-cols-2 gap-3 lg:mx-0">
       <section className="rounded-2xl border border-stone-200 bg-white p-4">
         <div className="flex items-center gap-2">
           <Droplet size={16} className="text-sky-600" aria-hidden />

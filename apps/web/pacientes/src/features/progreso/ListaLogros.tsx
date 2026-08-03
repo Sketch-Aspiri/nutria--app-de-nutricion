@@ -19,7 +19,7 @@ export function ListaLogros({ logros }: { logros: Logro[] }) {
 
   if (total === 0) {
     return (
-      <section className="mx-5 mt-4 rounded-2xl border border-stone-200 bg-white p-4">
+      <section className="mx-5 mt-4 rounded-2xl border border-stone-200 bg-white p-4 lg:mx-0">
         <EncabezadoLogros conseguidos={0} total={0} />
         <p className="mt-3 text-xs leading-relaxed text-stone-400">
           Tus logros aparecerán conforme registres tus comidas, tu agua y tu peso.
@@ -29,9 +29,9 @@ export function ListaLogros({ logros }: { logros: Logro[] }) {
   }
 
   return (
-    <section className="mx-5 mt-4 rounded-2xl border border-stone-200 bg-white p-4">
+    <section className="mx-5 mt-4 rounded-2xl border border-stone-200 bg-white p-4 lg:mx-0">
       <EncabezadoLogros conseguidos={conseguidos} total={total} />
-      <ul className="mt-3 space-y-3">
+      <ul className="mt-3 space-y-3 lg:grid lg:grid-cols-2 lg:gap-x-6 lg:gap-y-3 lg:space-y-0">
         {logros.map((logro) => (
           <FilaLogro key={logro.id} logro={logro} />
         ))}

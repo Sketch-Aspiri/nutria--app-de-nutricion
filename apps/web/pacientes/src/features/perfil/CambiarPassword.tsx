@@ -57,7 +57,7 @@ export function CambiarPassword() {
 
   if (!abierto) {
     return (
-      <div className="mx-5 mt-4 overflow-hidden rounded-3xl border border-stone-200 bg-white">
+      <div className="mx-5 lg:mx-0 mt-4 overflow-hidden rounded-3xl border border-stone-200 bg-white">
         <button
           type="button"
           onClick={() => setAbierto(true)}
@@ -78,7 +78,7 @@ export function CambiarPassword() {
   return (
     <form
       onSubmit={enviar}
-      className="mx-5 mt-4 rounded-3xl border border-stone-200 bg-white p-5"
+      className="mx-5 lg:mx-0 mt-4 rounded-3xl border border-stone-200 bg-white p-5"
     >
       <h2 className="flex items-center gap-2 text-sm font-medium text-emerald-950">
         <KeyRound size={16} className="text-emerald-800" aria-hidden />

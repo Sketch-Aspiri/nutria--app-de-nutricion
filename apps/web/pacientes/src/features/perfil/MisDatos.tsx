@@ -20,7 +20,7 @@ export function MisDatos({ onBaja }: { onBaja: () => void }) {
   const descarga = useDescargarMisDatos();
 
   return (
-    <section className="mx-5 mt-6">
+    <section className="mx-5 mt-6 lg:mx-0">
       <h2 className="px-1 text-xs font-medium uppercase tracking-wide text-stone-400">
         Tus datos
       </h2>

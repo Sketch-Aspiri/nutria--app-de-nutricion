@@ -40,7 +40,7 @@ export function PlanCliente() {
     <Pantalla titulo="Tu plan" subtitulo="Diseñado por tu nutrióloga">
       <nav
         aria-label="Secciones de tu plan"
-        className="mx-5 mb-4 flex gap-1 rounded-xl bg-stone-100 p-1"
+        className="mx-5 mb-4 flex gap-1 rounded-xl bg-stone-100 p-1 lg:mx-0"
       >
         {VISTAS.map(({ clave, etiqueta }) => {
           const activa = clave === vista;

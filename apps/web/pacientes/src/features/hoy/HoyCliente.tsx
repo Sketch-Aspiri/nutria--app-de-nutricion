@@ -27,7 +27,7 @@ export function HoyCliente({ nombre }: { nombre: string }) {
         subtitulo="Buen día"
         accion={<AvatarPerfil nombre={nombre} />}
       >
-        <div className="mx-5 flex min-h-64 items-center justify-center rounded-3xl border border-stone-200 bg-white text-emerald-800">
+        <div className="mx-5 lg:mx-0 flex min-h-64 items-center justify-center rounded-3xl border border-stone-200 bg-white text-emerald-800">
           <Loader2 size={24} className="animate-spin" aria-label="Cargando tu día" />
         </div>
       </Pantalla>
@@ -41,7 +41,7 @@ export function HoyCliente({ nombre }: { nombre: string }) {
         subtitulo="Buen día"
         accion={<AvatarPerfil nombre={nombre} />}
       >
-        <div className="mx-5 rounded-3xl border border-red-200 bg-white px-6 py-10 text-center">
+        <div className="mx-5 lg:mx-0 rounded-3xl border border-red-200 bg-white px-6 py-10 text-center">
           <p className="text-sm font-medium text-emerald-950">No pudimos cargar tu día</p>
           <p className="mt-1 text-xs text-stone-500">
             Revisa tu conexión. Tus registros guardados siguen seguros.
@@ -85,7 +85,7 @@ export function HoyCliente({ nombre }: { nombre: string }) {
       <button
         type="button"
         onClick={() => setCoachAbierto(true)}
-        className="mx-5 mt-4 flex w-[calc(100%-2.5rem)] items-center gap-3 rounded-2xl bg-emerald-900 p-4 text-left text-white transition-transform active:scale-[0.99]"
+        className="mx-5 mt-4 flex w-[calc(100%-2.5rem)] items-center gap-3 rounded-2xl bg-emerald-900 p-4 text-left text-white transition-transform active:scale-[0.99] lg:mx-0 lg:w-full"
       >
         <span className="rounded-full bg-emerald-800 p-2.5">
           <Sparkles size={18} aria-hidden />

@@ -34,7 +34,7 @@ export function MensajesCliente() {
   const nutriologa = perfil.data?.nutriologo.nombre ?? '';
 
   return (
-    <main className="flex min-h-screen flex-col pb-nav">
+    <main className="flex min-h-screen flex-col pb-nav lg:mx-auto lg:max-w-2xl lg:border-x lg:border-stone-200 lg:pb-0">
       <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-stone-200 bg-white px-5 py-3">
         <span
           aria-hidden

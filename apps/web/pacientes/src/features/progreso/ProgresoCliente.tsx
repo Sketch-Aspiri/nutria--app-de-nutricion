@@ -49,7 +49,7 @@ export function ProgresoCliente() {
     <Pantalla titulo="Tu progreso" subtitulo="Peso, rachas y logros">
       <TarjetasPeso progreso={datos} />
 
-      <section className="mx-5 mt-3 rounded-2xl border border-stone-200 bg-white p-4">
+      <section className="mx-5 mt-3 rounded-2xl border border-stone-200 bg-white p-4 lg:mx-0">
         <h2 className="flex items-center gap-2 text-sm font-medium text-emerald-950">
           <LineChart size={16} className="text-emerald-800" aria-hidden />
           Tu peso
@@ -64,7 +64,7 @@ export function ProgresoCliente() {
 
       <ListaLogros logros={datos.logros} />
 
-      <p className="mx-5 mt-4 text-center text-[10px] leading-relaxed text-stone-400">
+      <p className="mx-5 mt-4 text-center text-[10px] leading-relaxed text-stone-400 lg:mx-0">
         Tus logros se calculan con lo que registras. Si corriges un dato, se recalculan solos.
       </p>
     </Pantalla>

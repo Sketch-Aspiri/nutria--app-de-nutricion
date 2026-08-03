@@ -54,9 +54,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="es">
       <body className={`${inter.variable} ${fraunces.variable} ${plexMono.variable} font-sans`}>
         <Providers>
-          {/* Contenedor de la app: mobile-first a ancho completo y centrado en
-              pantallas grandes. Sin marco de teléfono — es una app web real. */}
-          <div className="mx-auto min-h-screen w-full max-w-app bg-stone-50">{children}</div>
+          {/* Sin marco de teléfono — es una app web real. El ancho ya no se
+              limita aquí: cada pantalla decide el suyo (acceso centrado,
+              texto legal en columna de lectura, app con barra lateral en
+              escritorio), porque un solo límite global no sirve para las tres. */}
+          <div className="min-h-screen w-full bg-stone-50">{children}</div>
         </Providers>
         <RegistrarServiceWorker />
       </body>

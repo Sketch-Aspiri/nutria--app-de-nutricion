@@ -41,7 +41,7 @@ export function RecetaDetalle({ recetaId }: { recetaId: string }) {
   if (!receta) {
     return (
       <Envoltorio titulo="Receta no disponible">
-        <div className="mx-5 rounded-3xl border border-stone-200 bg-white px-6 py-10 text-center">
+        <div className="mx-5 rounded-3xl border border-stone-200 bg-white px-6 py-10 text-center lg:mx-0">
           <p className="text-sm font-medium text-emerald-950">Esta receta ya no está disponible</p>
           <p className="mt-1 text-xs leading-relaxed text-stone-500">
             Tu nutrióloga pudo haberla retirado. Revisa las que tienes en tu plan.
@@ -75,8 +75,8 @@ export function RecetaDetalle({ recetaId }: { recetaId: string }) {
  */
 function Envoltorio({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
-    <main className="min-h-screen pb-nav">
-      <header className="flex items-center gap-2 px-5 pb-4 pt-8">
+    <main className="min-h-screen pb-nav lg:mx-auto lg:max-w-3xl lg:px-8 lg:pb-16">
+      <header className="flex items-center gap-2 px-5 pb-4 pt-8 lg:px-0">
         <Link
           href="/plan?vista=recetas"
           aria-label="Volver a mis recetas"
@@ -97,7 +97,7 @@ function Encabezado({ receta }: { receta: Receta }) {
   const porPorcion = caloriasPorPorcion(receta);
 
   return (
-    <p className="mx-5 mb-3 flex flex-wrap gap-3 text-xs text-stone-500">
+    <p className="mx-5 mb-3 flex flex-wrap gap-3 text-xs text-stone-500 lg:mx-0">
       <span className="flex items-center gap-1">
         <Users size={13} aria-hidden />
         {receta.porciones} {receta.porciones === 1 ? 'porción' : 'porciones'}
@@ -116,7 +116,7 @@ function Ingredientes({ receta }: { receta: Receta }) {
   const ingredientes = ingredientesDeReceta(receta);
 
   return (
-    <section className="mx-5 rounded-2xl border border-stone-200 bg-white p-4">
+    <section className="mx-5 rounded-2xl border border-stone-200 bg-white p-4 lg:mx-0">
       <h2 className="mb-2 text-xs uppercase tracking-wide text-stone-400">Ingredientes</h2>
       {ingredientes.length === 0 ? (
         <p className="text-sm text-stone-500">
@@ -148,7 +148,7 @@ function Preparacion({ receta }: { receta: Receta }) {
   if (pasos.length === 0) return null;
 
   return (
-    <section className="mx-5 mt-3 rounded-2xl border border-stone-200 bg-white p-4">
+    <section className="mx-5 mt-3 rounded-2xl border border-stone-200 bg-white p-4 lg:mx-0">
       <h2 className="mb-2 text-xs uppercase tracking-wide text-stone-400">Preparación</h2>
       <ol className="space-y-2.5">
         {pasos.map((paso, indice) => (

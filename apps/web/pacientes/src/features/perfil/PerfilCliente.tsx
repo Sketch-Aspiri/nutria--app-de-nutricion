@@ -46,7 +46,7 @@ export function PerfilCliente() {
 
   return (
     <Pantalla titulo="Tu perfil">
-      <div className="mx-5 flex items-center gap-3 rounded-3xl border border-stone-200 bg-white p-5">
+      <div className="mx-5 lg:mx-0 flex items-center gap-3 rounded-3xl border border-stone-200 bg-white p-5">
         <span
           aria-hidden
           className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-900 text-base font-medium text-white"
@@ -61,7 +61,7 @@ export function PerfilCliente() {
         </div>
       </div>
 
-      <div className="mx-5 mt-3 space-y-3">
+      <div className="mx-5 lg:mx-0 mt-3 space-y-3">
         <Dato
           icono={<Stethoscope size={16} className="text-emerald-800" aria-hidden />}
           etiqueta="Tu nutrióloga"
@@ -79,7 +79,7 @@ export function PerfilCliente() {
 
       <Recordatorios />
 
-      <div className="mx-5 mt-4 overflow-hidden rounded-3xl border border-stone-200 bg-white">
+      <div className="mx-5 lg:mx-0 mt-4 overflow-hidden rounded-3xl border border-stone-200 bg-white">
         <Link
           href="/privacidad"
           className="flex items-center justify-between px-5 py-4 text-sm text-stone-700 hover:bg-stone-50"
@@ -98,11 +98,11 @@ export function PerfilCliente() {
 
       <MisDatos onBaja={() => void signOut({ redirectTo: '/entrar?baja=1' })} />
 
-      <div className="mx-5 mt-6">
+      <div className="mx-5 lg:mx-0 mt-6">
         <CerrarSesion />
       </div>
 
-      <p className="mx-5 mt-4 text-center text-[11px] leading-relaxed text-stone-400">
+      <p className="mx-5 lg:mx-0 mt-4 text-center text-[11px] leading-relaxed text-stone-400">
         Tu expediente clínico lo resguarda tu nutrióloga. Cerrar sesión aquí no lo borra.
       </p>
     </Pantalla>
@@ -152,7 +152,7 @@ function Dato({
  */
 function Recordatorios() {
   return (
-    <section className="mx-5 mt-3 rounded-2xl border border-stone-200 bg-white p-4">
+    <section className="mx-5 lg:mx-0 mt-3 rounded-2xl border border-stone-200 bg-white p-4">
       <div className="flex items-center gap-2">
         <Bell size={16} className="text-emerald-800" aria-hidden />
         <h2 className="text-xs text-stone-500">Recordatorios</h2>

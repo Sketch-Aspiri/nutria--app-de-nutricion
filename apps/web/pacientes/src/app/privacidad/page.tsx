@@ -21,7 +21,7 @@ export default function PrivacidadPage() {
   const responsable = getPrivacyResponsible();
 
   return (
-    <main className="min-h-screen px-6 pb-16 pt-12">
+    <main className="min-h-screen px-6 pb-16 pt-12 lg:mx-auto lg:max-w-2xl">
       <Link href="/" className="font-display text-2xl font-medium text-emerald-950">
         nutria
       </Link>

@@ -9,7 +9,7 @@ export function ResumenNutricional({
 }) {
   if (!plan) {
     return (
-      <section className="mx-5 overflow-hidden rounded-3xl bg-emerald-950 px-5 py-5 text-white">
+      <section className="mx-5 overflow-hidden rounded-3xl bg-emerald-950 px-5 py-5 text-white lg:mx-0">
         <p className="text-xs text-emerald-300">Registrado hoy</p>
         <div className="mt-1 flex items-end justify-between">
           <p className="font-mono text-3xl">{totales.calorias}</p>
@@ -25,7 +25,7 @@ export function ResumenNutricional({
   const restantes = Math.max(plan.calorias_diarias - totales.calorias, 0);
 
   return (
-    <section className="mx-5 rounded-3xl border border-stone-200 bg-white p-5">
+    <section className="mx-5 rounded-3xl border border-stone-200 bg-white p-5 lg:mx-0">
       <div className="flex justify-center">
         <Anillo valor={totales.calorias} meta={plan.calorias_diarias}>
           <span className="font-mono text-3xl text-emerald-950">{restantes}</span>

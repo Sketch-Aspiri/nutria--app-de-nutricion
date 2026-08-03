@@ -16,7 +16,7 @@ import { useSinLeer } from '@/features/mensajes/useMensajes';
  * paciente la dejó.
  */
 
-const DESTINOS = [
+export const DESTINOS = [
   { href: '/', etiqueta: 'Hoy', icono: Home },
   { href: '/plan', etiqueta: 'Plan', icono: CalendarDays },
   { href: '/progreso', etiqueta: 'Progreso', icono: TrendingUp },
@@ -38,7 +38,7 @@ export function BottomNav() {
   return (
     <nav
       aria-label="Navegación principal"
-      className="safe-bottom fixed inset-x-0 bottom-0 z-30 mx-auto flex max-w-app items-center justify-around border-t border-stone-200 bg-white px-2 pt-2"
+      className="safe-bottom fixed inset-x-0 bottom-0 z-30 mx-auto flex max-w-app items-center justify-around border-t border-stone-200 bg-white px-2 pt-2 lg:hidden"
     >
       {[hoy, plan].map((destino) => (
         <Destino key={destino.href} {...destino} pathname={pathname} />

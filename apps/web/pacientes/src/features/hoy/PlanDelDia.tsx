@@ -10,7 +10,7 @@ export function PlanDelDia({ resumen }: { resumen: ResumenHoy }) {
   const toggle = useToggleComida();
   if (!resumen.plan) {
     return (
-      <section className="mx-5 mt-5 rounded-2xl border border-dashed border-stone-300 bg-white px-5 py-7 text-center">
+      <section className="mx-5 mt-5 rounded-2xl border border-dashed border-stone-300 bg-white px-5 py-7 text-center lg:mx-0">
         <p className="text-sm font-medium text-emerald-950">Aún no tienes un plan compartido</p>
         <p className="mt-1 text-xs leading-relaxed text-stone-500">
           Tu nutrióloga lo está preparando. Mientras tanto puedes registrar tus comidas.
@@ -25,7 +25,7 @@ export function PlanDelDia({ resumen }: { resumen: ResumenHoy }) {
         <h2 className="font-display text-lg text-emerald-950">Tu plan de hoy</h2>
         <span className="text-[11px] text-stone-400">Toca para marcar</span>
       </div>
-      <div className="mx-5 space-y-2">
+      <div className="mx-5 space-y-2 lg:mx-0 lg:grid lg:grid-cols-2 lg:gap-2 lg:space-y-0">
         {resumen.plan.comidas.map((comida) => {
           const marcada = resumen.comidas_marcadas.includes(comida.id);
           const registroIds = resumen.registros
@@ -75,7 +75,7 @@ export function PlanDelDia({ resumen }: { resumen: ResumenHoy }) {
         })}
       </div>
       {toggle.isError && (
-        <p role="alert" className="mx-5 mt-2 text-center text-xs text-red-700">
+        <p role="alert" className="mx-5 mt-2 text-center text-xs text-red-700 lg:mx-0">
           {toggle.error.message}
         </p>
       )}

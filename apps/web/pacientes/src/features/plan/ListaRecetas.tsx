@@ -37,7 +37,7 @@ export function ListaRecetas() {
   }
 
   return (
-    <ul className="mx-5 space-y-2">
+    <ul className="mx-5 space-y-2 lg:mx-0 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
       {recetas.data.map((receta) => (
         <li key={receta.id}>
           <TarjetaReceta receta={receta} />

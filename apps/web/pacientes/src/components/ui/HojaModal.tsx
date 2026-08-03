@@ -109,7 +109,7 @@ export function HojaModal({
         aria-modal="true"
         aria-labelledby={tituloId}
         aria-describedby={descripcion ? descripcionId : undefined}
-        className="safe-bottom relative max-h-[92dvh] w-full max-w-app overflow-y-auto rounded-t-[2rem] bg-stone-50 px-5 pb-6 pt-3 shadow-2xl"
+        className="safe-bottom relative max-h-[92dvh] w-full max-w-app overflow-y-auto rounded-t-[2rem] bg-stone-50 px-5 pb-6 pt-3 shadow-2xl lg:max-w-lg"
       >
         <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-stone-300" />
         <div className="mb-5 flex items-start justify-between gap-4">

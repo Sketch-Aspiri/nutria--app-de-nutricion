@@ -15,7 +15,7 @@ export function TarjetasPeso({ progreso }: { progreso: Progreso }) {
   const IconoCambio = cambio?.direccion === 'sube' ? TrendingUp : TrendingDown;
 
   return (
-    <div className="mx-5 grid grid-cols-3 gap-3">
+    <div className="mx-5 grid grid-cols-3 gap-3 lg:mx-0">
       {/*
         Con dos pesajes iguales el `0` sí es un dato —el paciente se pesó y no
         se movió—, no un relleno: se muestra. Lo que no se muestra es un cero

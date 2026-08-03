@@ -37,7 +37,7 @@ export function ActividadCompartida() {
   }
 
   return (
-    <section className="mx-5 rounded-2xl border border-stone-200 bg-white p-4">
+    <section className="mx-5 rounded-2xl border border-stone-200 bg-white p-4 lg:mx-0">
       <h2 className="flex items-center gap-2 text-sm font-medium text-emerald-950">
         <Activity size={16} className="text-emerald-800" aria-hidden />
         Tu actividad

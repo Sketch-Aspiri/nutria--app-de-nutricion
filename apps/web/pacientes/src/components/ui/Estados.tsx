@@ -15,7 +15,7 @@ import { Btn } from './Btn';
 
 export function Cargando({ etiqueta }: { etiqueta: string }) {
   return (
-    <div className="mx-5 flex min-h-48 items-center justify-center rounded-3xl border border-stone-200 bg-white text-emerald-800">
+    <div className="mx-5 lg:mx-0 flex min-h-48 items-center justify-center rounded-3xl border border-stone-200 bg-white text-emerald-800">
       <Loader2 size={24} className="animate-spin" aria-label={etiqueta} />
     </div>
   );
@@ -31,7 +31,7 @@ export function ErrorDeCarga({
   return (
     <div
       role="alert"
-      className="mx-5 rounded-3xl border border-red-200 bg-white px-6 py-10 text-center"
+      className="mx-5 lg:mx-0 rounded-3xl border border-red-200 bg-white px-6 py-10 text-center"
     >
       <p className="text-sm font-medium text-emerald-950">{titulo}</p>
       <p className="mt-1 text-xs text-stone-500">
