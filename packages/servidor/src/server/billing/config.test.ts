@@ -1,7 +1,14 @@
 /**
  * @jest-environment node
  */
-import { modoFacturacion, planDelPriceId, priceIdDe, stripeConfigurado, urlBase } from './config';
+import {
+  modoFacturacion,
+  planDelPriceId,
+  priceIdDe,
+  stripeCheckoutHabilitado,
+  stripeConfigurado,
+  urlBase,
+} from './config';
 
 const ENV_ORIGINAL = { ...process.env };
 
@@ -34,6 +41,20 @@ describe('stripeConfigurado', () => {
 
     process.env.STRIPE_SECRET_KEY = 'sk_test_x';
     expect(stripeConfigurado()).toBe(true);
+  });
+});
+
+describe('stripeCheckoutHabilitado', () => {
+  it('exige feature flag y llave para no publicar cobros por accidente', () => {
+    process.env.STRIPE_SECRET_KEY = 'sk_test_x';
+    delete process.env.STRIPE_CHECKOUT_ENABLED;
+    expect(stripeCheckoutHabilitado()).toBe(false);
+
+    process.env.STRIPE_CHECKOUT_ENABLED = 'true';
+    expect(stripeCheckoutHabilitado()).toBe(true);
+
+    delete process.env.STRIPE_SECRET_KEY;
+    expect(stripeCheckoutHabilitado()).toBe(false);
   });
 });
 

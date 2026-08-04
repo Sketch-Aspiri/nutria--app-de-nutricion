@@ -22,6 +22,8 @@ export const ErrorCode = {
   INVALID_TOKEN: 'INVALID_TOKEN',
   TOKEN_EXPIRED: 'TOKEN_EXPIRED',
   EMAIL_NOT_VERIFIED: 'EMAIL_NOT_VERIFIED',
+  /** 403: terminó el ciclo de acceso de la cuenta del nutriólogo. */
+  ACCOUNT_INACTIVE: 'ACCOUNT_INACTIVE',
   RATE_LIMITED: 'RATE_LIMITED',
   EXPORT_TOO_LARGE: 'EXPORT_TOO_LARGE',
   /** 402: el plan vigente no alcanza para la acción (cupo de pacientes, plantillas). */
@@ -119,6 +121,20 @@ export function unauthenticated(
   message = 'Necesitas iniciar sesión para continuar.',
 ): NextResponse {
   return jsonError(401, ErrorCode.UNAUTHENTICATED, message);
+}
+
+/**
+ * Rechaza mutaciones iniciadas desde otro origen cuando el navegador envía
+ * `Origin`. Clientes no-browser sin ese header siguen usando la API normal.
+ */
+export function origenPermitido(request: Request): boolean {
+  const origin = request.headers.get('origin');
+  if (!origin) return true;
+  try {
+    return new URL(origin).origin === new URL(request.url).origin;
+  } catch {
+    return false;
+  }
 }
 
 /**

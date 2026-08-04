@@ -4,7 +4,7 @@ import { planDelCatalogo } from '@nutria/shared';
 import { prisma } from '@/server/db';
 import { logger } from '@/server/logger';
 
-import { esBeta, priceIdDe, urlBase } from './config';
+import { priceIdDe, stripeCheckoutHabilitado, urlBase } from './config';
 import { estadoSuscripcion } from './entitlements';
 import { guardarCustomerId } from './repository';
 import { stripe } from './stripe';
@@ -15,7 +15,7 @@ import { stripe } from './stripe';
  * flujo de pago ocurre en dominios de Stripe.
  */
 
-export type MotivoNoDisponible = 'BETA' | 'PLAN_SIN_PRECIO' | 'SIN_SUSCRIPCION';
+export type MotivoNoDisponible = 'PAGOS_NO_CONFIGURADOS' | 'PLAN_SIN_PRECIO' | 'SIN_SUSCRIPCION';
 
 export class FacturacionNoDisponibleError extends Error {
   constructor(
@@ -63,10 +63,10 @@ export type PeticionCheckout = {
 
 /** Crea la sesión de Checkout y devuelve la URL a la que hay que redirigir. */
 export async function crearSesionCheckout(peticion: PeticionCheckout): Promise<string> {
-  if (esBeta()) {
+  if (!stripeCheckoutHabilitado()) {
     throw new FacturacionNoDisponibleError(
-      'BETA',
-      'Durante la beta todas las cuentas son gratuitas y sin límites; todavía no hay planes de pago que contratar.',
+      'PAGOS_NO_CONFIGURADOS',
+      'Los pagos en línea todavía no están disponibles; contáctanos para activar o renovar tu cuenta.',
     );
   }
 
@@ -108,6 +108,13 @@ export async function crearSesionCheckout(peticion: PeticionCheckout): Promise<s
 
 /** Abre el Customer Portal: cambio de plan, tarjeta y cancelación viven ahí. */
 export async function crearSesionPortal(userId: string): Promise<string> {
+  if (!stripeCheckoutHabilitado()) {
+    throw new FacturacionNoDisponibleError(
+      'PAGOS_NO_CONFIGURADOS',
+      'Los pagos en línea todavía no están disponibles; contáctanos para activar o renovar tu cuenta.',
+    );
+  }
+
   const estado = await estadoSuscripcion(userId);
   if (!estado.stripeCustomerId) {
     throw new FacturacionNoDisponibleError(

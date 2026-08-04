@@ -36,6 +36,8 @@ export type SuscripcionApi = {
   estado: 'ACTIVE' | 'TRIALING' | 'PAST_DUE' | 'CANCELED' | 'UNPAID';
   modo: 'beta' | 'produccion';
   periodo_fin: string | null;
+  acceso_expira: string | null;
+  contacto_renovacion: string;
   cancela_al_final: boolean;
   pagos_habilitados: boolean;
   tiene_suscripcion_stripe: boolean;

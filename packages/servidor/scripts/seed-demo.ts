@@ -20,6 +20,8 @@
 import { PrismaClient } from '@prisma/client';
 import { hash } from 'bcryptjs';
 
+import { calcularExpiracionInicial } from '@nutria/shared';
+
 const prisma = new PrismaClient();
 
 const PASSWORD = process.env.DEMO_PASSWORD ?? 'demo-nutria-2026';
@@ -59,6 +61,7 @@ async function main(): Promise<void> {
 
   const passwordHash = await hash(PASSWORD, 12);
   const ahora = new Date();
+  const accessExpiresAt = calcularExpiracionInicial(ahora);
 
   // --- Nutriólogo ---------------------------------------------------------
   const nutriologo = await prisma.user.upsert({
@@ -75,7 +78,7 @@ async function main(): Promise<void> {
       nutritionistProfile: {
         create: { nombreCompleto: `${ETIQUETA} Nutrióloga Demo`, marcaNombre: 'Consultorio Demo' },
       },
-      subscription: { create: {} },
+      subscription: { create: { plan: 'PRO', accessExpiresAt } },
     },
     select: { id: true },
   });
@@ -89,7 +92,7 @@ async function main(): Promise<void> {
   await prisma.subscription.upsert({
     where: { userId: nutriologo.id },
     update: {},
-    create: { userId: nutriologo.id },
+    create: { userId: nutriologo.id, plan: 'PRO', accessExpiresAt },
   });
 
   // --- Cuenta del paciente -----------------------------------------------
@@ -175,7 +178,12 @@ async function main(): Promise<void> {
     select: { id: true },
   });
 
-  const comidas: { orden: number; nombre: string; horario: string; items: [string, number, number, number, number][] }[] = [
+  const comidas: {
+    orden: number;
+    nombre: string;
+    horario: string;
+    items: [string, number, number, number, number][];
+  }[] = [
     {
       orden: 1,
       nombre: 'Desayuno',

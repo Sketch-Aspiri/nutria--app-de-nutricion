@@ -27,8 +27,10 @@ datos reales de pacientes.
   integración elimina cuerpo, correo, UUID, breadcrumbs y contexto libre.
 - Upstash: usar una base regional separada por ambiente para rate limiting.
 - Neon: usar conexión pooled para runtime y directa para migraciones.
-- Stripe: mantener `BILLING_MODE=beta` durante el piloto. Activar cobro solo con
-  precios/webhook productivos verificados.
+- Suscripción: mantener `BILLING_MODE=produccion`, definir
+  `BILLING_CONTACT_EMAIL` y usar `STRIPE_CHECKOUT_ENABLED=false` durante la
+  operación manual. Activar Checkout solo con precios/webhook productivos
+  verificados y después de migrar las cuentas manuales que correspondan.
 
 ## Rotación y recuperación
 

@@ -241,23 +241,39 @@ GET    /api/v1/health
 
 ---
 
-## 9. Suscripciones y facturación con Stripe
+## 9. Acceso Pro, activación manual y facturación futura con Stripe
 
 ### Planes
 
 | Plan | Precio | Incluye |
 |---|---|---|
-| **Free** | $0 | 3 pacientes activos, 15 generaciones IA/mes, sin PDF marca blanca |
 | **Pro** | $499 MXN/mes o $4,990 MXN/año | Pacientes ilimitados, 150 IA/mes, PDF marca blanca, plantillas ilimitadas |
 | **Clínica** | $1,299 MXN/mes | 3 asientos de nutriólogo, 500 IA/mes compartidas (V2 lo deja definido en Stripe; multi-asiento real en V2.1) |
 
-### Implementación
+### Etapa comercial interina: activación manual
+
+- El registro público crea una cuenta Pro con un mes gratuito desde la fecha original de alta.
+- `subscriptions.access_expires_at` es la autoridad de acceso. Al vencer, el panel y la API quedan bloqueados sin borrar datos.
+- El rol interno `SUPERADMIN` renueva desde `/superadmin/nutriologas`; cada activación abre un ciclo de un mes desde ese instante, guarda el último actor/fecha/nota y agrega un evento inmutable a `audit_logs` sin copiar la nota de pago.
+- Una cuenta vinculada a una suscripción Stripe no admite activación manual. Los webhooks conservan la vigencia local cuando un evento histórico intentaría recortarla.
+- `BILLING_MODE=produccion` aplica el tope real de 150 generaciones de IA al mes. `STRIPE_CHECKOUT_ENABLED=false` mantiene el checkout cerrado aunque existan credenciales técnicas, y la página indica el contacto de renovación.
+- El valor `FREE` permanece temporalmente en el enum por seguridad de migración, pero no se asigna a cuentas nuevas ni aparece como plan contratable.
+
+Promoción única de la cuenta propietaria, ejecutada desde la raíz contra la base deseada:
+
+```bash
+npm run db:promote-superadmin --workspace apps/web/nutriologos -- aspiriandres97@gmail.com
+```
+
+Después hay que cerrar y volver a iniciar sesión para que el JWT incorpore el rol.
+
+### Stripe cuando el negocio escale
 
 1. Productos/precios creados en Stripe (MXN, IVA con **Stripe Tax** activado), `price_id`s en variables de entorno.
 2. **Stripe Checkout** (modo subscription, con `trial_period_days: 14` en Pro) desde `POST /api/v1/billing/checkout`; `customer` ligado a `users.id` vía `metadata` + `subscriptions.stripe_customer_id`.
 3. **Customer Portal** de Stripe para cambiar plan/tarjeta/cancelar (`POST /api/v1/billing/portal`) — cero UI propia de gestión de tarjetas.
-4. **Webhook** `/api/webhooks/stripe` (verificación de firma, idempotente por `event.id`): `checkout.session.completed`, `customer.subscription.updated|deleted`, `invoice.paid`, `invoice.payment_failed` → actualizan `subscriptions`. Es la **única** fuente de verdad del plan.
-5. **Gate de features** en servidor: helper `getEntitlements(userId)` consultado por los handlers (crear paciente #4 en Free → `402 PLAN_LIMIT`; IA → límite de `ai_usage`). Nunca solo en el frontend.
+4. **Webhook** `/api/webhooks/stripe` (verificación de firma, idempotente por `event.id`): `checkout.session.completed`, `customer.subscription.updated|deleted`, `invoice.paid`, `invoice.payment_failed` → actualizan `subscriptions`, incluida la fecha de acceso. Es una de las dos escrituras autorizadas junto con la activación manual auditada.
+5. **Gate de features** en servidor: helper `getEntitlements(userId)` consultado por los handlers; IA aplica el límite de `ai_usage`. Nunca solo en el frontend.
 6. Modo test end-to-end con tarjetas de prueba + `stripe listen` local; en Vercel, webhook apuntando al dominio de producción y otro endpoint de test en preview.
 7. **CFDI** (factura fiscal mexicana de la suscripción): V2 emite recibos de Stripe; timbrado CFDI 4.0 vía Facturapi queda para V2.1 (documentado como decisión). El módulo `invoices` (cobros del nutriólogo a sus pacientes) permanece como registro manual de cobros en V2; cobro con link de pago Stripe Connect es V3.
 
@@ -275,7 +291,7 @@ La V2 se considera lista cuando estos journeys pasan en CI contra un preview dep
 5. **Seguimiento**: sembrar meal_logs del paciente → panel muestra adherencia/racha correctas → nutriólogo comenta una comida.
 6. **Agenda**: crear cita → aparece en la vista semanal → cancelarla → estado correcto (+ recordatorio por email vía cron, assert sobre outbox de test).
 7. **Mensajes**: enviar mensaje → aparece para el paciente (segunda sesión) → sugerencia IA de respuesta.
-8. **Suscripción**: Free llega al límite de 3 pacientes → paywall → checkout Stripe test → webhook actualiza a Pro → el límite desaparece; cancelación → vuelve a Free al fin del periodo.
+8. **Suscripción**: registro con mes Pro → vencimiento bloquea panel/API → superadmin activa un mes → el acceso se restaura; Stripe se cubre aparte cuando se habilite.
 9. **Aislamiento de datos (seguridad)**: nutriólogo B no puede ver/editar pacientes de A ni por URL directa ni por API (espera 404).
 10. **Límite de IA**: agotar cuota → `AI_LIMIT_REACHED` + CTA upgrade.
 

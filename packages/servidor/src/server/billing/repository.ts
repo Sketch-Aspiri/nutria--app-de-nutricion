@@ -1,11 +1,13 @@
 import type { SubscriptionPlan, SubscriptionStatus } from '@prisma/client';
 
+import { calcularEstadoCuenta, calcularExpiracionInicial } from '@nutria/shared';
+
 import { prisma } from '@/server/db';
 
 /**
- * Escrituras sobre `subscriptions`. Solo el webhook de Stripe llama a
- * `aplicarEstadoStripe`: el plan de un usuario no se cambia desde un handler
- * del panel, porque entonces la verdad estaría en dos lugares.
+ * Escrituras sobre `subscriptions`. El webhook de Stripe y la activación manual
+ * del superadmin son las dos escrituras sancionadas. La segunda siempre queda
+ * auditada con `lastActivatedAt` y `lastActivatedByUserId`.
  */
 
 export type EstadoStripe = {
@@ -18,20 +20,30 @@ export type EstadoStripe = {
   cancelAtPeriodEnd: boolean;
 };
 
+async function expiracionInicialDelUsuario(userId: string): Promise<Date> {
+  const usuario = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { createdAt: true },
+  });
+  if (!usuario) throw new Error(`No existe el usuario de la suscripción: ${userId}`);
+  return calcularExpiracionInicial(usuario.createdAt);
+}
+
 /** Garantiza que el usuario tenga fila. El alta ya la crea; esto cubre el resto. */
 export async function asegurarSuscripcion(userId: string) {
+  const accessExpiresAt = await expiracionInicialDelUsuario(userId);
   return prisma.subscription.upsert({
     where: { userId },
-    create: { userId },
+    create: { userId, plan: 'PRO', accessExpiresAt },
     update: {},
   });
 }
 
 export async function guardarCustomerId(userId: string, stripeCustomerId: string) {
-  return prisma.subscription.upsert({
+  await asegurarSuscripcion(userId);
+  return prisma.subscription.update({
     where: { userId },
-    create: { userId, stripeCustomerId },
-    update: { stripeCustomerId },
+    data: { stripeCustomerId },
   });
 }
 
@@ -43,10 +55,36 @@ export async function guardarCustomerId(userId: string, stripeCustomerId: string
  * de la sesión de checkout y de la suscripción.
  */
 export async function aplicarEstadoStripe(userId: string, estado: EstadoStripe) {
-  return prisma.subscription.upsert({
-    where: { userId },
-    create: { userId, ...estado },
-    update: estado,
+  await asegurarSuscripcion(userId);
+
+  return prisma.$transaction(async (tx) => {
+    // Serializa esta decisión con la activación manual. La lectura debe ocurrir
+    // después del lock para que un webhook nunca calcule sobre una vigencia vieja.
+    await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT "id" FROM "subscriptions" WHERE "user_id" = ${userId}::uuid FOR UPDATE
+    `;
+    const existente = await tx.subscription.findUniqueOrThrow({ where: { userId } });
+    const expiracionStripe = estado.currentPeriodEnd;
+    const conservaAccesoLocal =
+      calcularEstadoCuenta(existente.accessExpiresAt) === 'ACTIVA' &&
+      (!expiracionStripe || existente.accessExpiresAt.getTime() > expiracionStripe.getTime());
+    const accessExpiresAt = conservaAccesoLocal
+      ? existente.accessExpiresAt
+      : (expiracionStripe ?? existente.accessExpiresAt);
+    const estadoBloqueante = estado.status === 'CANCELED' || estado.status === 'UNPAID';
+
+    return tx.subscription.update({
+      where: { userId },
+      data: {
+        ...estado,
+        plan: conservaAccesoLocal ? existente.plan : estado.plan,
+        status:
+          estadoBloqueante && calcularEstadoCuenta(accessExpiresAt) === 'ACTIVA'
+            ? 'ACTIVE'
+            : estado.status,
+        accessExpiresAt,
+      },
+    });
   });
 }
 

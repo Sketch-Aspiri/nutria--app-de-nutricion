@@ -7,12 +7,14 @@ declare module 'next-auth' {
       id: string;
       role: UserRole;
       emailVerificado: boolean;
+      cuentaActiva: boolean;
     } & DefaultSession['user'];
   }
 
   interface User {
     role?: UserRole;
     emailVerified?: Date | null;
+    cuentaActiva?: boolean;
   }
 }
 
@@ -23,5 +25,6 @@ declare module '@auth/core/jwt' {
     userId?: string;
     role?: UserRole;
     emailVerificado?: boolean;
+    cuentaActiva?: boolean;
   }
 }

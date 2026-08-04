@@ -25,6 +25,7 @@
     "db:encrypt:check": "tsx ../../../packages/servidor/scripts/encrypt-clinical-data.ts",
     "launch:check": "tsx --env-file=.env ../../../packages/servidor/scripts/check-production-readiness.ts",
     "pilot:status": "tsx --env-file=.env ../../../packages/servidor/scripts/pilot-status.ts",
+    "db:promote-superadmin": "tsx --env-file=.env ../../../packages/servidor/scripts/promote-superadmin.ts",
     "test:load": "tsx ../../../packages/servidor/scripts/load/smoke.ts",
     "test:load:k6": "k6 run ../../../packages/servidor/scripts/load/k6-smoke.js",
     "postinstall": "prisma generate --schema ../../../packages/servidor/prisma/schema.prisma",

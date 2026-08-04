@@ -24,6 +24,7 @@ datasource db {
 enum UserRole {
   NUTRITIONIST @map("nutritionist")
   ADMIN        @map("admin")
+  SUPERADMIN   @map("superadmin")
   END_USER     @map("end_user")
 
   @@map("user_role")
@@ -166,22 +167,23 @@ model User {
   updatedAt               DateTime  @updatedAt @map("updated_at")
   deletedAt               DateTime? @map("deleted_at")
 
-  accounts             Account[]
-  sessions             Session[]
-  nutritionistProfile  NutritionistProfile?
-  subscription         Subscription?
-  aiUsage              AiUsage[]
-  patients             Patient[]             @relation("NutritionistPatients")
-  patientAccount       Patient?              @relation("PatientAccount")
-  planTemplates        PlanTemplate[]
-  recipes              Recipe[]
-  appointments         Appointment[]
-  messages             Message[]
-  invoices             Invoice[]
-  foods                Food[]
-  auditLogs            AuditLog[]
-  emailTokens          EmailVerificationToken[]
-  passwordResetTokens  PasswordResetToken[]
+  accounts               Account[]
+  sessions               Session[]
+  nutritionistProfile    NutritionistProfile?
+  subscription           Subscription?          @relation("SubscriptionOwner")
+  activatedSubscriptions Subscription[]         @relation("SubscriptionActivator")
+  aiUsage                AiUsage[]
+  patients               Patient[]              @relation("NutritionistPatients")
+  patientAccount         Patient?               @relation("PatientAccount")
+  planTemplates          PlanTemplate[]
+  recipes                Recipe[]
+  appointments           Appointment[]
+  messages               Message[]
+  invoices               Invoice[]
+  foods                  Food[]
+  auditLogs              AuditLog[]
+  emailTokens            EmailVerificationToken[]
+  passwordResetTokens    PasswordResetToken[]
 
   @@map("users")
 }
@@ -216,15 +218,22 @@ model Subscription {
   stripeSubscriptionId String?            @unique @map("stripe_subscription_id")
   /** Precio contratado en Stripe; distingue Pro mensual de Pro anual al mostrar el plan. */
   stripePriceId        String?            @map("stripe_price_id")
-  plan                 SubscriptionPlan   @default(FREE)
+  plan                 SubscriptionPlan   @default(PRO)
   status               SubscriptionStatus @default(ACTIVE)
   currentPeriodEnd     DateTime?          @map("current_period_end")
   cancelAtPeriodEnd    Boolean            @default(false) @map("cancel_at_period_end")
+  accessExpiresAt      DateTime           @map("access_expires_at")
+  lastActivatedAt      DateTime?          @map("last_activated_at")
+  lastActivatedByUserId String?            @map("last_activated_by_user_id") @db.Uuid
+  activationNote       String?            @map("activation_note")
   createdAt            DateTime           @default(now()) @map("created_at")
   updatedAt            DateTime           @updatedAt @map("updated_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user            User  @relation("SubscriptionOwner", fields: [userId], references: [id], onDelete: Cascade)
+  lastActivatedBy User? @relation("SubscriptionActivator", fields: [lastActivatedByUserId], references: [id], onDelete: SetNull)
 
+  @@index([accessExpiresAt])
+  @@index([lastActivatedByUserId])
   @@map("subscriptions")
 }
 

@@ -58,16 +58,15 @@ export function traducirSuscripcion(sub: Stripe.Subscription): EstadoStripe {
   // campaña) no puede degradar a alguien que sí está pagando: se asume Pro, el
   // plan de pago base, y queda el `stripe_price_id` para diagnosticarlo.
   const planDelPrecio = planDelPriceId(priceId);
-  const plan: SubscriptionPlan =
-    planDelPrecio ?? (status === 'CANCELED' || status === 'UNPAID' ? 'FREE' : 'PRO');
+  const plan: SubscriptionPlan = planDelPrecio ?? 'PRO';
 
   return {
     stripeCustomerId: typeof sub.customer === 'string' ? sub.customer : sub.customer.id,
     stripeSubscriptionId: sub.id,
     stripePriceId: priceId,
-    // Una suscripción cancelada vuelve a Free: guardar el plan contratado con
-    // estado `CANCELED` obligaría a que cada lector recordara degradarlo.
-    plan: status === 'CANCELED' || status === 'UNPAID' ? 'FREE' : plan,
+    // El plan contratado se conserva para auditoría. El estado y la expiración
+    // deciden el acceso; `FREE` queda en el enum solo por compatibilidad.
+    plan,
     status,
     currentPeriodEnd: finDePeriodo(sub),
     cancelAtPeriodEnd: sub.cancel_at_period_end === true,
@@ -75,9 +74,7 @@ export function traducirSuscripcion(sub: Stripe.Subscription): EstadoStripe {
 }
 
 /** El `user_id` viaja en la metadata desde que se crea la sesión de checkout. */
-export function userIdDeMetadata(
-  metadata: Stripe.Metadata | null | undefined,
-): string | undefined {
+export function userIdDeMetadata(metadata: Stripe.Metadata | null | undefined): string | undefined {
   const valor = metadata?.user_id?.trim();
   return valor ? valor : undefined;
 }

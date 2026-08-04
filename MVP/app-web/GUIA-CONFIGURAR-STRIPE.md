@@ -2,12 +2,10 @@
 
 Todo el código ya está listo. Esto es lo que **tú** tienes que hacer, y en qué orden.
 
-> **Antes de empezar: no hace falta nada de esto para seguir usando la app.**
-> Con `BILLING_MODE=beta` (el valor por omisión) todas las cuentas son Free y sin
-> límites: pacientes, plantillas y generaciones de IA ilimitadas, y PDF con tu
-> marca incluido. La página **Suscripción** muestra los planes como
-> "próximamente". Puedes hacer los pasos 1–6 tranquilamente y activar el cobro
-> (paso 7) cuando termine el piloto.
+> **La operación actual es manual.** Mantén `BILLING_MODE=produccion` y
+> `STRIPE_CHECKOUT_ENABLED=false`: las cuentas nuevas reciben un mes de Pro y el
+> superadministrador renueva meses desde su panel después de confirmar el pago.
+> Las llaves de Stripe pueden configurarse y probarse sin abrir Checkout al público.
 
 ---
 
@@ -65,7 +63,9 @@ y en las variables de entorno de Vercel.
 En `apps/web/nutriologos/.env` (créalo copiando `apps/web/nutriologos/.env.example` si aún no existe):
 
 ```bash
-BILLING_MODE=beta
+BILLING_MODE=produccion
+BILLING_CONTACT_EMAIL=aspiriandres97@gmail.com
+STRIPE_CHECKOUT_ENABLED=false
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_PRICE_PRO_MENSUAL=price_...
 STRIPE_PRICE_PRO_ANUAL=price_...
@@ -103,10 +103,10 @@ Necesitas la CLI de Stripe para que los webhooks lleguen a tu máquina.
    `whsec_...` a `STRIPE_WEBHOOK_SECRET` en `apps/web/nutriologos/.env`.** Es distinto del
    secreto de producción; cada endpoint tiene el suyo.
 
-4. **Pon el cobro en marcha temporalmente** para poder probarlo. En `.env`:
+4. **Abre Checkout temporalmente** para poder probarlo. En `.env`:
 
    ```bash
-   BILLING_MODE=produccion
+   STRIPE_CHECKOUT_ENABLED=true
    ```
 
 5. **Levanta la app** en otra terminal:
@@ -139,8 +139,8 @@ Necesitas la CLI de Stripe para que los webhooks lleguen a tu máquina.
    `4000 0000 0000 0341`: el estado debe quedar en *Pago pendiente* sin que
    pierdas el acceso.
 
-9. **Vuelve a `BILLING_MODE=beta`** cuando termines de probar, si el piloto sigue
-   en curso.
+9. **Vuelve a `STRIPE_CHECKOUT_ENABLED=false`** cuando termines. La operación
+   manual permanece activa con `BILLING_MODE=produccion`.
 
 ## Paso 7 — Producción (cuando decidas empezar a cobrar)
 
@@ -165,6 +165,8 @@ Necesitas la CLI de Stripe para que los webhooks lleguen a tu máquina.
 
    ```
    BILLING_MODE=produccion
+   BILLING_CONTACT_EMAIL=aspiriandres97@gmail.com
+   STRIPE_CHECKOUT_ENABLED=true
    STRIPE_SECRET_KEY=sk_live_...
    STRIPE_WEBHOOK_SECRET=whsec_...        (el del endpoint de producción)
    STRIPE_PRICE_PRO_MENSUAL=price_...     (los de modo real)
@@ -173,8 +175,8 @@ Necesitas la CLI de Stripe para que los webhooks lleguen a tu máquina.
    APP_URL=https://<tu-dominio>
    ```
 
-   Para **Preview** deja `BILLING_MODE=beta` y las llaves de prueba: no quieres
-   que un deploy de rama cobre a nadie.
+   Para **Preview** mantén `BILLING_MODE=produccion`, usa llaves de prueba y deja
+   `STRIPE_CHECKOUT_ENABLED=false`: no quieres que un deploy de rama cobre a nadie.
 5. **Redespliega** para que tome las variables nuevas.
 6. **Personaliza la marca del checkout**: **Settings → Branding** (logo, color,
    nombre del negocio). Es lo que verá el nutriólogo al pagar.
@@ -191,22 +193,26 @@ Necesitas la CLI de Stripe para que los webhooks lleguen a tu máquina.
 
 | Variable | Para qué |
 |---|---|
-| `BILLING_MODE` | `beta` = todo gratis y sin límites. `produccion` = topes de Free y cobro activos. |
-| `STRIPE_SECRET_KEY` | Crear sesiones de checkout y de portal. Sin ella, ambos responden 503. |
+| `BILLING_MODE` | `produccion` activa los límites reales de Pro; `beta` queda solo para desarrollo excepcional. |
+| `BILLING_CONTACT_EMAIL` | Contacto que se muestra para solicitar la renovación manual. |
+| `STRIPE_CHECKOUT_ENABLED` | Único interruptor que abre Checkout/Portal. Debe ser exactamente `true`. |
+| `STRIPE_SECRET_KEY` | Permite crear sesiones cuando el interruptor está activo. Por sí sola no abre Checkout. |
 | `STRIPE_WEBHOOK_SECRET` | Verificar la firma del webhook. Sin ella, el webhook responde 503 y nada cambia de plan. |
 | `STRIPE_PRICE_*` | Qué precio contratar. Un plan sin su price id aparece como "próximamente". |
 | `APP_URL` | A dónde regresa Stripe tras el pago. |
 
 ## Cosas que conviene tener claras
 
-- **El plan de un usuario solo lo cambia el webhook.** Ni el panel ni un endpoint
-  del panel escriben el plan. Si quieres regalarle Pro a alguien, hazlo desde el
-  dashboard de Stripe (crea una suscripción para su customer, o aplica un cupón
-  del 100 %) y el webhook se encarga.
+- **Mientras Checkout esté cerrado, el acceso lo renueva el superadministrador.**
+  Cada activación agrega un mes desde hoy y deja bitácora. Una cuenta vinculada a
+  una suscripción de Stripe no puede renovarse manualmente para evitar dos fuentes
+  de verdad.
+- **Cuando Checkout se habilite, Stripe administra esas cuentas.** Los webhooks
+  respetan una vigencia manual más larga y adoptan una vigencia posterior de Stripe.
 - **Los topes se aplican en el servidor**, no escondiendo botones. Un nutriólogo
   con la sesión en la mano y `curl` recibe el mismo 402.
-- **Los límites de Free** cuando salgas de beta: 3 pacientes activos, 15
-  generaciones de IA al mes, sin PDF con marca propia, 3 plantillas.
+- **No hay plan Free en la operación actual.** Una cuenta vencida queda bloqueada;
+  una cuenta activa conserva los límites configurados para Pro.
 - **CFDI 4.0** (factura fiscal timbrada) no está: Stripe emite recibos. El
   timbrado con Facturapi quedó documentado como V2.1.
 - **Los precios están en el código** (`packages/shared/src/suscripcion/planes.ts`)

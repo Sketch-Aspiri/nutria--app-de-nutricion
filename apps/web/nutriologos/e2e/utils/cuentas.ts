@@ -2,6 +2,8 @@ import { PrismaClient } from '@prisma/client';
 import type { Page } from '@playwright/test';
 import { hash } from 'bcryptjs';
 
+import { calcularExpiracionInicial } from '@nutria/shared';
+
 import { sembrarSesion } from './sesion';
 
 /**
@@ -20,6 +22,8 @@ export type CuentaPrueba = {
   id: string;
   email: string;
   nombre: string;
+  role?: 'NUTRITIONIST' | 'SUPERADMIN';
+  cuentaActiva?: boolean;
 };
 
 /** Correo único por corrida para que dos ejecuciones no colisionen. */
@@ -40,12 +44,20 @@ export async function crearNutriologo(prefijo: string, nombre: string): Promise<
       role: 'NUTRITIONIST',
       emailVerified: new Date(),
       nutritionistProfile: { create: { nombreCompleto: nombre } },
-      subscription: { create: {} },
+      subscription: {
+        create: { plan: 'PRO', accessExpiresAt: calcularExpiracionInicial(new Date()) },
+      },
     },
     select: { id: true },
   });
 
-  return { id: usuario.id, email, nombre };
+  return { id: usuario.id, email, nombre, role: 'NUTRITIONIST', cuentaActiva: true };
+}
+
+export async function crearSuperadmin(prefijo: string, nombre: string): Promise<CuentaPrueba> {
+  const cuenta = await crearNutriologo(prefijo, nombre);
+  await prisma.user.update({ where: { id: cuenta.id }, data: { role: 'SUPERADMIN' } });
+  return { ...cuenta, role: 'SUPERADMIN', cuentaActiva: true };
 }
 
 /** El borrado en cascada arrastra pacientes, expedientes y mediciones. */

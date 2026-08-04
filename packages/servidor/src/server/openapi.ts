@@ -10,6 +10,7 @@ import {
 } from '@/server/plans/schemas';
 import { generarSchema } from '@/server/ai/schemas';
 import { checkoutSchema } from '@/server/billing/schemas';
+import { activarNutriologaSchema } from '@/server/admin/nutritionists';
 import { createConsultationNoteSchema } from '@/server/consultations/schemas';
 import { actualizarPerfilSchema } from '@/server/profile/schemas';
 
@@ -222,6 +223,8 @@ const suscripcionSchema = z
     estado: z.enum(['ACTIVE', 'TRIALING', 'PAST_DUE', 'CANCELED', 'UNPAID']),
     modo: z.enum(['beta', 'produccion']),
     periodo_fin: fechaHora.nullable(),
+    acceso_expira: fechaHora.nullable(),
+    contacto_renovacion: z.email(),
     cancela_al_final: z.boolean(),
     pagos_habilitados: z.boolean(),
     tiene_suscripcion_stripe: z.boolean(),
@@ -234,6 +237,30 @@ const suscripcionSchema = z
     catalogo: z.array(planCatalogoSchema),
   })
   .meta({ id: 'Suscripcion' });
+
+const nutriologaAdminSchema = z
+  .object({
+    id: uuid,
+    nombre: z.string(),
+    email: z.email(),
+    fecha_registro: fechaHora,
+    plan: z.enum(['FREE', 'PRO', 'CLINICA']),
+    estado_cuenta: z.enum(['ACTIVA', 'BLOQUEADA']),
+    acceso_expira: fechaHora.nullable(),
+    primer_mes_gratis: z.boolean(),
+    ultima_activacion: fechaHora.nullable(),
+    nota_activacion: z.string().nullable(),
+    gestionada_por_stripe: z.boolean(),
+  })
+  .meta({ id: 'NutriologaAdmin' });
+
+const listaNutriologasAdminSchema = z.object({
+  data: z.array(nutriologaAdminSchema),
+  meta: metaPaginacionSchema.extend({
+    activas: z.number().int(),
+    bloqueadas: z.number().int(),
+  }),
+});
 
 const urlStripeSchema = z.object({ url: z.url() }).meta({ id: 'UrlStripe' });
 
@@ -348,7 +375,7 @@ export const openApiDocument = createDocument({
           '200': respuesta('URL de la sesión de checkout', urlStripeSchema),
           '400': respuesta('JSON inválido o validación fallida', errorSchema),
           '409': respuesta(
-            'Beta comercial o plan sin precio configurado (BILLING_NOT_AVAILABLE)',
+            'Pagos en línea no configurados o plan sin precio (BILLING_NOT_AVAILABLE)',
             errorSchema,
           ),
           '503': respuesta('Falta STRIPE_SECRET_KEY (BILLING_NOT_CONFIGURED)', errorSchema),
@@ -362,8 +389,37 @@ export const openApiDocument = createDocument({
         summary: 'Abre el Customer Portal de Stripe',
         responses: {
           '200': respuesta('URL del portal de facturación', urlStripeSchema),
-          '409': respuesta('El usuario no tiene suscripción de pago (BILLING_NOT_AVAILABLE)', errorSchema),
+          '409': respuesta(
+            'El usuario no tiene suscripción de pago (BILLING_NOT_AVAILABLE)',
+            errorSchema,
+          ),
           '503': respuesta('Falta STRIPE_SECRET_KEY (BILLING_NOT_CONFIGURED)', errorSchema),
+          ...erroresComunes,
+        },
+      },
+    },
+    '/api/v1/admin/nutritionists': {
+      get: {
+        tags: ['Superadmin'],
+        summary: 'Lista las cuentas de nutriólogas y su vigencia',
+        requestParams: { query: paginacion },
+        responses: {
+          '200': respuesta('Nutriólogas paginadas', listaNutriologasAdminSchema),
+          ...erroresComunes,
+        },
+      },
+    },
+    '/api/v1/admin/nutritionists/{id}/activate': {
+      post: {
+        tags: ['Superadmin'],
+        summary: 'Activa una cuenta Pro durante un mes desde este momento',
+        requestParams: { path: idPath },
+        requestBody: { required: true, content: json(activarNutriologaSchema) },
+        responses: {
+          '200': respuesta('Cuenta activada', nutriologaAdminSchema),
+          '400': respuesta('JSON inválido o validación fallida', errorSchema),
+          '404': respuesta('Nutrióloga no encontrada', errorSchema),
+          '409': respuesta('La cuenta se gestiona mediante Stripe', errorSchema),
           ...erroresComunes,
         },
       },

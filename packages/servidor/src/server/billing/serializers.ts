@@ -1,6 +1,6 @@
 import { CATALOGO_PLANES, type CuotaIA, type LimiteUso } from '@nutria/shared';
 
-import { priceIdDe, stripeConfigurado } from './config';
+import { priceIdDe, stripeCheckoutHabilitado } from './config';
 import type { EntitlementsConEstado } from './entitlements';
 
 /**
@@ -34,8 +34,10 @@ export type SuscripcionApi = {
   estado: string;
   modo: string;
   periodo_fin: string | null;
+  acceso_expira: string | null;
+  contacto_renovacion: string;
   cancela_al_final: boolean;
-  /** El checkout y el portal solo existen si hay llave de Stripe y no es beta. */
+  /** El checkout y el portal solo existen si hay llave de Stripe. */
   pagos_habilitados: boolean;
   tiene_suscripcion_stripe: boolean;
   entitlements: {
@@ -58,13 +60,15 @@ function limite(uso: LimiteUso): LimiteUsoApi {
 
 export function serializarSuscripcion(entitlements: EntitlementsConEstado): SuscripcionApi {
   const { suscripcion } = entitlements;
-  const pagosHabilitados = entitlements.modo === 'produccion' && stripeConfigurado();
+  const pagosHabilitados = stripeCheckoutHabilitado();
 
   return {
     plan: entitlements.plan,
     estado: entitlements.estado,
     modo: entitlements.modo,
     periodo_fin: suscripcion.periodoFin?.toISOString() ?? null,
+    acceso_expira: suscripcion.accesoExpira?.toISOString() ?? null,
+    contacto_renovacion: process.env.BILLING_CONTACT_EMAIL?.trim() || 'aspiriandres97@gmail.com',
     cancela_al_final: suscripcion.cancelaAlFinal,
     pagos_habilitados: pagosHabilitados,
     tiene_suscripcion_stripe: suscripcion.stripeSubscriptionId !== null,
@@ -74,7 +78,7 @@ export function serializarSuscripcion(entitlements: EntitlementsConEstado): Susc
       ia: entitlements.ia,
       marca_blanca: entitlements.marcaBlanca,
     },
-    catalogo: CATALOGO_PLANES.map((plan) => ({
+    catalogo: CATALOGO_PLANES.filter((plan) => plan.clave !== 'FREE').map((plan) => ({
       clave: plan.clave,
       nombre: plan.nombre,
       descripcion: plan.descripcion,
@@ -88,7 +92,6 @@ export function serializarSuscripcion(entitlements: EntitlementsConEstado): Susc
       // Un plan sin `price_id` configurado en el servidor no se puede contratar
       // aunque Stripe esté listo: el checkout fallaría al llegar a la pasarela.
       contratable:
-        plan.clave !== 'FREE' &&
         pagosHabilitados &&
         plan.precios.some((p) => priceIdDe(plan.clave, p.periodo) !== undefined),
     })),

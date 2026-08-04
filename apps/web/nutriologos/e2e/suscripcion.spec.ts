@@ -45,7 +45,11 @@ async function fijarSuscripcion(
 ): Promise<void> {
   await prisma.subscription.upsert({
     where: { userId },
-    create: { userId, ...datos },
+    create: {
+      userId,
+      accessExpiresAt: datos.currentPeriodEnd ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      ...datos,
+    },
     update: { ...datos },
   });
 }
@@ -141,14 +145,18 @@ test.describe('Flujo #8 — suscripción, cupo del plan y paywall', () => {
     await iniciarSesion(page, cuenta);
 
     await page.goto('/pacientes');
-    await page.getByRole('button', { name: /Nuevo paciente/i }).first().click();
-    await page.getByLabel(/Nombre/i).first().fill('Paciente Paywall E2E');
+    await page
+      .getByRole('button', { name: /Nuevo paciente/i })
+      .first()
+      .click();
+    await page
+      .getByLabel(/Nombre/i)
+      .first()
+      .fill('Paciente Paywall E2E');
     for (let i = 0; i < 3; i += 1) {
       await page.getByRole('button', { name: 'Siguiente' }).click();
     }
-    await page
-      .getByLabel(/Confirmo que entregué al paciente el aviso de privacidad/i)
-      .check();
+    await page.getByLabel(/Confirmo que entregué al paciente el aviso de privacidad/i).check();
     await page.getByRole('button', { name: 'Crear paciente' }).click();
 
     // Next.js monta su propio `role="alert"` para anunciar rutas; se filtra por

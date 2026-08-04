@@ -1,14 +1,19 @@
+import { calcularExpiracionInicial } from '@nutria/shared';
+
 import { prisma } from '@/server/db';
 
 /**
  * Toda cuenta de nutriólogo necesita perfil (para la marca blanca) y una
- * suscripción en plan Free. Se ejecuta tanto en el alta con contraseña como
+ * suscripción Pro con un mes de acceso gratuito. Se ejecuta tanto en el alta con contraseña como
  * en el primer inicio de sesión con Google, por eso es idempotente.
  */
 export async function asegurarCuentaNutriologo(
   userId: string,
   nombreCompleto: string,
+  fechaRegistro: Date = new Date(),
 ): Promise<void> {
+  const accessExpiresAt = calcularExpiracionInicial(fechaRegistro);
+
   await prisma.$transaction([
     prisma.nutritionistProfile.upsert({
       where: { userId },
@@ -18,7 +23,7 @@ export async function asegurarCuentaNutriologo(
     prisma.subscription.upsert({
       where: { userId },
       update: {},
-      create: { userId },
+      create: { userId, plan: 'PRO', accessExpiresAt },
     }),
   ]);
 }

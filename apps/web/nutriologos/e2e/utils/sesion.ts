@@ -51,8 +51,9 @@ export async function sembrarSesion(context: BrowserContext, cuenta: CuentaPrueb
     token: {
       sub: cuenta.id,
       userId: cuenta.id,
-      role: 'NUTRITIONIST',
+      role: cuenta.role ?? 'NUTRITIONIST',
       emailVerificado: true,
+      cuentaActiva: cuenta.cuentaActiva ?? true,
       name: cuenta.nombre,
       email: cuenta.email,
     },

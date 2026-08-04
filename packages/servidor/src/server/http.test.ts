@@ -9,6 +9,7 @@ import {
   jsonError,
   jsonList,
   jsonOk,
+  origenPermitido,
   parsePagination,
   zodDetails,
 } from './http';
@@ -19,6 +20,29 @@ describe('jsonOk', () => {
 
     expect(respuesta.status).toBe(200);
     await expect(respuesta.json()).resolves.toEqual({ id: 'abc', nombre: 'Ana' });
+  });
+});
+
+describe('origenPermitido', () => {
+  it('acepta el mismo origen y clientes sin header Origin', () => {
+    expect(origenPermitido(new Request('https://app.nutria.mx/api/v1/admin'))).toBe(true);
+    expect(
+      origenPermitido(
+        new Request('https://app.nutria.mx/api/v1/admin', {
+          headers: { origin: 'https://app.nutria.mx' },
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it('rechaza otro origen aunque sea un subdominio parecido', () => {
+    expect(
+      origenPermitido(
+        new Request('https://app.nutria.mx/api/v1/admin', {
+          headers: { origin: 'https://malicioso.nutria.mx' },
+        }),
+      ),
+    ).toBe(false);
   });
 });
 
@@ -53,7 +77,10 @@ describe('jsonError', () => {
 
 describe('zodDetails', () => {
   it('agrupa los mensajes por campo', () => {
-    const schema = z.object({ email: z.email('Correo inválido.'), edad: z.number().min(18, 'Muy joven.') });
+    const schema = z.object({
+      email: z.email('Correo inválido.'),
+      edad: z.number().min(18, 'Muy joven.'),
+    });
     const resultado = schema.safeParse({ email: 'no-es-correo', edad: 12 });
 
     expect(resultado.success).toBe(false);

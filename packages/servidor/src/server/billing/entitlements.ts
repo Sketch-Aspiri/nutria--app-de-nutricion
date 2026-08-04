@@ -28,16 +28,18 @@ export type EstadoSuscripcionUsuario = {
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
   stripePriceId: string | null;
+  accesoExpira: Date | null;
 };
 
 const SIN_SUSCRIPCION: EstadoSuscripcionUsuario = {
-  plan: 'FREE',
+  plan: 'PRO',
   estado: 'ACTIVE',
   periodoFin: null,
   cancelaAlFinal: false,
   stripeCustomerId: null,
   stripeSubscriptionId: null,
   stripePriceId: null,
+  accesoExpira: null,
 };
 
 function desdeFila(fila: Subscription | null): EstadoSuscripcionUsuario {
@@ -52,6 +54,7 @@ function desdeFila(fila: Subscription | null): EstadoSuscripcionUsuario {
     stripeCustomerId: fila.stripeCustomerId,
     stripeSubscriptionId: fila.stripeSubscriptionId,
     stripePriceId: fila.stripePriceId,
+    accesoExpira: fila.accessExpiresAt,
   };
 }
 

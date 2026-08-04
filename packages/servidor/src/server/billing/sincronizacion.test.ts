@@ -76,12 +76,12 @@ describe('traducirSuscripcion', () => {
     expect(traducirSuscripcion(sub).currentPeriodEnd).toBeNull();
   });
 
-  it('degrada a FREE lo cancelado y lo impago', () => {
+  it('conserva Pro para auditoría aunque el estado retire el acceso', () => {
     expect(traducirSuscripcion(suscripcion({ status: 'canceled' }))).toMatchObject({
-      plan: 'FREE',
+      plan: 'PRO',
       status: 'CANCELED',
     });
-    expect(traducirSuscripcion(suscripcion({ status: 'unpaid' })).plan).toBe('FREE');
+    expect(traducirSuscripcion(suscripcion({ status: 'unpaid' })).plan).toBe('PRO');
   });
 
   it('un precio desconocido y activo no degrada a quien sí está pagando', () => {

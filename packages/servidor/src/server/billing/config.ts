@@ -41,6 +41,14 @@ export function stripeConfigurado(): boolean {
 }
 
 /**
+ * Feature flag comercial separado de las credenciales técnicas de Stripe.
+ * Una llave puede existir para procesar webhooks sin que eso publique Checkout.
+ */
+export function stripeCheckoutHabilitado(): boolean {
+  return process.env.STRIPE_CHECKOUT_ENABLED?.trim() === 'true' && stripeConfigurado();
+}
+
+/**
  * Precios de Stripe por (plan, periodo). Se declaran uno por variable en lugar
  * de un JSON en una sola: así una variable mal puesta rompe un plan y no todos.
  */
@@ -50,10 +58,7 @@ const VARIABLE_DE_PRECIO: Record<string, string> = {
   'CLINICA:MENSUAL': 'STRIPE_PRICE_CLINICA_MENSUAL',
 };
 
-export function priceIdDe(
-  plan: PlanSuscripcion,
-  periodo: PeriodoFacturacion,
-): string | undefined {
+export function priceIdDe(plan: PlanSuscripcion, periodo: PeriodoFacturacion): string | undefined {
   const variable = VARIABLE_DE_PRECIO[`${plan}:${periodo}`];
   return variable ? env(variable) : undefined;
 }

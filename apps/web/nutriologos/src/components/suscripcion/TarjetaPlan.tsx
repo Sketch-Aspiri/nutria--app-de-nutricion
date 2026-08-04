@@ -89,9 +89,7 @@ export function TarjetaPlan({
               : `Contratar ${plan.nombre}`}
           </Btn>
         ) : (
-          <div className="text-xs text-stone-400 text-center py-2">
-            {plan.clave === 'FREE' ? 'Es el plan base de toda cuenta' : 'Próximamente'}
-          </div>
+          <div className="text-xs text-stone-400 text-center py-2">Próximamente</div>
         )}
       </div>
     </div>

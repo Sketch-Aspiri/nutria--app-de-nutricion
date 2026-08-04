@@ -3,6 +3,8 @@ import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import { z } from 'zod';
 
+import { calcularEstadoCuenta, calcularExpiracionInicial } from '@nutria/shared';
+
 import { prisma } from '@/server/db';
 import { avisarAltaAlEquipo } from '@/server/email';
 import { logger } from '@/server/logger';
@@ -76,6 +78,38 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
+  callbacks: {
+    ...authConfig.callbacks,
+    async signIn({ user }) {
+      if (!user.id) return false;
+
+      const usuario = await prisma.user.findFirst({
+        where: { id: user.id, deletedAt: null },
+        select: {
+          role: true,
+          createdAt: true,
+          subscription: { select: { accessExpiresAt: true } },
+        },
+      });
+      if (!usuario) return false;
+
+      let accessExpiresAt = usuario.subscription?.accessExpiresAt;
+      if (usuario.role === 'NUTRITIONIST' && !accessExpiresAt) {
+        await asegurarCuentaNutriologo(
+          user.id,
+          user.name ?? user.email ?? 'Nutriólogo',
+          usuario.createdAt,
+        );
+        accessExpiresAt = calcularExpiracionInicial(usuario.createdAt);
+      }
+
+      user.role = usuario.role;
+      user.cuentaActiva =
+        usuario.role !== 'NUTRITIONIST' ||
+        (accessExpiresAt !== undefined && calcularEstadoCuenta(accessExpiresAt) === 'ACTIVA');
+      return true;
+    },
+  },
   events: {
     /** Alta con Google: el proveedor ya validó el correo. */
     async linkAccount({ user }) {

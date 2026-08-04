@@ -60,7 +60,8 @@ function main(): void {
   present('ENCRYPTION_KEY_ID');
   // Conectar el store desde el panel de Vercel inyecta `KV_REST_API_*`; el
   // limitador acepta los dos juegos de nombres, así que el check también.
-  const redisUrl = process.env.UPSTASH_REDIS_REST_URL?.trim() || process.env.KV_REST_API_URL?.trim();
+  const redisUrl =
+    process.env.UPSTASH_REDIS_REST_URL?.trim() || process.env.KV_REST_API_URL?.trim();
   const redisToken =
     process.env.UPSTASH_REDIS_REST_TOKEN?.trim() || process.env.KV_REST_API_TOKEN?.trim();
   add(
@@ -112,20 +113,37 @@ function main(): void {
   );
 
   if ((process.env.BILLING_MODE ?? 'beta') === 'produccion') {
-    present('STRIPE_SECRET_KEY');
-    present('STRIPE_WEBHOOK_SECRET');
-    present('STRIPE_PRICE_PRO_MENSUAL');
-    present('STRIPE_PRICE_PRO_ANUAL');
-    present('STRIPE_PRICE_CLINICA_MENSUAL');
+    add('Límites reales Pro', true, 'BILLING_MODE=produccion');
+    present('BILLING_CONTACT_EMAIL');
+
+    if (process.env.STRIPE_CHECKOUT_ENABLED?.trim() === 'true') {
+      present('STRIPE_SECRET_KEY');
+      present('STRIPE_WEBHOOK_SECRET');
+      present('STRIPE_PRICE_PRO_MENSUAL');
+      present('STRIPE_PRICE_PRO_ANUAL');
+      present('STRIPE_PRICE_CLINICA_MENSUAL');
+    } else {
+      add(
+        'Checkout Stripe cerrado',
+        true,
+        'STRIPE_CHECKOUT_ENABLED no está en true; renovación manual habilitada',
+      );
+    }
   } else {
-    add('Cobro durante pilotos', true, 'BILLING_MODE=beta; no se cobran suscripciones');
+    add(
+      'Límites reales Pro',
+      false,
+      'configura BILLING_MODE=produccion para aplicar la cuota de 150 IA',
+    );
   }
 
   for (const check of checks) {
     console.info(`${check.ok ? '✓' : '✗'} ${check.name}: ${check.detail}`);
   }
   const failures = checks.filter((check) => !check.ok);
-  console.info(`\nResultado: ${checks.length - failures.length}/${checks.length} controles listos.`);
+  console.info(
+    `\nResultado: ${checks.length - failures.length}/${checks.length} controles listos.`,
+  );
   if (failures.length > 0) process.exitCode = 2;
 }
 
