@@ -23,7 +23,8 @@ import {
  * datos son ficticios.
  */
 
-const LIMITE_FREE = 15;
+// Toda cuenta nueva nace en Pro (fin del plan Free, ver Docs/plan-fin-plan-free-superadmin.md).
+const LIMITE_PRO = 150;
 
 let nutriologa: CuentaPrueba | undefined;
 let pacienteId = '';
@@ -57,26 +58,26 @@ test.afterAll(async () => {
 });
 
 test.describe('Flujo #10 — límite de generaciones de IA', () => {
-  test('la cuota del plan Free se reporta y se agota en el servidor', async ({ page }) => {
+  test('la cuota del plan Pro se reporta y se agota en el servidor', async ({ page }) => {
     test.skip(!nutriologa, 'No se pudo preparar la cuenta de prueba.');
     const cuenta = nutriologa!;
 
     await fijarConsumo(cuenta.id, 0);
     await iniciarSesion(page, cuenta);
 
-    // 1. Con cuota libre, el endpoint reporta el plan Free y su límite.
+    // 1. Con cuota libre, el endpoint reporta el plan Pro y su límite.
     const inicial = await page.request.get('/api/v1/ai/usage');
     expect(inicial.ok()).toBeTruthy();
     expect(await inicial.json()).toMatchObject({
-      plan: 'FREE',
-      limite: LIMITE_FREE,
+      plan: 'PRO',
+      limite: LIMITE_PRO,
       usadas: 0,
-      restantes: LIMITE_FREE,
+      restantes: LIMITE_PRO,
       agotada: false,
     });
 
     // 2. Agotada la cuota, el endpoint lo refleja.
-    await fijarConsumo(cuenta.id, LIMITE_FREE);
+    await fijarConsumo(cuenta.id, LIMITE_PRO);
     const agotada = await page.request.get('/api/v1/ai/usage');
     expect(await agotada.json()).toMatchObject({ restantes: 0, agotada: true });
 
@@ -90,14 +91,14 @@ test.describe('Flujo #10 — límite de generaciones de IA', () => {
     expect(cuerpo.error.message).toContain('Mejora tu plan');
 
     // 4. El rechazo no consume cuota: el contador se queda en el límite.
-    expect(await consumoActual(cuenta.id)).toBe(LIMITE_FREE);
+    expect(await consumoActual(cuenta.id)).toBe(LIMITE_PRO);
   });
 
   test('el límite se aplica aunque el cliente pida streaming', async ({ page }) => {
     test.skip(!nutriologa, 'No se pudo preparar la cuenta de prueba.');
     const cuenta = nutriologa!;
 
-    await fijarConsumo(cuenta.id, LIMITE_FREE);
+    await fijarConsumo(cuenta.id, LIMITE_PRO);
     await iniciarSesion(page, cuenta);
 
     const respuesta = await page.request.post('/api/v1/ai/generate', {
@@ -113,26 +114,26 @@ test.describe('Flujo #10 — límite de generaciones de IA', () => {
     test.skip(!nutriologa, 'No se pudo preparar la cuenta de prueba.');
     const cuenta = nutriologa!;
 
-    await fijarConsumo(cuenta.id, LIMITE_FREE);
+    await fijarConsumo(cuenta.id, LIMITE_PRO);
     await prisma.subscription.update({
       where: { userId: cuenta.id },
-      data: { plan: 'PRO', status: 'ACTIVE' },
+      data: { plan: 'CLINICA', status: 'ACTIVE' },
     });
     await iniciarSesion(page, cuenta);
 
     const respuesta = await page.request.get('/api/v1/ai/usage');
 
     expect(await respuesta.json()).toMatchObject({
-      plan: 'PRO',
-      limite: 150,
-      usadas: LIMITE_FREE,
-      restantes: 135,
+      plan: 'CLINICA',
+      limite: 500,
+      usadas: LIMITE_PRO,
+      restantes: 350,
       agotada: false,
     });
 
     await prisma.subscription.update({
       where: { userId: cuenta.id },
-      data: { plan: 'FREE' },
+      data: { plan: 'PRO' },
     });
   });
 
@@ -141,7 +142,7 @@ test.describe('Flujo #10 — límite de generaciones de IA', () => {
     const otro = await crearNutriologo('ia-limite-b', 'Nutriólogo Cuota B E2E');
 
     try {
-      await fijarConsumo(nutriologa!.id, LIMITE_FREE);
+      await fijarConsumo(nutriologa!.id, LIMITE_PRO);
       await iniciarSesion(page, otro);
 
       const respuesta = await page.request.get('/api/v1/ai/usage');

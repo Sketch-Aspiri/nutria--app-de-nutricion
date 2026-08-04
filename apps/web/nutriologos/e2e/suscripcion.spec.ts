@@ -12,10 +12,16 @@ import {
 /**
  * Flujo E2E #8: suscripción y paywall.
  *
- * Cubre lo que es nuestro: que el cupo del plan Free se aplique **en el
+ * Cubre lo que es nuestro: que el tope de un plan se aplique **en el
  * servidor**, que la UI ofrezca la salida, y que el estado que escribe el
  * webhook (plan Pro, cancelación al fin del periodo) cambie los entitlements de
  * inmediato.
+ *
+ * El plan Free ya no se asigna a ninguna cuenta nueva (toda cuenta nace en Pro,
+ * ver Docs/plan-fin-plan-free-superadmin.md); el enum y su cálculo de
+ * entitlements siguen vivos a propósito (limpieza pendiente), así que algunos
+ * de estos tests siguen forzándolo por Prisma solo para ejercitar ese código,
+ * no porque represente a un usuario real.
  *
  * Lo que no cubre, a propósito: la pasarela de Stripe. El checkout ocurre en un
  * dominio de Stripe y su resultado nos llega como webhook; ese salto se prueba
@@ -80,31 +86,36 @@ test.afterAll(async () => {
 });
 
 test.describe('Flujo #8 — suscripción, cupo del plan y paywall', () => {
-  test('el plan Free reporta su cupo y la página de suscripción lo explica', async ({ page }) => {
+  test('una cuenta Pro reporta su acceso y, sin Stripe configurado, ofrece el contacto de renovación', async ({
+    page,
+  }) => {
     test.skip(!nutriologa, 'No se pudo preparar la cuenta de prueba.');
     const cuenta = nutriologa!;
 
-    await fijarSuscripcion(cuenta.id, { plan: 'FREE', status: 'ACTIVE' });
+    // Cuenta recién creada: ya nace en Pro con acceso vigente (fin del plan
+    // Free, ver Docs/plan-fin-plan-free-superadmin.md), sin tocar `subscription`.
     await iniciarSesion(page, cuenta);
 
     const respuesta = await page.request.get('/api/v1/billing/subscription');
     expect(respuesta.ok()).toBeTruthy();
     expect(await respuesta.json()).toMatchObject({
-      plan: 'FREE',
+      plan: 'PRO',
       modo: 'produccion',
+      pagos_habilitados: false,
       entitlements: {
-        pacientes: { limite: CUPO_FREE, alcanzado: false },
-        ia: { limite: 15 },
-        marca_blanca: false,
+        pacientes: { limite: null, alcanzado: false },
+        ia: { limite: 150 },
+        marca_blanca: true,
       },
     });
 
     await page.goto('/suscripcion');
-    await expect(page.getByRole('heading', { name: 'Suscripción' })).toBeVisible();
-    await expect(page.getByText('Pacientes activos', { exact: true })).toBeVisible();
-    // El catálogo completo se ofrece desde el servidor.
-    await expect(page.getByRole('heading', { name: 'Pro' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Clínica' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Plan y acceso' })).toBeVisible();
+    await expect(page.getByText('Generaciones de IA', { exact: true })).toBeVisible();
+    // Sin `STRIPE_SECRET_KEY` configurada, la página no ofrece checkout: pide
+    // contactar al equipo para renovar (ver `stripeConfigurado()` en config.ts).
+    await expect(page.getByRole('heading', { name: 'Renovación mensual' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Contactar para renovar' })).toBeVisible();
   });
 
   test('al tercer paciente el servidor rechaza el alta con 402 PLAN_LIMIT', async ({ page }) => {
