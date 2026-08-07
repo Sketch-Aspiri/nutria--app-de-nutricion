@@ -12,7 +12,7 @@
     "@nutria/shared": "*",
     "@prisma/client": "^6.19.3",
     "@react-pdf/renderer": "^4.5.1",
-    "@sentry/nextjs": "^10.68.0",
+    "@sentry/nextjs": "^10.69.0",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.0",
     "@vercel/blob": "^2.6.1",

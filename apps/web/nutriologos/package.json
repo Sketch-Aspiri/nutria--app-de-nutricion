@@ -37,7 +37,7 @@
     "@nutria/shared": "*",
     "@nutria/ui-tokens": "*",
     "@prisma/client": "^6.19.3",
-    "@sentry/nextjs": "^10.68.0",
+    "@sentry/nextjs": "^10.69.0",
     "@tanstack/react-query": "^5.62.0",
     "bcryptjs": "^3.0.3",
     "lucide-react": "^0.469.0",
